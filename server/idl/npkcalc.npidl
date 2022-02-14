@@ -1,0 +1,116 @@
+// Copyright (c) 2022 nikitapnn1@gmail.com
+// This file is a part of Nikita's NPK calculator and covered by LICENSING file in the topmost directory
+
+namespace npkcalc {
+
+enum ELEMENT { 
+	N_NO3, N_NH4, P, K, Ca, Mg, S, Cl, Fe, Zn, B, Mn, Cu, Mo, 
+	CO3, _P1, _P2, _P3, _P4, _P5, _P6, _P7, _P8, 
+	H, O, C, NH4, NO3, SO4, H2PO4
+};
+
+Solution: flat {
+	id: u32;
+	name: string;
+	owner: string;
+	elements: float64[14];
+}
+
+enum FertilizerBottle: u8 {
+	BOTTLE_A,
+	BOTTLE_B,
+	BOTTLE_C
+};
+
+enum FertilizerType: u8 {
+	DRY,
+	LIQUID,
+	SOLUTION,
+};
+
+Fertilizer: flat {
+	id: u32;
+	name: string;
+	owner: string;
+	formula: string;
+}
+
+TargetElement : flat {
+	value: float64;
+	value_base: float64;
+	ratio: float64;
+}
+
+Calculation: flat {
+	id: u32;
+	name: string;
+	elements: TargetElement[14];
+	fertilizers_ids: vector<u32>;
+	volume: float64;
+	mode: boolean;
+}
+
+Media: flat {
+	name: string;
+	data: vector<u8>;
+}
+
+enum AuthorizationFailed_Reason: u8 {
+	email_does_not_exist,
+	incorrect_password,
+	session_does_not_exist
+}
+
+AuthorizationFailed: exception {
+	reason: AuthorizationFailed_Reason;
+}
+
+UserData: flat {
+	name: string;
+	session_id: string;
+	db: object; 
+}
+
+SolutionElement: flat {
+	index: u32;
+	value: float64;
+}
+
+interface Authorizator {
+	UserData LogIn(login: in string, password: in string) raises(AuthorizationFailed);
+	UserData LogInWithSessionId(session_id: in string) raises(AuthorizationFailed);
+	boolean LogOut(session_id: in string);
+}
+
+interface RegisteredUser {
+	void GetMyCalculations(calculations: out direct vector<Calculation>);
+	
+	u32 AddSolution(name: in string, elements: in float64[14]);
+	void SetSolutionName(id: in u32, name: in string);
+	void SetSolutionElements(id: in u32, name: in vector<SolutionElement>);
+	void DeleteSolution(id: in u32);
+	
+	u32 AddFertilizer(name: in string, formula: in string);
+	void SetFertilizerName(id: in u32, name: in string);
+	void SetFertilizerFormula(id: in u32, name: in string);
+	void DeleteFertilizer(id: in u32);
+	void SaveData();
+	
+	void Advise(obj: in object);
+}
+
+interface DataObserver {
+	void DataChanged(idx: in u32);
+}
+
+interface Calculator {
+	void GetData(
+		solutions: out direct vector<Solution>,
+		fertilizers: out direct vector<Fertilizer>
+	);
+	void GetImages(
+		images: out direct vector<Media>
+	);
+}
+
+}

@@ -1,0 +1,40 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="src">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="idl">
+      <UniqueIdentifier>{02560279-0439-4415-85aa-d88f333f1bf6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\proxy">
+      <UniqueIdentifier>{86f6dbcb-a089-4e9b-b508-63b1ee5d1813}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\data.hpp">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\npkcalc_m.hpp">
+      <Filter>src\proxy</Filter>
+    </ClInclude>
+    <ClInclude Include="src\npkcalc.hpp">
+      <Filter>src\proxy</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\main.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\npkcalc.cpp">
+      <Filter>src\proxy</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="idl\npkcalc.npidl">
+      <Filter>idl</Filter>
+    </None>
+    <None Include="Makefile" />
+  </ItemGroup>
+</Project>
