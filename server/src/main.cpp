@@ -5,6 +5,7 @@
 #include <string>
 #include <concepts>
 #include <cassert>
+#include <filesystem>
 
 #include <boost/asio/signal_set.hpp>
 #include <boost/beast/core/error.hpp>
@@ -12,6 +13,7 @@
 #include <boost/serialization/set.hpp>
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/archive/text_oarchive.hpp>
+#include <boost/program_options.hpp>
 #include <set>
 
 #include <openssl/sha.h>
@@ -25,28 +27,32 @@ enum class Tables {
 };
 
 class DataManager {
+	const std::string& data_root_dir_;
 public:
-
 	std::mutex mut_solutions;
-	Solutions solutions{"./data/sols.bin"};
-	
+	Solutions solutions;
+
 	std::mutex mut_fertilizers;
-	Fertilizers fertilizers{"./data/ferts.bin"};
-	
+	Fertilizers fertilizers;
+
 	std::vector<npkcalc::Media> icons;
 
 
 	Calculations get_calculations(std::string owner) const noexcept {
-		Calculations calcs{"./data/calculations/" + owner + ".bin"};
+		Calculations calcs{data_root_dir_ + "/calculations/" + owner + ".bin"};
 		calcs.load();
 		return calcs;
 	}
 
 	void save_calculations(const Calculations& calculations, const std::string& owner) const noexcept {
-		calculations.store("./data/calculations/" + owner + ".bin");
+		calculations.store(data_root_dir_ + "/calculations/" + owner + ".bin");
 	}
 
-	DataManager() {
+	DataManager(const std::string& data_root_dir)
+		: data_root_dir_{data_root_dir}
+		, solutions{data_root_dir + "/sols.bin"}
+		, fertilizers{data_root_dir + "/ferts.bin"}
+	{
 		solutions.load();
 		solutions.sort();
 
@@ -54,7 +60,7 @@ public:
 		fertilizers.sort();
 
 		constexpr std::string_view icon_list[] = {"add", "save", "redo", "undo", "gear"};
-		const auto root = std::string("./data/icons/");
+		const auto root = std::string(data_root_dir + "/icons/");
 		const auto svg = std::string(".svg");
 
 		for (auto ic : icon_list) {
@@ -87,7 +93,7 @@ std::vector<npkcalc::DataObserver*> observers;
 class RegisteredUser : public npkcalc::IRegisteredUser_Servant {
 	friend class CalculatorImpl;
 	inline static DataManager* data_manager;
-	
+
 	User& user_data_;
 
 	bool calculations_changed = false;
@@ -103,7 +109,7 @@ public:
 		/*out*/::flat::Vector_Direct2<npkcalc::flat::Calculation, npkcalc::flat::Calculation_Direct> calculations) {
 		npkcalc::helper::assign_GetMyCalculations_calculations(calculations, data_manager->get_calculations(user_data().user_name).data());
 	}
-	
+
 	virtual uint32_t AddSolution(::flat::Span<char> name, ::flat::Span<double> elements) {
 		solutions_changed = true;
 		std::lock_guard<std::mutex> lk(data_manager->mut_solutions);
@@ -138,7 +144,7 @@ public:
 		std::lock_guard<std::mutex> lk(data_manager->mut_solutions);
 		data_manager->solutions.remove_by_id(id);
 	}
-	
+
 	virtual uint32_t AddFertilizer(::flat::Span<char> name, ::flat::Span<char> formula) {
 		fertilizers_changed = true;
 		std::lock_guard<std::mutex> lk(data_manager->mut_fertilizers);
@@ -181,14 +187,14 @@ public:
 		if (data_observer) {
 			data_observer->add_ref();
 			observers.push_back(data_observer);
-//			std::jthread([](npkcalc::DataObserver* data_observer) { 
-//				uint32_t i = 0;
-//				while (true) {
-//					data_observer->DataChanged(i++);
-//					using namespace std::chrono_literals;
-//					std::this_thread::sleep_for(1s);
-//				}
-//				}, data_observer).detach();
+			//			std::jthread([](npkcalc::DataObserver* data_observer) { 
+			//				uint32_t i = 0;
+			//				while (true) {
+			//					data_observer->DataChanged(i++);
+			//					using namespace std::chrono_literals;
+			//					std::this_thread::sleep_for(1s);
+			//				}
+			//				}, data_observer).detach();
 		}
 	}
 
@@ -221,8 +227,8 @@ public:
 class CalculatorImpl : public npkcalc::ICalculator_Servant {
 	std::unique_ptr<DataManager> data_manager;
 public:
-	CalculatorImpl()
-		: data_manager{std::make_unique<DataManager>()}
+	CalculatorImpl(const std::string& data_root_dir)
+		: data_manager{std::make_unique<DataManager>(data_root_dir)}
 	{
 		RegisteredUser::data_manager = data_manager.get();
 	}
@@ -246,6 +252,8 @@ public:
 };
 
 class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
+	const std::string& data_root_dir_;
+
 	struct Session {
 		std::string sid;
 		std::string email;
@@ -349,20 +357,20 @@ public:
 	void load_users() noexcept {
 		//store_users();
 		try {
-			std::ifstream is("./data/users.txt");
+			std::ifstream is(data_root_dir_ + "/users.txt");
 			boost::archive::text_iarchive ar(is, boost::archive::no_header | boost::archive::no_tracking);
 			ar >> users_db_;
 		} catch (std::exception& ex) {
 			std::cerr << ex.what() << '\n';
 		}
 
-//		try {
-//			std::ifstream is("./data/sessions.txt");
-//			boost::archive::text_iarchive ar(is, boost::archive::no_header | boost::archive::no_tracking);
-//			ar >> sessions_;
-//		} catch (std::exception& ex) {
-//			std::cerr << ex.what() << '\n';
-//		}
+		//		try {
+		//			std::ifstream is(data_root_dir_ + "/sessions.txt");
+		//			boost::archive::text_iarchive ar(is, boost::archive::no_header | boost::archive::no_tracking);
+		//			ar >> sessions_;
+		//		} catch (std::exception& ex) {
+		//			std::cerr << ex.what() << '\n';
+		//		}
 
 		std::cout << "Users:\n";
 		for (auto& user : users_db_) {
@@ -374,22 +382,24 @@ public:
 	void store_users() noexcept {
 		//users_db_.emplace_back(std::make_unique<User>("admin@npkcalc.com", sha256("1"), "Admin"));
 		try {
-			std::ofstream ofs("./data/users.txt");
+			std::ofstream ofs(data_root_dir_ + "/users.txt");
 			boost::archive::text_oarchive ar(ofs, boost::archive::no_header | boost::archive::no_tracking);
 			ar << users_db_;
 		} catch (std::exception& ex) {
 			std::cerr << ex.what() << '\n';
 		}
-//		try {
-//			std::ofstream ofs("./data/sessions.txt");
-//			boost::archive::text_oarchive ar(ofs, boost::archive::no_header | boost::archive::no_tracking);
-//			ar << sessions_;
-//		} catch (std::exception& ex) {
-//			std::cerr << ex.what() << '\n';
-//		}
+		//		try {
+		//			std::ofstream ofs(data_root_dir_ + "/sessions.txt");
+		//			boost::archive::text_oarchive ar(ofs, boost::archive::no_header | boost::archive::no_tracking);
+		//			ar << sessions_;
+		//		} catch (std::exception& ex) {
+		//			std::cerr << ex.what() << '\n';
+		//		}
 	}
 
-	AuthorizatorImpl(nprpc::Rpc* rpc) {
+	AuthorizatorImpl(nprpc::Rpc* rpc, const std::string& data_root_dir)
+		: data_root_dir_(data_root_dir)
+	{
 		assert(rpc);
 		load_users();
 		auto policy = std::make_unique<nprpc::Policy_Lifespan>(nprpc::Policy_Lifespan::Transient);
@@ -398,6 +408,33 @@ public:
 };
 
 int main(int argc, char* argv[]) {
+	namespace po = boost::program_options;
+	namespace fs = std::filesystem;
+
+	std::string http_root;
+	std::string data_root;
+
+	po::options_description desc("Allowed options");
+	desc.add_options()
+		("help", "produce help message")
+		("root_dir", po::value<std::string>(&http_root)->
+			default_value("\\\\wsl$\\Debian\\home\\png\\projects\\npk-calculator\\client\\public"), "HTTP root directory")
+		("data_dir", po::value<std::string>(&data_root)->default_value("./data"), "Data root directory")
+		;
+
+	try {
+		po::variables_map vm;
+		po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
+		po::notify(vm);
+		if (vm.count("help")) {
+			std::cout << desc << "\n";
+			return 0;
+		}
+	} catch (po::unknown_option& e) {
+		std::cerr << e.what();
+		return -1;
+	}
+
 	boost::asio::io_context ioc;
 	// Capture SIGINT and SIGTERM to perform a clean shutdown
 	boost::asio::signal_set signals(ioc, SIGINT, SIGTERM);
@@ -407,16 +444,16 @@ int main(int argc, char* argv[]) {
 		rpc_cfg.debug_level = nprpc::DebugLevel::DebugLevel_Critical;
 		rpc_cfg.port = 52244;
 		rpc_cfg.websocket_port = 80;
-		rpc_cfg.http_root_dir = "\\\\wsl$\\Debian\\home\\png\\projects\\npk-calculator\\client\\public";
-		
+		rpc_cfg.http_root_dir = http_root;
+
 		auto rpc = nprpc::init(ioc, std::move(rpc_cfg));
 
 		// static poa
 		auto policy = std::make_unique<nprpc::Policy_Lifespan>(nprpc::Policy_Lifespan::Persistent);
 		auto poa = rpc->create_poa(2, {policy.get()});
 
-		CalculatorImpl calc;
-		AuthorizatorImpl autorizator(rpc);
+		CalculatorImpl calc{data_root};
+		AuthorizatorImpl autorizator(rpc, data_root);
 
 		auto oid_calculator = poa->activate_object(&calc);
 		auto oid_authorizator = poa->activate_object(&autorizator);
