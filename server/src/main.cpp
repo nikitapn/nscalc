@@ -413,6 +413,7 @@ int main(int argc, char* argv[]) {
 
 	std::string http_root;
 	std::string data_root;
+	unsigned short port;
 
 	po::options_description desc("Allowed options");
 	desc.add_options()
@@ -420,6 +421,7 @@ int main(int argc, char* argv[]) {
 		("root_dir", po::value<std::string>(&http_root)->
 			default_value("\\\\wsl$\\Debian\\home\\png\\projects\\npk-calculator\\client\\public"), "HTTP root directory")
 		("data_dir", po::value<std::string>(&data_root)->default_value("./data"), "Data root directory")
+		("port", po::value<unsigned short>(&port)->default_value(33252), "Port to listen")
 		;
 
 	try {
@@ -443,7 +445,7 @@ int main(int argc, char* argv[]) {
 		nprpc::Config rpc_cfg;
 		rpc_cfg.debug_level = nprpc::DebugLevel::DebugLevel_Critical;
 		rpc_cfg.port = 52244;
-		rpc_cfg.websocket_port = 80;
+		rpc_cfg.websocket_port = port;
 		rpc_cfg.http_root_dir = http_root;
 
 		auto rpc = nprpc::init(ioc, std::move(rpc_cfg));
