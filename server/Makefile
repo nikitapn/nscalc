@@ -1,16 +1,19 @@
 TARGET = linux/bin/npk-calculator
 CXX = g++
 CXXVER = -std=c++20
-CXXFLAGS = $(CXXVER) -Wall -ftemplate-backtrace-limit=0 -O2 -Winvalid-pch
+CXXFLAGS = $(CXXVER) -Wall -ftemplate-backtrace-limit=0 -O2 -Winvalid-pch -I/usr/local/include
 
 SRCS = $(shell find src/ -name '*.cpp')
 OBJS = $(addprefix linux/obj/,$(addsuffix .o, $(basename $(notdir $(SRCS)))))
 
-LIBS_PATH = 
+LIBS_PATH = -L/usr/local/lib
 LIBS = \
 	-lboost_serialization \
 	-lstdc++fs \
-	-lpthread
+	-lpthread \
+	-lnprpc \
+	-lcrypto \
+	-lboost_program_options
 	
 $(TARGET): $(OBJS) | bin
 	$(CXX) $(OBJS) $(LIBS_PATH) $(LIBS) -o $(TARGET)
@@ -31,4 +34,4 @@ clean:
 	rm -rf ./linux/obj
 	rm -f $(TARGET)
 
-.PHONY: all install clean
+.PHONY: install clean
