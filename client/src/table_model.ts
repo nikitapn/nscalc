@@ -68,14 +68,14 @@ export function TableModelWithCommands<T extends TableItem>(unused: { new(is_new
 	return class extends TableModel(UndoRedo, unused) {
 
 		add_new_row<U extends TableItem>(item: U): void {
-			this.add_comand(
+			this.add_command(
 				new Command_AddTableItem(item, this.items, this.table_index, item)
 			);
 		}
 
 		erase(item: T): void {
 			let index = this.items.indexOf(item);
-			this.add_comand(
+			this.add_command(
 				new Command_RemoveTableItem(index, this.items, this.table_index, item.get_id())
 			);
 		}

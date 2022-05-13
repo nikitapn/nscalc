@@ -1,3 +1,6 @@
+// Copyright (c) 2022 nikitapnn1@gmail.com
+// This file is a part of Nikita's NPK calculator and covered by LICENSING file in the topmost directory
+
 #pragma once
 
 #include <iostream>
@@ -6,13 +9,10 @@
 #include <vector>
 #include <array>
 #include <algorithm>
-// Copyright (c) 2022 nikitapnn1@gmail.com
-// This file is a part of Nikita's NPK calculator and covered by LICENSING file in the topmost directory
-
 #include <optional>
 #include <fstream>
 #include <numeric>
-#include <assert.h>
+#include <cassert>
 
 #include <boost/asio/io_context.hpp>
 #include <boost/archive/binary_iarchive.hpp>

@@ -1,15 +1,23 @@
 {
-    "compilerOptions": {
+	"compilerOptions": {
 		"esModuleInterop": true,
 		"experimentalDecorators": true,
-        "outDir": "build",
-        "sourceMap": true,
-        "noImplicitAny": true,
-        "module": "commonjs",
-        "target": "esnext",
-        "jsx": "react",
-		"typeRoots": [ "./node_modules/@types", "./types" ]
-    },
-    "include": [ "./src/**/*" ],
-    "exclude": ["node_modules", "typings"]
+		"outDir": "build",
+		"sourceMap": true,
+		"noImplicitAny": true,
+		"module": "commonjs",
+		"target": "esnext",
+		"jsx": "react",
+		"typeRoots": [
+			"./node_modules/@types",
+			"./types"
+		]
+	},
+	"include": [
+		"./src/**/*"
+	],
+	"exclude": [
+		"node_modules",
+		"typings"
+	]
 }

@@ -12,7 +12,9 @@ import { observer } from 'mobx-react'
 import { store, Tables } from './store'
 import * as Calculation from './calculation'
 import {calculations} from './store_calculations'
-
+import {Command_RemoveElementFromArray} from './command'
+import { confirmAlert } from 'react-confirm-alert';
+import 'react-confirm-alert/src/react-confirm-alert.css';
 
 @observer
 class Element extends React.Component<{
@@ -355,7 +357,6 @@ class View_Calculation extends View {
 	componentWillUnmount() {
 		this.watch();
 		this.watch_volume();
-		calculations.erase_by_id(this.props.data.get_id());
 	}
 
 	onKeyDown = function(event: KeyboardEvent) {
@@ -397,6 +398,7 @@ export class View_Calculator extends View {
 	tab_pane: React.RefObject<TabPane>;
 	undo_btn: React.RefObject<UndoButton>;
 	redo_btn: React.RefObject<RedoButton>;
+	current_calc: Calculation.Calculation;
 
 	constructor(props: any) {
 		super(props);
@@ -440,11 +442,43 @@ export class View_Calculator extends View {
 		if (data === -1) {
 			this.undo_btn.current.setState({storage: undefined});
 			this.redo_btn.current.setState({storage: undefined});
+			this.current_calc = null;
 		} else {
-			let calc = data as Calculation.Calculation;
-			this.undo_btn.current.setState({storage: calc.commands});
-			this.redo_btn.current.setState({storage: calc.commands});
+			this.current_calc = data as Calculation.Calculation;
+			this.undo_btn.current.setState({storage: this.current_calc.commands});
+			this.redo_btn.current.setState({storage: this.current_calc.commands});
 		}
+	}
+
+	handle_tab_closed(view: View, idx: number) {
+		confirmAlert({
+			title: "Confirm to submit",
+			message: "Are you sure to delete this calculation\"" + view.props.data.get_name() + "\"?",
+			buttons: [
+				{
+					label: "Yes",
+					onClick: () => {
+						calculations.delete_calculation(view.props.data);
+						this.tab_pane.current.remove_view(idx);
+					}
+				},
+				{
+					label: "No",
+					onClick: null
+				}
+			],
+			childrenElement: () => <div />,
+			closeOnEscape: true,
+			closeOnClickOutside: true,
+			overlayClassName: "overlay-custom-class-name"
+		});
+
+		return false;
+	}
+
+	handle_save_calculation() {
+		if (!this.current_calc) return;
+		calculations.save_calculation(this.current_calc);
 	}
 
 	paint() {
@@ -453,12 +487,15 @@ export class View_Calculator extends View {
 			<div className="toolbar-pane"> 
 				<div className="toolbar"> 
 					<img src={global.icons.add} className="toolbar-btn" onClick={this.create_new_calculation.bind(this)} />
-					<SaveButtonCustom save={calculations.store.bind(calculations)}/>
+					<SaveButtonCustom save={this.handle_save_calculation.bind(this)}/>
 					<UndoButton ref={this.undo_btn}/>
 					<RedoButton ref={this.redo_btn}/>
 				</div>
 			</div>
-			<TabPane menu_className="tab-calc" ref={this.tab_pane} dynamic={true} editable={true} notify_tab_selected={this.handle_tab_selected.bind(this)} />
+			<TabPane menu_className="tab-calc" ref={this.tab_pane} dynamic={true} editable={true} 
+				notify_tab_selected={this.handle_tab_selected.bind(this)} 
+				notify_before_closing={this.handle_tab_closed.bind(this)}
+				/>
 		</div>);
 	}
 }

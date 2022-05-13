@@ -17,7 +17,7 @@ import global from './global'
 import {MyIcons} from './global'
 import * as utils from './utils'
 import { fetch_user_data } from './store_calculations'
-import {calculator, authorizator} from './rpc'
+import {calculator, authorizator, init_object} from './rpc'
 
 class App extends TabPane {
 	constructor(props:any) {
@@ -60,16 +60,16 @@ class App extends TabPane {
 	}
 }
 
-async function ping() {
+//async function ping() {
 //	await obj.Ping();
 //	console.log("ping");
 //	setTimeout(ping, 5000);
-}
+//}
 
 async function fetch_data() {
 	let solutions = NPRPC.make_ref<NPRPC.Flat.Vector_Direct2<npkcalc.Flat_npkcalc.Solution_Direct>>();
 	let fertilizers = NPRPC.make_ref<NPRPC.Flat.Vector_Direct2<npkcalc.Flat_npkcalc.Fertilizer_Direct>>();
-	let t0 = performance.now()
+	// let t0 = performance.now()
 
 	try {
 		await (global.icons as MyIcons).fetch(calculator);
@@ -89,11 +89,9 @@ async function fetch_data() {
 	} catch (e) {
 		console.log(e);
 	}
-
-	let t1 = performance.now();
-	console.log("Call to RPC took " + (t1 - t0) + " milliseconds.");
-
-	//	setTimeout(ping, 5000);
+	// let t1 = performance.now();
+	// console.log("Call to RPC took " + (t1 - t0) + " milliseconds.");
+  // setTimeout(ping, 5000);
 }
 
 let root = document.getElementById('root') as HTMLDivElement;
@@ -109,8 +107,9 @@ root.addEventListener("ce_data_recieved", () => {
 });
 
 async function auth() {
+	await init_object();
 	let session_id = utils.getCookie("sid");
-	if (session_id) {
+	if (session_id != null) {
 		try { set_user_data(await authorizator.LogInWithSessionId(session_id), false); } catch(e) {}
 	}
 	fetch_data();

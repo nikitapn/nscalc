@@ -96,6 +96,9 @@ interface RegisteredUser {
 	void DeleteFertilizer(id: in u32);
 	void SaveData();
 	
+	u32 UpdateCalculation(calculation: in Calculation);
+	void DeleteCalculation(id: in u32);
+	
 	void Advise(obj: in object);
 }
 

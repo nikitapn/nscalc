@@ -3,18 +3,18 @@
 
 import * as npkcalc from './npkcalc'
 import * as NPRPC from './nprpc';
-import { observable } from 'mobx'
+import { observable, computed } from 'mobx'
 
 export class UserData {
 	@observable user: string;
+	@computed get is_guest() { return this.user == "Guest" }
 	email: string;
-	guest: boolean;
+	
 	reg_user: npkcalc.RegisteredUser;
 	
 	constructor() {
 		this.user = "Guest";
 		this.email = "";
-		this.guest = true;
 	}
 }
 

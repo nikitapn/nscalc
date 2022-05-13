@@ -8,20 +8,28 @@ import global from './global'
 NPRPC.set_debug_level(NPRPC.DebugLevel.DebugLevel_EveryCall);
 let rpc = NPRPC.init();
 
-export let poa =rpc.create_poa(10);
+export let poa = rpc.create_poa(10);
 
 export let calculator = new npkcalc.Calculator();
-calculator.data.ip4 = 0x7F000001;
+
 calculator.data.port = 0;
-calculator.data.websocket_port = 80;
 calculator.data.object_id = 0n;
 calculator.data.poa_idx = 0;
 
 export let authorizator = new npkcalc.Authorizator();
-authorizator.data.ip4 = 0x7F000001;
+
 authorizator.data.port = 0;
-authorizator.data.websocket_port = 80;
 authorizator.data.object_id = 1n;
 authorizator.data.poa_idx = 0;
 
 global.authorizator = authorizator;
+
+export const init_object = async (): Promise<void> => {
+	let info = await NPRPC.read_host();
+
+	calculator.data.ip4 = info.ip;
+	calculator.data.websocket_port = info.port;
+
+	authorizator.data.ip4 = info.ip;
+	authorizator.data.websocket_port = info.port;
+}

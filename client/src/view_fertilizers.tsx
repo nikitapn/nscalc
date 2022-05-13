@@ -105,7 +105,7 @@ class Row extends React.Component<{
 			item.accumulate(sbs);
 			this.set_edit_mode(false);
 			let fun =  (x: any) => item.parse_formula();
-			store.fertilizers.add_comand(
+			store.fertilizers.add_command(
 				item.is_new ?
 				new Command_ValueChangedUpdateDependValue(item.formula, formula, this.formula_text_old, fun) :
 				new Command_FertilizerFormulaChanged(item.formula, formula, this.formula_text_old, item, fun)
@@ -251,10 +251,9 @@ class Table extends React.Component<{
 	}
 
 	render() {
+		const paddingLastRow = { paddingBottom: '25px' };
 		let count = 0;
-		const paddingLastRow = {
-			paddingBottom: '25px'
-		};
+		
 		return (<div>
 			<ContextMenu id="cm_1">
 				<MenuItem onClick={this.handleMenu_Edit.bind(this)}>Edit</MenuItem>
@@ -265,7 +264,7 @@ class Table extends React.Component<{
 
 			<div className="toolbar-pane"> 
 				<div className="toolbar"> 
-					<img src={global.icons.add} className={"toolbar-btn" + (global.user_data.guest ? " toolbar-btn-disabled" : "")}
+					<img src={global.icons.add} className={"toolbar-btn" + (global.user_data.is_guest ? " toolbar-btn-disabled" : "")}
 					onClick={() => store.fertilizers.add_new_row<che.Fertilizer>(che.Fertilizer.create())} />
 					<SaveButton storage={store.fertilizers} save={store.fertilizers.store.bind(store.fertilizers)}/>
 					<UndoButton storage={store.fertilizers} />

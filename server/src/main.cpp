@@ -94,12 +94,13 @@ class RegisteredUser : public npkcalc::IRegisteredUser_Servant {
 	friend class CalculatorImpl;
 	inline static DataManager* data_manager;
 
-	User& user_data_;
+	const User& user_data_;
 
 	bool calculations_changed = false;
 	bool solutions_changed = false;
 	bool fertilizers_changed = false;
 
+	Calculations calculations;
 public:
 	const User& user_data() const noexcept {
 		return user_data_;
@@ -107,7 +108,7 @@ public:
 
 	virtual void GetMyCalculations(
 		/*out*/::flat::Vector_Direct2<npkcalc::flat::Calculation, npkcalc::flat::Calculation_Direct> calculations) {
-		npkcalc::helper::assign_GetMyCalculations_calculations(calculations, data_manager->get_calculations(user_data().user_name).data());
+		npkcalc::helper::assign_from_cpp_GetMyCalculations_calculations(calculations, this->calculations.data());
 	}
 
 	virtual uint32_t AddSolution(::flat::Span<char> name, ::flat::Span<double> elements) {
@@ -182,7 +183,7 @@ public:
 	}
 
 	virtual void Advise(nprpc::Object* obj) {
-		std::cerr << "Advise():\n" << *obj << '\n';
+		// std::cerr << "Advise():\n" << *obj << '\n';
 		auto data_observer = nprpc::narrow<npkcalc::DataObserver>(obj);
 		if (data_observer) {
 			data_observer->add_ref();
@@ -199,7 +200,7 @@ public:
 	}
 
 	virtual void SaveData() {
-		std::cerr << "SaveData() solutions_changed: " << solutions_changed << ", fertilizers_changed: " << fertilizers_changed << '\n';
+		// std::cerr << "SaveData() solutions_changed: " << solutions_changed << ", fertilizers_changed: " << fertilizers_changed << '\n';
 
 		if (solutions_changed) {
 			std::lock_guard<std::mutex> lk(data_manager->mut_solutions);
@@ -214,13 +215,34 @@ public:
 		}
 	}
 
-	RegisteredUser(User& user_data)
-		: user_data_(user_data)
+	virtual uint32_t UpdateCalculation(npkcalc::flat::Calculation_Direct calculation) {
+		uint32_t id = calculation.id();
+		npkcalc::Calculation* calc = calculations.get_by_id(id);
+
+		if (!calc) {
+			calc = calculations.create();
+			id = calculation.id() = calc->id;
+		}
+
+		npkcalc::helper::assign_from_flat_UpdateCalculation_calculation(calculation, *calc);
+		data_manager->save_calculations(calculations, user_data().user_name);
+		
+		return id;
+	}
+
+	virtual void DeleteCalculation(uint32_t id) {
+		calculations.remove_by_id(id);
+		data_manager->save_calculations(calculations, user_data().user_name);
+	}
+
+	RegisteredUser(const User& _user_data)
+		: user_data_(_user_data)
+		, calculations(data_manager->get_calculations(_user_data.user_name))
 	{
 	}
 
 	~RegisteredUser() {
-		std::cerr << "~RegisteredUser()\n";
+		// std::cerr << "~RegisteredUser()\n";
 	}
 };
 
@@ -238,16 +260,16 @@ public:
 		/*out*/::flat::Vector_Direct2<npkcalc::flat::Fertilizer, npkcalc::flat::Fertilizer_Direct> fertilizers)
 	{
 		const auto& sols = data_manager->solutions.data();
-		npkcalc::helper::assign_GetData_solutions(solutions, sols);
+		npkcalc::helper::assign_from_cpp_GetData_solutions(solutions, sols);
 
 		const auto& ferts = data_manager->fertilizers.data();
-		npkcalc::helper::assign_GetData_fertilizers(fertilizers, ferts);
+		npkcalc::helper::assign_from_cpp_GetData_fertilizers(fertilizers, ferts);
 	}
 
 	virtual void GetImages(
 		/*out*/::flat::Vector_Direct2<npkcalc::flat::Media, npkcalc::flat::Media_Direct> images)
 	{
-		npkcalc::helper::assign_GetImages_images(images, data_manager->icons);
+		npkcalc::helper::assign_from_cpp_GetImages_images(images, data_manager->icons);
 	}
 };
 
@@ -438,9 +460,11 @@ int main(int argc, char* argv[]) {
 	}
 
 	boost::asio::io_context ioc;
+	
 	// Capture SIGINT and SIGTERM to perform a clean shutdown
 	boost::asio::signal_set signals(ioc, SIGINT, SIGTERM);
 	signals.async_wait([&](boost::beast::error_code const&, int) { ioc.stop(); });
+	
 	try {
 		nprpc::Config rpc_cfg;
 		rpc_cfg.debug_level = nprpc::DebugLevel::DebugLevel_Critical;

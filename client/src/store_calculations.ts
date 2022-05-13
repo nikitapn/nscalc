@@ -7,14 +7,13 @@ import * as NPRPC from './nprpc';
 import * as npkcalc from './npkcalc'
 import { TableModel } from './table_item'
 import { poa } from './rpc'
+import { TableModelWithCommands } from './table_model';
 
 class Table_Calculations extends TableModel(class {}, Calculation.Calculation) {
 	constructor() {
 		super();
 	}
-	store() {
-//		networking.send(new Array<IMyEvent>(new Event_UserSavesCalculations(this.items)));
-	}
+
 	private get_new_id() {
 		let id = 0;
 		for (let calc of this.items) {
@@ -29,14 +28,36 @@ class Table_Calculations extends TableModel(class {}, Calculation.Calculation) {
 		this.items.push(calc);
 		return calc;
 	}
+
+	public save_calculation(calc: Calculation.Calculation) {
+		global.user_data.reg_user.UpdateCalculation({	
+				id: calc.get_id(),
+				name: calc.get_name(),
+				elements: calc.elements.map(x => { return {
+						value: x.value,
+						value_base: x.value_base,
+						ratio: x.ratio
+					}}),
+				fertilizers_ids: calc.ferts.map( x => { return x.get_id() }),
+				volume: calc.volume.mx_value,
+				mode: calc.mode,
+			}
+		).then(id => calc.set_id(id))
+		.catch(e => { console.log("save_calculation failed: " + e) });
+	}
+
+	public delete_calculation(calc: Calculation.Calculation) {
+		const [id, is_new] = [calc.get_id(), calc.is_new];
+		calculations.erase_by_id(id);
+		if (is_new) global.user_data.reg_user.DeleteCalculation(id);
+	}
 }
 
 export let calculations = new Table_Calculations();
 
-
 class DataObserverImpl extends npkcalc._IDataObserver_Servant implements npkcalc.IDataObserver_Servant {
 	DataChanged(idx: number): void {
-		console.log("DataObserverImpl(): " + idx.toString());
+		// console.log("DataObserverImpl(): " + idx.toString());
 	}
 }
 

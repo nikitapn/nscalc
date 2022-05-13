@@ -154,7 +154,7 @@ export class MobXInput<T extends MobXValue<any>, CustomProp = any> extends React
 	record_changes(value: string) : void {
 		if (this.is_pending_commands()) return;
 		let new_value = value;
-		this.props.storage.add_comand(
+		this.props.storage.add_command(
 			new Command_ValueChanged(this.props.object, new_value, this.old_value) 
 		);
 	}
@@ -186,7 +186,7 @@ export class MobXInputTableFloat<T extends MobXValue<number>, CustomProp> extend
 		
 		if (value === "." || value === "0." || isNaN(result)) result = value;
 	
-		this.props.storage.add_comand(
+		this.props.storage.add_command(
 			new Command_ValueChanged(this.props.object, result, this.old_value) 
 		);
 	}
@@ -203,7 +203,7 @@ export class MobXInputTableItemName extends MobXInput<TableItem> {
 	}
 	record_changes(new_value: string) : void {
 		if (this.is_pending_commands()) return;
-		this.props.storage.add_comand(
+		this.props.storage.add_command(
 			this.props.object.is_new ?
 			new Command_ValueChanged(this.props.object, new_value, this.old_value) :
 			new Command_TableItemNameChanged(this.props.object, new_value, this.old_value, this.props.custom, this.props.object.get_id())

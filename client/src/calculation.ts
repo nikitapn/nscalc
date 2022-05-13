@@ -11,7 +11,7 @@ import * as NPKCalc from './npkcalc'
 
 export class TargetElement {
 	private value_: MobXValue<number>;
-	private value_base_: number;
+	value_base: number;
 	ratio: number;
 
 	value_minus_water: number;
@@ -21,26 +21,14 @@ export class TargetElement {
 	constructor() {
 		this.value_ = new MobXValue<number>();
 	}
-
-	//	deserialize(ar: iarchive) {
-	//		this.value_.mx_value = ar.get_double();
-	//		this.value_base_ = ar.get_double();
-	//		this.ratio = ar.get_double();
-	//	}
-	//
-	//	serialize(ar: oarchive) {
-	//		ar.set_double(this.value_.mx_value);
-	//		ar.set_double(this.value_base_);
-	//		ar.set_double(this.ratio);
-	//	}
-
+	
 	get mx() {
 		return this.value_;
 	}
 
 
 	set_value(x: number): void {
-		this.value_.mx_value = this.value_base_ = x;
+		this.value_.mx_value = this.value_base = x;
 	}
 
 	@computed
@@ -49,11 +37,11 @@ export class TargetElement {
 	}
 
 	public set_base_value() {
-		this.value_base_ = this.value_.mx_value;
+		this.value_base = this.value_.mx_value;
 	}
 
 	from_percent(x: number) {
-		this.value_.mx_value = this.value_base_ * x;
+		this.value_.mx_value = this.value_base * x;
 	}
 }
 

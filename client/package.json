@@ -2,47 +2,35 @@
   "name": "calculator",
   "version": "1.0.0",
   "main": "index.tsx",
+  "description": "Hydroponics nutrient calculator",
   "scripts": {
-    "debug": "webpack --env NODE_ENV=true --config webpack.config.js",
-    "release": "webpack --env NODE_ENV=true --env production=true --config webpack.config.js",
-    "release-server": "webpack --env NODE_ENV=true --env production=true --env server==true --config webpack.config.js",
-    "release2": "webpack --config webpack.config2.js"
+    "dev": "webpack --env NODE_ENV=true --config webpack.config.js",
+    "build": "webpack --env NODE_ENV=true --env production=true --config webpack.config.js"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "nikitapnn1@gmail.com",
+  "license": "GPL-3.0",
   "dependencies": {
-    "@types/node": "^13.13.40",
-    "@types/react": "^16.14.2",
-    "@types/react-dom": "^16.9.10",
-    "awesome-typescript-loader": "^5.2.1",
-    "babel-cli": "^6.26.0",
-    "babel-preset-env": "^1.7.0",
-    "babel-preset-react": "^6.24.1",
-    "babel-preset-react-app": "^3.1.2",
-    "babelify": "^10.0.0",
-    "css-loader": "^3.6.0",
-    "jison": "^0.4.18",
     "mobx": "^5.15.7",
     "mobx-react": "^6.3.1",
     "react": "^16.14.0",
+    "react-confirm-alert": "^2.8.0",
     "react-contextmenu": "^2.14.0",
-    "react-dom": "^16.14.0",
-    "source-map-loader": "^0.2.4",
-    "style-loader": "^1.3.0",
-    "typescript": "^3.9.7"
+    "react-dom": "^16.14.0"
   },
   "devDependencies": {
-    "@babel/cli": "^7.12.10",
-    "@babel/core": "^7.12.10",
-    "@babel/preset-env": "^7.12.11",
-    "javascript-obfuscator": "^2.18.1",
+    "@types/node": "^13.13.40",
+    "@types/react": "^16.14.2",
+    "@types/react-dom": "^16.9.10",
+    "css-loader": "^3.6.0",
+    "jison": "^0.4.18",
     "script-loader": "^0.7.2",
+    "source-map-loader": "^0.2.4",
+    "style-loader": "^1.3.0",
     "terser-webpack-plugin": "^2.3.8",
-    "uglifyjs-webpack-plugin": "^1.1.2",
+    "ts-loader": "^9.3.0",
+    "typescript": "^3.9.7",
     "webpack": "^5.48.0",
-    "webpack-cli": "^4.7.2",
-    "webpack-obfuscator": "^3.4.0"
-  },
-  "description": ""
+    "webpack-cli": "^4.7.2"
+  }
 }

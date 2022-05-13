@@ -16,7 +16,7 @@ export interface IServerCommand {
 }
 
 export class Command_RemoveElementFromArray implements ICommand {
-	private readonly index: number;
+	protected readonly index: number;
 	private array: Array<any>;
 	private removed: any;
 
@@ -33,9 +33,7 @@ export class Command_RemoveElementFromArray implements ICommand {
 		this.array.splice(this.index, 0, this.removed);
 	}
 
-	commit(): void {
-
-	}
+	commit(): void {}
 }
 
 export class Command_AddElementToArray implements ICommand {
@@ -117,7 +115,7 @@ export class UndoRedo {
 		this.commands = new Array<ICommand>();
 	}
 
-	public add_comand(command: ICommand): void {
+	public add_command(command: ICommand): void {
 		if (this.pos + 1 !== this.commands.length) {
 			this.commands.splice(this.pos + 1, this.commands.length - this.pos - 1);
 		}

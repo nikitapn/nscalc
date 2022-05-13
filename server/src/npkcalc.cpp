@@ -464,6 +464,67 @@ void npkcalc::RegisteredUser::SaveData() {
   }
 }
 
+uint32_t npkcalc::RegisteredUser::UpdateCalculation(/*in*/const npkcalc::Calculation& calculation) {
+  boost::beast::flat_buffer buf;
+  {
+    auto mb = buf.prepare(536);
+    buf.commit(408);
+    static_cast<::nprpc::impl::Header*>(mb.data())->msg_id = ::nprpc::impl::MessageId::FunctionCall;
+    static_cast<::nprpc::impl::Header*>(mb.data())->msg_type = ::nprpc::impl::MessageType::Request;
+  }
+  ::nprpc::impl::flat::CallHeader_Direct __ch(buf, sizeof(::nprpc::impl::Header));
+  __ch.object_id() = this->_data().object_id;
+  __ch.poa_idx() = this->_data().poa_idx;
+  __ch.interface_idx() = interface_idx_;
+  __ch.function_idx() = 10;
+  ::flat::npkcalc_M10_Direct _(buf,32);
+  _._1().id() = calculation.id;
+  _._1().name(calculation.name);
+  memcpy(_._1().elements().data(), calculation.elements.data(), calculation.elements.size() * 24);
+  _._1().fertilizers_ids(calculation.fertilizers_ids.size());
+  memcpy(_._1().fertilizers_ids().data(), calculation.fertilizers_ids.data(), calculation.fertilizers_ids.size() * 4);
+  _._1().volume() = calculation.volume;
+  _._1().mode() = calculation.mode;
+  static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
+  ::nprpc::impl::g_orb->call(
+    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
+  );
+  auto std_reply = nprpc::impl::handle_standart_reply(buf);
+  if (std_reply != -1) {
+    std::cerr << "received an unusual reply for function with output arguments\n";
+    throw nprpc::Exception("Unknown Error");
+  }
+  ::flat::npkcalc_M7_Direct out(buf, sizeof(::nprpc::impl::Header));
+  uint32_t __ret_value;
+  __ret_value = out._1();
+  return __ret_value;
+}
+
+void npkcalc::RegisteredUser::DeleteCalculation(/*in*/uint32_t id) {
+  boost::beast::flat_buffer buf;
+  {
+    auto mb = buf.prepare(36);
+    buf.commit(36);
+    static_cast<::nprpc::impl::Header*>(mb.data())->msg_id = ::nprpc::impl::MessageId::FunctionCall;
+    static_cast<::nprpc::impl::Header*>(mb.data())->msg_type = ::nprpc::impl::MessageType::Request;
+  }
+  ::nprpc::impl::flat::CallHeader_Direct __ch(buf, sizeof(::nprpc::impl::Header));
+  __ch.object_id() = this->_data().object_id;
+  __ch.poa_idx() = this->_data().poa_idx;
+  __ch.interface_idx() = interface_idx_;
+  __ch.function_idx() = 11;
+  ::flat::npkcalc_M7_Direct _(buf,32);
+  _._1() = id;
+  static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
+  ::nprpc::impl::g_orb->call(
+    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
+  );
+  auto std_reply = nprpc::impl::handle_standart_reply(buf);
+  if (std_reply != 0) {
+    std::cerr << "received an unusual reply for function with no output arguments\n";
+  }
+}
+
 void npkcalc::RegisteredUser::Advise(/*in*/const ObjectId& obj) {
   boost::beast::flat_buffer buf;
   {
@@ -476,8 +537,8 @@ void npkcalc::RegisteredUser::Advise(/*in*/const ObjectId& obj) {
   __ch.object_id() = this->_data().object_id;
   __ch.poa_idx() = this->_data().poa_idx;
   __ch.interface_idx() = interface_idx_;
-  __ch.function_idx() = 10;
-  ::flat::npkcalc_M10_Direct _(buf,32);
+  __ch.function_idx() = 12;
+  ::flat::npkcalc_M11_Direct _(buf,32);
   memcpy(_._1().__data(), &obj._data(), 24);
   _._1().class_id(obj._data().class_id);
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
@@ -578,6 +639,27 @@ uint32_t __ret_val;
     }
     case 10: {
       ::flat::npkcalc_M10_Direct ia(bufs(), 32);
+uint32_t __ret_val;
+      __ret_val = UpdateCalculation(ia._1());
+      auto& obuf = bufs();
+      obuf.consume(obuf.size());
+      obuf.prepare(20);
+      obuf.commit(20);
+      ::flat::npkcalc_M7_Direct oa(obuf,16);
+  oa._1() = __ret_val;
+      static_cast<::nprpc::impl::Header*>(obuf.data().data())->size = static_cast<uint32_t>(obuf.size() - 4);
+      static_cast<::nprpc::impl::Header*>(obuf.data().data())->msg_id = ::nprpc::impl::MessageId::BlockResponse;
+      static_cast<::nprpc::impl::Header*>(obuf.data().data())->msg_type = ::nprpc::impl::MessageType::Answer;
+      break;
+    }
+    case 11: {
+      ::flat::npkcalc_M7_Direct ia(bufs(), 32);
+      DeleteCalculation(ia._1());
+      nprpc::impl::make_simple_answer(bufs(), nprpc::impl::MessageId::Success);
+      break;
+    }
+    case 12: {
+      ::flat::npkcalc_M11_Direct ia(bufs(), 32);
       Advise(nprpc::impl::g_orb->create_object_from_flat(ia._1(), remote_endpoint));
       nprpc::impl::make_simple_answer(bufs(), nprpc::impl::MessageId::Success);
       break;
@@ -648,7 +730,7 @@ void npkcalc::Calculator::GetData(/*out*/std::vector<npkcalc::Solution>& solutio
     std::cerr << "received an unusual reply for function with output arguments\n";
     throw nprpc::Exception("Unknown Error");
   }
-  ::flat::npkcalc_M11_Direct out(buf, sizeof(::nprpc::impl::Header));
+  ::flat::npkcalc_M12_Direct out(buf, sizeof(::nprpc::impl::Header));
   {
     auto span = out._1();
     solutions.resize(span.size());
@@ -681,7 +763,7 @@ void npkcalc::Calculator::GetImages(/*out*/std::vector<npkcalc::Media>& images) 
     std::cerr << "received an unusual reply for function with output arguments\n";
     throw nprpc::Exception("Unknown Error");
   }
-  ::flat::npkcalc_M12_Direct out(buf, sizeof(::nprpc::impl::Header));
+  ::flat::npkcalc_M13_Direct out(buf, sizeof(::nprpc::impl::Header));
   {
     auto span = out._1();
     images.resize(span.size());
@@ -696,7 +778,7 @@ void npkcalc::ICalculator_Servant::dispatch(nprpc::Buffers& bufs, nprpc::EndPoin
       obuf.consume(obuf.size());
       obuf.prepare(160);
       obuf.commit(32);
-      ::flat::npkcalc_M11_Direct oa(obuf,16);
+      ::flat::npkcalc_M12_Direct oa(obuf,16);
       GetData(oa._1_vd(), oa._2_vd());
       static_cast<::nprpc::impl::Header*>(obuf.data().data())->size = static_cast<uint32_t>(obuf.size() - 4);
       static_cast<::nprpc::impl::Header*>(obuf.data().data())->msg_id = ::nprpc::impl::MessageId::BlockResponse;
@@ -708,7 +790,7 @@ void npkcalc::ICalculator_Servant::dispatch(nprpc::Buffers& bufs, nprpc::EndPoin
       obuf.consume(obuf.size());
       obuf.prepare(152);
       obuf.commit(24);
-      ::flat::npkcalc_M12_Direct oa(obuf,16);
+      ::flat::npkcalc_M13_Direct oa(obuf,16);
       GetImages(oa._1_vd());
       static_cast<::nprpc::impl::Header*>(obuf.data().data())->size = static_cast<uint32_t>(obuf.size() - 4);
       static_cast<::nprpc::impl::Header*>(obuf.data().data())->msg_id = ::nprpc::impl::MessageId::BlockResponse;

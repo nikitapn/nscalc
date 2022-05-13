@@ -7,35 +7,35 @@
 namespace npkcalc { 
 enum class ELEMENT : uint32_t {
   N_NO3,
-  N_NH4,
-  P,
-  K,
-  Ca,
-  Mg,
-  S,
-  Cl,
-  Fe,
-  Zn,
-  B,
-  Mn,
-  Cu,
-  Mo,
-  CO3,
-  _P1,
-  _P2,
-  _P3,
-  _P4,
-  _P5,
-  _P6,
-  _P7,
-  _P8,
-  H,
-  O,
-  C,
-  NH4,
-  NO3,
-  SO4,
-  H2PO4
+  N_NH4 = 1,
+  P = 2,
+  K = 3,
+  Ca = 4,
+  Mg = 5,
+  S = 6,
+  Cl = 7,
+  Fe = 8,
+  Zn = 9,
+  B = 10,
+  Mn = 11,
+  Cu = 12,
+  Mo = 13,
+  CO3 = 14,
+  _P1 = 15,
+  _P2 = 16,
+  _P3 = 17,
+  _P4 = 18,
+  _P5 = 19,
+  _P6 = 20,
+  _P7 = 21,
+  _P8 = 22,
+  H = 23,
+  O = 24,
+  C = 25,
+  NH4 = 26,
+  NO3 = 27,
+  SO4 = 28,
+  H2PO4 = 29
 };
 struct Solution {
   uint32_t id;
@@ -83,13 +83,13 @@ public:
 
 enum class FertilizerBottle : uint8_t {
   BOTTLE_A,
-  BOTTLE_B,
-  BOTTLE_C
+  BOTTLE_B = 1,
+  BOTTLE_C = 2
 };
 enum class FertilizerType : uint8_t {
   DRY,
-  LIQUID,
-  SOLUTION
+  LIQUID = 1,
+  SOLUTION = 2
 };
 struct Fertilizer {
   uint32_t id;
@@ -261,8 +261,8 @@ public:
 
 enum class AuthorizationFailed_Reason : uint8_t {
   email_does_not_exist,
-  incorrect_password,
-  session_does_not_exist
+  incorrect_password = 1,
+  session_does_not_exist = 2
 };
 class AuthorizationFailed : public ::nprpc::Exception {
 public:
@@ -415,6 +415,8 @@ public:
   virtual void SetFertilizerFormula (uint32_t id, ::flat::Span<char> name) = 0;
   virtual void DeleteFertilizer (uint32_t id) = 0;
   virtual void SaveData () = 0;
+  virtual uint32_t UpdateCalculation (npkcalc::flat::Calculation_Direct calculation) = 0;
+  virtual void DeleteCalculation (uint32_t id) = 0;
   virtual void Advise (nprpc::Object* obj) = 0;
 };
 
@@ -436,6 +438,8 @@ public:
   void SetFertilizerFormula (/*in*/uint32_t id, /*in*/const std::string& name);
   void DeleteFertilizer (/*in*/uint32_t id);
   void SaveData ();
+  uint32_t UpdateCalculation (/*in*/const npkcalc::Calculation& calculation);
+  void DeleteCalculation (/*in*/uint32_t id);
   void Advise (/*in*/const ObjectId& obj);
 };
 
@@ -487,14 +491,7 @@ public:
 
 namespace npkcalc::helper {
 template<::nprpc::IterableCollection T>
-void assign_LogIn_ret_val(npkcalc::flat::UserData_Direct& dest, const T & src) {
-  dest.name(src.name);
-  dest.session_id(src.session_id);
-  memcpy(dest.db().__data(), &src.db._data(), 24);
-  dest.db().class_id(src.db._data().class_id);
-}
-template<::nprpc::IterableCollection T>
-void assign_GetMyCalculations_calculations(/*out*/::flat::Vector_Direct2<npkcalc::flat::Calculation, npkcalc::flat::Calculation_Direct>& dest, const T & src) {
+void assign_from_cpp_GetMyCalculations_calculations(/*out*/::flat::Vector_Direct2<npkcalc::flat::Calculation, npkcalc::flat::Calculation_Direct>& dest, const T & src) {
   dest.length(src.size());
   auto span = dest();
   auto it = src.begin();
@@ -510,8 +507,23 @@ void assign_GetMyCalculations_calculations(/*out*/::flat::Vector_Direct2<npkcalc
     ++it;
   }
 }
+inline void assign_from_flat_UpdateCalculation_calculation(npkcalc::flat::Calculation_Direct& src, npkcalc::Calculation& dest) {
+  dest.id = src.id();
+  dest.name = (std::string_view)src.name();
+  {
+    auto span = src.elements();
+    memcpy(dest.elements.data(), span.data(), 24 * span.size());
+  }
+  {
+    auto span = src.fertilizers_ids();
+    dest.fertilizers_ids.resize(span.size());
+    memcpy(dest.fertilizers_ids.data(), span.data(), 4 * span.size());
+  }
+  dest.volume = src.volume();
+  dest.mode = src.mode();
+}
 template<::nprpc::IterableCollection T>
-void assign_GetData_solutions(/*out*/::flat::Vector_Direct2<npkcalc::flat::Solution, npkcalc::flat::Solution_Direct>& dest, const T & src) {
+void assign_from_cpp_GetData_solutions(/*out*/::flat::Vector_Direct2<npkcalc::flat::Solution, npkcalc::flat::Solution_Direct>& dest, const T & src) {
   dest.length(src.size());
   auto span = dest();
   auto it = src.begin();
@@ -525,7 +537,7 @@ void assign_GetData_solutions(/*out*/::flat::Vector_Direct2<npkcalc::flat::Solut
   }
 }
 template<::nprpc::IterableCollection T>
-void assign_GetData_fertilizers(/*out*/::flat::Vector_Direct2<npkcalc::flat::Fertilizer, npkcalc::flat::Fertilizer_Direct>& dest, const T & src) {
+void assign_from_cpp_GetData_fertilizers(/*out*/::flat::Vector_Direct2<npkcalc::flat::Fertilizer, npkcalc::flat::Fertilizer_Direct>& dest, const T & src) {
   dest.length(src.size());
   auto span = dest();
   auto it = src.begin();
@@ -539,7 +551,7 @@ void assign_GetData_fertilizers(/*out*/::flat::Vector_Direct2<npkcalc::flat::Fer
   }
 }
 template<::nprpc::IterableCollection T>
-void assign_GetImages_images(/*out*/::flat::Vector_Direct2<npkcalc::flat::Media, npkcalc::flat::Media_Direct>& dest, const T & src) {
+void assign_from_cpp_GetImages_images(/*out*/::flat::Vector_Direct2<npkcalc::flat::Media, npkcalc::flat::Media_Direct>& dest, const T & src) {
   dest.length(src.size());
   auto span = dest();
   auto it = src.begin();

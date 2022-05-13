@@ -21,9 +21,9 @@ class MenuButton extends React.Component<{
 	selected: boolean;
 }> {
 	mounted: boolean;
-	constructor(props:any) {
+	constructor(props: any) {
 		super(props);
-		this.state = { 
+		this.state = {
 			selected: false
 		};
 	}
@@ -36,8 +36,8 @@ class MenuButton extends React.Component<{
 		this.mounted = false;
 	}
 
-	set_select(selected:boolean) {
-		this.setState({selected: selected});
+	set_select(selected: boolean) {
+		this.setState({ selected: selected });
 	}
 
 	handle_onClickCapture(ev: Event) {
@@ -54,14 +54,14 @@ class MenuButton extends React.Component<{
 		const style = {
 			display: 'flex',
 		}
-		return (<div style={style} className={this.state.selected ? "tab-btn tab-btn-selected" : "tab-btn"} 
-				onClickCapture={this.handle_onClickCapture.bind(this)}>
-				<div>{this.props.item.name}</div>
-				{
-					this.props.dynamic ? 
+		return (<div style={style} className={this.state.selected ? "tab-btn tab-btn-selected" : "tab-btn"}
+			onClickCapture={this.handle_onClickCapture.bind(this)}>
+			<div>{this.props.item.name}</div>
+			{
+				this.props.dynamic ?
 					<button id="idbtnclose" className="tab-btn-close" onClick={this.props.item.oncloseclick}>x</button> : ""
-				}
-			</div>);
+			}
+		</div>);
 	}
 }
 
@@ -69,7 +69,7 @@ class Menu extends React.Component<{
 	className: string,
 	dynamic?: boolean,
 	editable?: boolean,
-	items: Array<MenuItem>, 
+	items: Array<MenuItem>,
 	active_index?: number
 }, {
 
@@ -106,14 +106,14 @@ class Menu extends React.Component<{
 			overflow: 'hidden'
 		}
 		return (
-				
+
 			<div className={this.props.className} style={style}>
 				{
-				this.props.items.map(
-					(item: MenuItem, key: number) => {
-						return (<MenuButton ref={this.props.items[key].ref} key={key} dynamic={this.props.dynamic} editable={this.props.editable}
-							item={item} onclick={this.on_button_click.bind(this)} />);
-					}) 
+					this.props.items.map(
+						(item: MenuItem, key: number) => {
+							return (<MenuButton ref={this.props.items[key].ref} key={key} dynamic={this.props.dynamic} editable={this.props.editable}
+								item={item} onclick={this.on_button_click.bind(this)} />);
+						})
 				}
 			</div>
 		);
@@ -124,8 +124,9 @@ class TabPane extends React.Component<{
 	dynamic: boolean,
 	editable?: boolean,
 	menu_className: string,
-	notify_tab_selected?: (data: any) => void
-},{
+	notify_tab_selected?: (data: any) => void,
+	notify_before_closing?: (view: View, index: number) => boolean
+}, {
 	view_builder: Array<{ create: (key: number) => JSX.Element, tab_name: string }>
 }> {
 	protected menu: React.RefObject<Menu>;
@@ -133,18 +134,18 @@ class TabPane extends React.Component<{
 	private active_view: View;
 	protected active_index_after_adding: number;
 
-	constructor(props:any) {
+	constructor(props: any) {
 		super(props);
 		this.menu = React.createRef<Menu>();
 		this.views = [];
 		this.active_view = null;
 		this.active_index_after_adding = 0;
-		
+
 		this.state = {
 			view_builder: []
 		};
 	}
-	
+
 	clear() {
 		this.views = [];
 		this.active_view = null;
@@ -159,28 +160,43 @@ class TabPane extends React.Component<{
 	}
 
 	public add_view<P extends {}, T extends React.Component<P, React.ComponentState>, C extends React.ComponentClass<P>>(
-		type: React.ClassType<P, T, C>, 
-		tab_name: string, 
+		type: React.ClassType<P, T, C>,
+		tab_name: string,
 		activate: boolean,
 		update_dom?: boolean,
 		data?: any,
-		key?: number) : void {
+		key?: number): void {
+		this.insert_view(this.state.view_builder.length, type, tab_name, activate, update_dom, data, key);
+	}
+
+	public insert_view<P extends {}, T extends React.Component<P, React.ComponentState>, C extends React.ComponentClass<P>>(
+		index_to_insert: number,
+		type: React.ClassType<P, T, C>,
+		tab_name: string,
+		activate: boolean,
+		update_dom?: boolean,
+		data?: any,
+		key?: number): void {
+			
 		let view_builder = this.state.view_builder;
-		
-		view_builder.push({ create:
-			function (data: any, index: number) {
-				if (!data) data = {};
-				data.key = key ? key : index;
-				data.ref = this.views[index];
-				return React.createElement(type, data);
-			}.bind(this, data), tab_name: tab_name }
+
+		view_builder.splice(index_to_insert, 0, {
+			create:
+				function (data: any, index: number) {
+					if (!data) data = {};
+					data.key = key ? key : index;
+					data.ref = this.views[index];
+					return React.createElement(type, data);
+				}.bind(this, data), tab_name: tab_name
+		}
 		);
 
 		this.views.push(React.createRef<View>());
-		
+
 		if (activate === true) this.active_index_after_adding = this.views.length - 1;
-		if (update_dom === true) this.setState({view_builder: view_builder}, activate ? function() {
-			this.select_view(this.active_index_after_adding); }.bind(this) : undefined);
+		if (update_dom === true) this.setState({ view_builder: view_builder }, activate ? function () {
+			this.select_view(this.active_index_after_adding);
+		}.bind(this) : undefined);
 	}
 
 	public remove_view(index: number) {
@@ -194,7 +210,7 @@ class TabPane extends React.Component<{
 		this.views.splice(index, 1);
 		this.active_view.show_window(false);
 		this.active_view = null;
-		this.setState({view_builder: view_builder}, function() {
+		this.setState({ view_builder: view_builder }, function () {
 			this.select_view(active_index)
 		}.bind(this));
 
@@ -223,15 +239,20 @@ class TabPane extends React.Component<{
 		return (
 			<div key="hc">
 				<Menu className={this.props.menu_className} ref={this.menu} dynamic={this.props.dynamic} editable={this.props.editable} active_index={this.active_index_after_adding} items=
-				{
-					view_builder.map((x, index) => {
-					return {
-						name: x.tab_name, 
-						ref: React.createRef<MenuButton>(),
-						onclick: () => { this.handle_select_view(this.views[index]) },
-						oncloseclick: () => { this.remove_view(index) }
-					};})
-				}/>
+					{
+						view_builder.map((x, index) => {
+							return {
+								name: x.tab_name,
+								ref: React.createRef<MenuButton>(),
+								onclick: () => { this.handle_select_view(this.views[index]) },
+								oncloseclick: () => {
+									if (this.props.notify_before_closing && this.props.notify_before_closing(this.views[index].current, index) == true) {
+										this.remove_view(index)
+									}
+								}
+							};
+						})
+					} />
 				<div className="main">
 					{
 						view_builder.map((x, index) => { return (x.create(index)) })
@@ -242,6 +263,6 @@ class TabPane extends React.Component<{
 	}
 }
 
-export { 
+export {
 	Menu, TabPane, MenuButton
 }

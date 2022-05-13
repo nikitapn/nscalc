@@ -21,7 +21,7 @@ class MobXInputSolutionElement extends MobXInputTableFloat<che.SolutionElement, 
 	record_changes(value: string) : void {
 		if (this.is_pending_commands()) return;
 		let new_value = parseFloat(value);
-		this.props.storage.add_comand(
+		this.props.storage.add_command(
 			this.props.custom.is_new ?
 			new Command_ValueChanged(this.props.object, new_value, this.old_value) :
 			new Command_SolutionValueChanged(this.props.object, new_value, this.old_value, this.props.custom, this.props.object.e)
@@ -210,7 +210,7 @@ class Table extends React.Component<{
 
 			<div className="toolbar-pane"> 
 				<div className="toolbar"> 
-					<img src={global.icons.add} className={"toolbar-btn" + (global.user_data.guest ? " toolbar-btn-disabled" : "")}
+					<img src={global.icons.add} className={"toolbar-btn" + (global.user_data.is_guest ? " toolbar-btn-disabled" : "")}
 					onClick={() => store.solutions.add_new_row<che.Solution>(che.Solution.create())} />
 					<SaveButton storage={store.solutions} save={store.solutions.store.bind(store.solutions)}/>
 					<UndoButton storage={store.solutions} />

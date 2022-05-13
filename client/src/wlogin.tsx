@@ -11,7 +11,6 @@ import { fetch_user_data } from './store_calculations'
 export function set_user_data(ud: npkcalc.UserData | null, component_mounted: boolean): void {
 	if (ud === null) {
 		global.user_data.user = "Guest";
-		global.user_data.guest = true;
 		global.user_data.email = "";
 		if (global.user_data.reg_user) {
 			global.user_data.reg_user.release();
@@ -22,7 +21,6 @@ export function set_user_data(ud: npkcalc.UserData | null, component_mounted: bo
 	}
 
 	global.user_data.user = ud.name;
-	global.user_data.guest = false;
 	
 	let obj = new ObjectProxy(ud.db); 
 	obj.add_ref();
@@ -49,7 +47,7 @@ export class WLogin extends React.Component<{
 		super(props)
 
 		this.state = {
-			is_logged_in: !global.user_data.guest,
+			is_logged_in: !global.user_data.is_guest,
 			email: "", pwd: ""
 		};
 
