@@ -436,6 +436,9 @@ int main(int argc, char* argv[]) {
 	std::string http_root;
 	std::string data_root;
 	unsigned short port;
+	bool use_ssl;
+	std::string public_key;
+	std::string private_key;
 
 	po::options_description desc("Allowed options");
 	desc.add_options()
@@ -444,6 +447,9 @@ int main(int argc, char* argv[]) {
 			default_value("\\\\wsl$\\Debian\\home\\png\\projects\\npk-calculator\\client\\public"), "HTTP root directory")
 		("data_dir", po::value<std::string>(&data_root)->default_value("./data"), "Data root directory")
 		("port", po::value<unsigned short>(&port)->default_value(33252), "Port to listen")
+		("use_ssl", po::value<bool>(&use_ssl)->default_value(false), "Port to listen")
+		("public_key", po::value<std::string>(&public_key)->default_value(""), "Path to the public key")
+		("private_key", po::value<std::string>(&private_key)->default_value(""), "Path to the private key")
 		;
 
 	try {
@@ -471,6 +477,9 @@ int main(int argc, char* argv[]) {
 		rpc_cfg.port = 52244;
 		rpc_cfg.websocket_port = port;
 		rpc_cfg.http_root_dir = http_root;
+		rpc_cfg.use_ssl = use_ssl;
+		rpc_cfg.ssl_public_key = public_key;
+		rpc_cfg.ssl_secret_key = private_key;
 
 		auto rpc = nprpc::init(ioc, std::move(rpc_cfg));
 

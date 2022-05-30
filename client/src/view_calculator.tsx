@@ -453,7 +453,7 @@ export class View_Calculator extends View {
 	handle_tab_closed(view: View, idx: number) {
 		confirmAlert({
 			title: "Confirm to submit",
-			message: "Are you sure to delete this calculation\"" + view.props.data.get_name() + "\"?",
+			message: "Are you sure want to delete this calculation \"" + view.props.data.get_name() + "\"?",
 			buttons: [
 				{
 					label: "Yes",

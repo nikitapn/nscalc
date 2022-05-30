@@ -49,7 +49,7 @@ class Table_Calculations extends TableModel(class {}, Calculation.Calculation) {
 	public delete_calculation(calc: Calculation.Calculation) {
 		const [id, is_new] = [calc.get_id(), calc.is_new];
 		calculations.erase_by_id(id);
-		if (is_new) global.user_data.reg_user.DeleteCalculation(id);
+		if (!is_new) global.user_data.reg_user.DeleteCalculation(id);
 	}
 }
 
