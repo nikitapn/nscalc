@@ -17,7 +17,7 @@ import global from './global'
 import {MyIcons} from './global'
 import * as utils from './utils'
 import { fetch_user_data } from './store_calculations'
-import {calculator, authorizator, init_object} from './rpc'
+import {calculator, authorizator, init_rpc} from './rpc'
 
 class App extends TabPane {
 	constructor(props:any) {
@@ -107,7 +107,7 @@ root.addEventListener("ce_data_recieved", () => {
 });
 
 async function auth() {
-	await init_object();
+	await init_rpc();
 	let session_id = utils.getCookie("sid");
 	if (session_id != null) {
 		try { set_user_data(await authorizator.LogInWithSessionId(session_id), false); } catch(e) {}

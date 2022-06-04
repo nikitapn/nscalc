@@ -7,6 +7,7 @@ import * as npkcalc from './npkcalc'
 import {narrow, ObjectProxy} from './nprpc'
 import * as utils from './utils'
 import { fetch_user_data } from './store_calculations'
+import { authorizator } from './rpc'
 
 export function set_user_data(ud: npkcalc.UserData | null, component_mounted: boolean): void {
 	if (ud === null) {
@@ -67,7 +68,7 @@ export class WLogin extends React.Component<{
 	handleSubmit(event: any) {
 		event.preventDefault();
 		let this_ = this;
-		global.authorizator.LogIn(this.state.email, this.state.pwd).then((ud: npkcalc.UserData) => {
+		authorizator.LogIn(this.state.email, this.state.pwd).then((ud: npkcalc.UserData) => {
 			set_user_data(ud, true);
 			this_.setState({is_logged_in: true});
 		}).catch((e: any) => {
@@ -85,7 +86,7 @@ export class WLogin extends React.Component<{
 
 	handleLogOut(event: any) {
 		let this_ = this;
-		global.authorizator.LogOut(utils.getCookie("sid")).then( () => {
+		authorizator.LogOut(utils.getCookie("sid")).then( () => {
 			set_user_data(null, true);
 			this_.setState({is_logged_in: false})
 		 });

@@ -21,6 +21,8 @@
 #include "npkcalc.hpp"
 #include "data.hpp"
 
+#include <nprpc/serialization/oarchive.h>
+
 enum class Tables {
 	Solutions,
 	Fertilizers
@@ -429,20 +431,46 @@ public:
 	}
 };
 
+struct HostJson {
+	bool secured;
+
+	struct {
+		nprpc::ObjectId calculator;
+		nprpc::ObjectId authorizator;
+		template<typename Archive>
+		void serialize(Archive& ar) {
+			ar& NVP(calculator);
+			ar& NVP(authorizator);
+		}
+	} objects;
+
+	template<typename Archive>
+	void serialize(Archive& ar) {
+		ar & NVP(secured);
+		ar & NVP(objects);
+	}
+};
+
+
 int main(int argc, char* argv[]) {
 	namespace po = boost::program_options;
 	namespace fs = std::filesystem;
 
+	HostJson host_json;
+
+	std::string hostname;
 	std::string http_root;
 	std::string data_root;
 	unsigned short port;
 	bool use_ssl;
 	std::string public_key;
 	std::string private_key;
+	std::string dh_params;
 
 	po::options_description desc("Allowed options");
 	desc.add_options()
 		("help", "produce help message")
+		("hostname", po::value<std::string>(&hostname))
 		("root_dir", po::value<std::string>(&http_root)->
 			default_value("\\\\wsl$\\Debian\\home\\png\\projects\\npk-calculator\\client\\public"), "HTTP root directory")
 		("data_dir", po::value<std::string>(&data_root)->default_value("./data"), "Data root directory")
@@ -450,6 +478,7 @@ int main(int argc, char* argv[]) {
 		("use_ssl", po::value<bool>(&use_ssl)->default_value(false), "Port to listen")
 		("public_key", po::value<std::string>(&public_key)->default_value(""), "Path to the public key")
 		("private_key", po::value<std::string>(&private_key)->default_value(""), "Path to the private key")
+		("dh_params", po::value<std::string>(&dh_params)->default_value(""), "Path to Diffie-Hellman parameters")
 		;
 
 	try {
@@ -464,6 +493,8 @@ int main(int argc, char* argv[]) {
 		std::cerr << e.what();
 		return -1;
 	}
+
+	host_json.secured = use_ssl;
 
 	boost::asio::io_context ioc;
 	
@@ -480,6 +511,8 @@ int main(int argc, char* argv[]) {
 		rpc_cfg.use_ssl = use_ssl;
 		rpc_cfg.ssl_public_key = public_key;
 		rpc_cfg.ssl_secret_key = private_key;
+		rpc_cfg.ssl_dh_params = dh_params;
+		rpc_cfg.hostname = hostname;
 
 		auto rpc = nprpc::init(ioc, std::move(rpc_cfg));
 
@@ -490,12 +523,18 @@ int main(int argc, char* argv[]) {
 		CalculatorImpl calc{data_root};
 		AuthorizatorImpl autorizator(rpc, data_root);
 
-		auto oid_calculator = poa->activate_object(&calc);
-		auto oid_authorizator = poa->activate_object(&autorizator);
+		host_json.objects.calculator = poa->activate_object(&calc);
+		host_json.objects.authorizator = poa->activate_object(&autorizator);
 
 		std::cerr << "calculator  - poa: " << calc.poa_index() << ", oid: " << calc.oid() << "\n";
 		std::cerr << "autorizator - poa: " << autorizator.poa_index() << ", oid: " << autorizator.oid() << "\n";
 
+		{
+			std::ofstream os(std::filesystem::path(http_root) / "host.json");
+			nprpc::serialization::json_oarchive oa(os);
+			oa << host_json;
+		}
+		
 		rpc->start();
 		ioc.run();
 	} catch (std::exception& ex) {

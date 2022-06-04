@@ -61,7 +61,7 @@ class DataObserverImpl extends npkcalc._IDataObserver_Servant implements npkcalc
 	}
 }
 
-export async function fetch_user_data() {
+export const fetch_user_data = async () => {
 	if (global.user_data.reg_user) {
 		let calculations_data = NPRPC.make_ref<NPRPC.Flat.Vector_Direct2<npkcalc.Flat_npkcalc.Calculation_Direct>>();
 		await global.user_data.reg_user.GetMyCalculations(calculations_data);
@@ -69,6 +69,9 @@ export async function fetch_user_data() {
 		for (let calc_data of calculations_data.value) {
 			calculations.add(Calculation.Calculation.create_from_data(calc_data));
 		}
-		await global.user_data.reg_user.Advise(poa.activate_object(new DataObserverImpl()));
+		
+		await global.user_data.reg_user.Advise(
+			poa.activate_object(new DataObserverImpl())
+		);
 	}
 }

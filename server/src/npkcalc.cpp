@@ -113,8 +113,8 @@ void npkcalc::IAuthorizator_Servant::dispatch(nprpc::Buffers& bufs, nprpc::EndPo
       ::flat::npkcalc_M1_Direct ia(bufs(), 32);
       auto& obuf = bufs.flip();
       obuf.consume(obuf.size());
-      obuf.prepare(192);
-      obuf.commit(64);
+      obuf.prepare(200);
+      obuf.commit(72);
       ::flat::npkcalc_M2_Direct oa(obuf,16);
 UserData __ret_val;
       try {
@@ -137,6 +137,7 @@ UserData __ret_val;
   oa._1().session_id(__ret_val.session_id);
   memcpy(oa._1().db().__data(), &__ret_val.db._data(), 24);
   oa._1().db().class_id(__ret_val.db._data().class_id);
+  oa._1().db().hostname(__ret_val.db._data().hostname);
       static_cast<::nprpc::impl::Header*>(obuf.data().data())->size = static_cast<uint32_t>(obuf.size() - 4);
       static_cast<::nprpc::impl::Header*>(obuf.data().data())->msg_id = ::nprpc::impl::MessageId::BlockResponse;
       static_cast<::nprpc::impl::Header*>(obuf.data().data())->msg_type = ::nprpc::impl::MessageType::Answer;
@@ -146,8 +147,8 @@ UserData __ret_val;
       ::flat::npkcalc_M3_Direct ia(bufs(), 32);
       auto& obuf = bufs.flip();
       obuf.consume(obuf.size());
-      obuf.prepare(192);
-      obuf.commit(64);
+      obuf.prepare(200);
+      obuf.commit(72);
       ::flat::npkcalc_M2_Direct oa(obuf,16);
 UserData __ret_val;
       try {
@@ -170,6 +171,7 @@ UserData __ret_val;
   oa._1().session_id(__ret_val.session_id);
   memcpy(oa._1().db().__data(), &__ret_val.db._data(), 24);
   oa._1().db().class_id(__ret_val.db._data().class_id);
+  oa._1().db().hostname(__ret_val.db._data().hostname);
       static_cast<::nprpc::impl::Header*>(obuf.data().data())->size = static_cast<uint32_t>(obuf.size() - 4);
       static_cast<::nprpc::impl::Header*>(obuf.data().data())->msg_id = ::nprpc::impl::MessageId::BlockResponse;
       static_cast<::nprpc::impl::Header*>(obuf.data().data())->msg_type = ::nprpc::impl::MessageType::Answer;
@@ -528,8 +530,8 @@ void npkcalc::RegisteredUser::DeleteCalculation(/*in*/uint32_t id) {
 void npkcalc::RegisteredUser::Advise(/*in*/const ObjectId& obj) {
   boost::beast::flat_buffer buf;
   {
-    auto mb = buf.prepare(192);
-    buf.commit(64);
+    auto mb = buf.prepare(200);
+    buf.commit(72);
     static_cast<::nprpc::impl::Header*>(mb.data())->msg_id = ::nprpc::impl::MessageId::FunctionCall;
     static_cast<::nprpc::impl::Header*>(mb.data())->msg_type = ::nprpc::impl::MessageType::Request;
   }
@@ -541,6 +543,7 @@ void npkcalc::RegisteredUser::Advise(/*in*/const ObjectId& obj) {
   ::flat::npkcalc_M11_Direct _(buf,32);
   memcpy(_._1().__data(), &obj._data(), 24);
   _._1().class_id(obj._data().class_id);
+  _._1().hostname(obj._data().hostname);
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
   ::nprpc::impl::g_orb->call(
     nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()

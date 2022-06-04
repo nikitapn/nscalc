@@ -3,33 +3,15 @@
 
 import * as NPRPC from './nprpc';
 import * as npkcalc from './npkcalc'
-import global from './global'
 
-NPRPC.set_debug_level(NPRPC.DebugLevel.DebugLevel_EveryCall);
-let rpc = NPRPC.init();
+export let poa: NPRPC.Poa;
+export let calculator: npkcalc.Calculator;
+export let authorizator: npkcalc.Authorizator;
 
-export let poa = rpc.create_poa(10);
-
-export let calculator = new npkcalc.Calculator();
-
-calculator.data.port = 0;
-calculator.data.object_id = 0n;
-calculator.data.poa_idx = 0;
-
-export let authorizator = new npkcalc.Authorizator();
-
-authorizator.data.port = 0;
-authorizator.data.object_id = 1n;
-authorizator.data.poa_idx = 0;
-
-global.authorizator = authorizator;
-
-export const init_object = async (): Promise<void> => {
-	let info = await NPRPC.read_host();
-
-	calculator.data.ip4 = info.ip;
-	calculator.data.websocket_port = info.port;
-
-	authorizator.data.ip4 = info.ip;
-	authorizator.data.websocket_port = info.port;
+export const init_rpc= async (): Promise<void> => {
+	NPRPC.set_debug_level(NPRPC.DebugLevel.DebugLevel_Critical);
+	let rpc = await NPRPC.init();
+	poa = rpc.create_poa(10);
+	calculator = new npkcalc.Calculator(rpc.host_info.objects.calculator);
+	authorizator = new npkcalc.Authorizator(rpc.host_info.objects.authorizator);
 }

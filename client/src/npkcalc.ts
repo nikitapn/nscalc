@@ -312,7 +312,7 @@ export class Authorizator extends NPRPC.ObjectProxy {
   _._2 = password;
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
-      {ip4: this.data.ip4, port: this.data.websocket_port}, buf, this.timeout
+      this.endpoint(), buf, this.timeout
     );
     let std_reply = NPRPC.handle_standart_reply(buf);
     if (std_reply == 1) {
@@ -347,7 +347,7 @@ export class Authorizator extends NPRPC.ObjectProxy {
   _._1 = session_id;
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
-      {ip4: this.data.ip4, port: this.data.websocket_port}, buf, this.timeout
+      this.endpoint(), buf, this.timeout
     );
     let std_reply = NPRPC.handle_standart_reply(buf);
     if (std_reply == 1) {
@@ -382,7 +382,7 @@ export class Authorizator extends NPRPC.ObjectProxy {
   _._1 = session_id;
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
-      {ip4: this.data.ip4, port: this.data.websocket_port}, buf, this.timeout
+      this.endpoint(), buf, this.timeout
     );
     let std_reply = NPRPC.handle_standart_reply(buf);
     if (std_reply != -1) {
@@ -417,8 +417,8 @@ export class _IAuthorizator_Servant extends NPRPC.ObjectServant {
       let ia = new Flat_npkcalc.npkcalc_M1_Direct(buf, 32);
       let obuf = buf;
       obuf.consume(obuf.size);
-      obuf.prepare(192);
-      obuf.commit(64);
+      obuf.prepare(200);
+      obuf.commit(72);
       let oa = new Flat_npkcalc.npkcalc_M2_Direct(obuf,16);
 let __ret_val: UserData;
       try {
@@ -446,6 +446,7 @@ let __ret_val: UserData;
   oa._1.db.poa_idx = __ret_val.db.poa_idx;
   oa._1.db.flags = __ret_val.db.flags;
   oa._1.db.class_id = __ret_val.db.class_id;
+  oa._1.db.hostname = __ret_val.db.hostname;
       obuf.write_len(obuf.size - 4);
       obuf.write_msg_id(NPRPC.impl.MessageId.BlockResponse);
       obuf.write_msg_type(NPRPC.impl.MessageType.Answer);
@@ -455,8 +456,8 @@ let __ret_val: UserData;
       let ia = new Flat_npkcalc.npkcalc_M3_Direct(buf, 32);
       let obuf = buf;
       obuf.consume(obuf.size);
-      obuf.prepare(192);
-      obuf.commit(64);
+      obuf.prepare(200);
+      obuf.commit(72);
       let oa = new Flat_npkcalc.npkcalc_M2_Direct(obuf,16);
 let __ret_val: UserData;
       try {
@@ -484,6 +485,7 @@ let __ret_val: UserData;
   oa._1.db.poa_idx = __ret_val.db.poa_idx;
   oa._1.db.flags = __ret_val.db.flags;
   oa._1.db.class_id = __ret_val.db.class_id;
+  oa._1.db.hostname = __ret_val.db.hostname;
       obuf.write_len(obuf.size - 4);
       obuf.write_msg_id(NPRPC.impl.MessageId.BlockResponse);
       obuf.write_msg_type(NPRPC.impl.MessageType.Answer);
@@ -530,7 +532,7 @@ export class RegisteredUser extends NPRPC.ObjectProxy {
     __ch.function_idx = 0;
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
-      {ip4: this.data.ip4, port: this.data.websocket_port}, buf, this.timeout
+      this.endpoint(), buf, this.timeout
     );
     let std_reply = NPRPC.handle_standart_reply(buf);
     if (std_reply != -1) {
@@ -558,7 +560,7 @@ export class RegisteredUser extends NPRPC.ObjectProxy {
   _._2_vd().copy_from_ts_array(elements); 
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
-      {ip4: this.data.ip4, port: this.data.websocket_port}, buf, this.timeout
+      this.endpoint(), buf, this.timeout
     );
     let std_reply = NPRPC.handle_standart_reply(buf);
     if (std_reply != -1) {
@@ -588,7 +590,7 @@ export class RegisteredUser extends NPRPC.ObjectProxy {
   _._2 = name;
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
-      {ip4: this.data.ip4, port: this.data.websocket_port}, buf, this.timeout
+      this.endpoint(), buf, this.timeout
     );
     let std_reply = NPRPC.handle_standart_reply(buf);
     if (std_reply != 0) {
@@ -621,7 +623,7 @@ export class RegisteredUser extends NPRPC.ObjectProxy {
   }
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
-      {ip4: this.data.ip4, port: this.data.websocket_port}, buf, this.timeout
+      this.endpoint(), buf, this.timeout
     );
     let std_reply = NPRPC.handle_standart_reply(buf);
     if (std_reply != 0) {
@@ -645,7 +647,7 @@ export class RegisteredUser extends NPRPC.ObjectProxy {
   _._1 = id;
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
-      {ip4: this.data.ip4, port: this.data.websocket_port}, buf, this.timeout
+      this.endpoint(), buf, this.timeout
     );
     let std_reply = NPRPC.handle_standart_reply(buf);
     if (std_reply != 0) {
@@ -670,7 +672,7 @@ export class RegisteredUser extends NPRPC.ObjectProxy {
   _._2 = formula;
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
-      {ip4: this.data.ip4, port: this.data.websocket_port}, buf, this.timeout
+      this.endpoint(), buf, this.timeout
     );
     let std_reply = NPRPC.handle_standart_reply(buf);
     if (std_reply != -1) {
@@ -700,7 +702,7 @@ export class RegisteredUser extends NPRPC.ObjectProxy {
   _._2 = name;
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
-      {ip4: this.data.ip4, port: this.data.websocket_port}, buf, this.timeout
+      this.endpoint(), buf, this.timeout
     );
     let std_reply = NPRPC.handle_standart_reply(buf);
     if (std_reply != 0) {
@@ -725,7 +727,7 @@ export class RegisteredUser extends NPRPC.ObjectProxy {
   _._2 = name;
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
-      {ip4: this.data.ip4, port: this.data.websocket_port}, buf, this.timeout
+      this.endpoint(), buf, this.timeout
     );
     let std_reply = NPRPC.handle_standart_reply(buf);
     if (std_reply != 0) {
@@ -749,7 +751,7 @@ export class RegisteredUser extends NPRPC.ObjectProxy {
   _._1 = id;
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
-      {ip4: this.data.ip4, port: this.data.websocket_port}, buf, this.timeout
+      this.endpoint(), buf, this.timeout
     );
     let std_reply = NPRPC.handle_standart_reply(buf);
     if (std_reply != 0) {
@@ -771,7 +773,7 @@ export class RegisteredUser extends NPRPC.ObjectProxy {
     __ch.function_idx = 9;
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
-      {ip4: this.data.ip4, port: this.data.websocket_port}, buf, this.timeout
+      this.endpoint(), buf, this.timeout
     );
     let std_reply = NPRPC.handle_standart_reply(buf);
     if (std_reply != 0) {
@@ -809,7 +811,7 @@ export class RegisteredUser extends NPRPC.ObjectProxy {
   _._1.mode = calculation.mode;
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
-      {ip4: this.data.ip4, port: this.data.websocket_port}, buf, this.timeout
+      this.endpoint(), buf, this.timeout
     );
     let std_reply = NPRPC.handle_standart_reply(buf);
     if (std_reply != -1) {
@@ -838,7 +840,7 @@ export class RegisteredUser extends NPRPC.ObjectProxy {
   _._1 = id;
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
-      {ip4: this.data.ip4, port: this.data.websocket_port}, buf, this.timeout
+      this.endpoint(), buf, this.timeout
     );
     let std_reply = NPRPC.handle_standart_reply(buf);
     if (std_reply != 0) {
@@ -849,8 +851,8 @@ export class RegisteredUser extends NPRPC.ObjectProxy {
   public async Advise(obj: /*in*/NPRPC.detail.ObjectId): Promise<void> {
     let interface_idx = (arguments.length == 1 ? 0 : arguments[arguments.length - 1]);
     let buf = NPRPC.FlatBuffer.create();
-    buf.prepare(192);
-    buf.commit(64);
+    buf.prepare(200);
+    buf.commit(72);
     buf.write_msg_id(NPRPC.impl.MessageId.FunctionCall);
     buf.write_msg_type(NPRPC.impl.MessageType.Request);
     let __ch = new NPRPC.impl.Flat_nprpc_base.CallHeader_Direct(buf, 16);
@@ -866,9 +868,10 @@ export class RegisteredUser extends NPRPC.ObjectProxy {
   _._1.poa_idx = obj.poa_idx;
   _._1.flags = obj.flags;
   _._1.class_id = obj.class_id;
+  _._1.hostname = obj.hostname;
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
-      {ip4: this.data.ip4, port: this.data.websocket_port}, buf, this.timeout
+      this.endpoint(), buf, this.timeout
     );
     let std_reply = NPRPC.handle_standart_reply(buf);
     if (std_reply != 0) {
@@ -1042,7 +1045,7 @@ export class DataObserver extends NPRPC.ObjectProxy {
   _._1 = idx;
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
-      {ip4: this.data.ip4, port: this.data.websocket_port}, buf, this.timeout
+      this.endpoint(), buf, this.timeout
     );
     let std_reply = NPRPC.handle_standart_reply(buf);
     if (std_reply != 0) {
@@ -1098,7 +1101,7 @@ export class Calculator extends NPRPC.ObjectProxy {
     __ch.function_idx = 0;
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
-      {ip4: this.data.ip4, port: this.data.websocket_port}, buf, this.timeout
+      this.endpoint(), buf, this.timeout
     );
     let std_reply = NPRPC.handle_standart_reply(buf);
     if (std_reply != -1) {
@@ -1124,7 +1127,7 @@ export class Calculator extends NPRPC.ObjectProxy {
     __ch.function_idx = 1;
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
-      {ip4: this.data.ip4, port: this.data.websocket_port}, buf, this.timeout
+      this.endpoint(), buf, this.timeout
     );
     let std_reply = NPRPC.handle_standart_reply(buf);
     if (std_reply != -1) {

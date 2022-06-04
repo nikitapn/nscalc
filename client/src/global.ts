@@ -44,8 +44,7 @@ export class MyIcons {
 class Global {
 	user_data: UserData;
 	icons: any;
-	authorizator: npkcalc.Authorizator;
-
+	
 	constructor() {
 		this.user_data = new UserData();
 		this.icons = new MyIcons();
