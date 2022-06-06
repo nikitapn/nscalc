@@ -76,6 +76,19 @@ SolutionElement: flat {
 	value: float64;
 }
 
+
+enum AlarmType {
+	Info,
+	Warning,
+	Critical
+}
+
+Alarm: flat {
+	id: u32;
+	type: AlarmType;
+	msg: string;
+}
+
 interface Authorizator {
 	UserData LogIn(login: in string, password: in string) raises(AuthorizationFailed);
 	UserData LogInWithSessionId(session_id: in string) raises(AuthorizationFailed);
@@ -98,22 +111,18 @@ interface RegisteredUser {
 	
 	u32 UpdateCalculation(calculation: in Calculation);
 	void DeleteCalculation(id: in u32);
-	
-	void Advise(obj: in object);
 }
 
 interface DataObserver {
 	void DataChanged(idx: in u32);
+	void OnAlarm(alarm: in Alarm);
 }
 
 interface Calculator {
-	void GetData(
-		solutions: out direct vector<Solution>,
-		fertilizers: out direct vector<Fertilizer>
-	);
-	void GetImages(
-		images: out direct vector<Media>
-	);
+	void GetData(solutions: out direct vector<Solution>, fertilizers: out direct vector<Fertilizer>);
+	void GetImages(images: out direct vector<Media>);
+	void Subscribe(obj: in object);
+	void GetGuestCalculations(calculations: out direct vector<Calculation>);
 }
 
 }

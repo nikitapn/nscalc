@@ -1,0 +1,25 @@
+{
+	"secured": false,
+	"objects": {
+		"calculator": {
+			"object_id": 0,
+			"ip4": 2130706433,
+			"port": 52244,
+			"websocket_port": 8080,
+			"poa_idx": 0,
+			"flags": 1,
+			"class_id": "npkcalc/npkcalc.Calculator",
+			"hostname": ""
+		},
+		"authorizator": {
+			"object_id": 1,
+			"ip4": 2130706433,
+			"port": 52244,
+			"websocket_port": 8080,
+			"poa_idx": 0,
+			"flags": 1,
+			"class_id": "npkcalc/npkcalc.Authorizator",
+			"hostname": ""
+		}
+	}
+}

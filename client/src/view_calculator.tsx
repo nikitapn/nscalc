@@ -411,7 +411,13 @@ export class View_Calculator extends View {
 		document.addEventListener("new_calculation", this.handle_create_new_calculation.bind(this));
 		document.addEventListener("calc_clear", this.handle_clear.bind(this));
 		document.addEventListener("calc_data_received", this.handle_data_received.bind(this));
+	
+		for (let calc of calculations.items) {
+			this.tab_pane.current.add_view(View_Calculation, calc.get_name(), true, true, {data: calc}, calc.get_id());
+		}
+	}
 
+	populate() {
 		for (let calc of calculations.items) {
 			this.tab_pane.current.add_view(View_Calculation, calc.get_name(), true, true, {data: calc}, calc.get_id());
 		}
@@ -419,12 +425,11 @@ export class View_Calculator extends View {
 
 	handle_clear(ev: CustomEvent) : void {
 		this.tab_pane.current.clear();
+		this.populate();
 	}
 
 	handle_data_received(ev: CustomEvent) : void {
-		for (let calc of calculations.items) {
-			this.tab_pane.current.add_view(View_Calculation, calc.get_name(), true, true, {data: calc}, calc.get_id());
-		}
+		this.populate();
 	}
 
 	handle_create_new_calculation(ev: CustomEvent) : void {

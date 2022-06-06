@@ -6,7 +6,7 @@ import global from './global'
 import * as npkcalc from './npkcalc'
 import {narrow, ObjectProxy} from './nprpc'
 import * as utils from './utils'
-import { fetch_user_data } from './store_calculations'
+import { get_calculations } from './store_calculations'
 import { authorizator } from './rpc'
 
 export function set_user_data(ud: npkcalc.UserData | null, component_mounted: boolean): void {
@@ -16,11 +16,12 @@ export function set_user_data(ud: npkcalc.UserData | null, component_mounted: bo
 		if (global.user_data.reg_user) {
 			global.user_data.reg_user.release();
 		}
-		document.dispatchEvent(new CustomEvent("calc_clear"));
+		global.user_data.reg_user = null;
 		utils.setCookie("sid", undefined, 31, false);
+		get_calculations();
 		return;
 	}
-
+	
 	global.user_data.user = ud.name;
 	
 	let obj = new ObjectProxy(ud.db); 
@@ -31,7 +32,7 @@ export function set_user_data(ud: npkcalc.UserData | null, component_mounted: bo
 	}
 
 	if (component_mounted) {
-		fetch_user_data().then(	() => document.dispatchEvent(new CustomEvent("calc_data_received")) );
+		get_calculations().then(	() => document.dispatchEvent(new CustomEvent("calc_data_received")) );
 	}
 	
 	utils.setCookie("sid", ud.session_id, 31, false);

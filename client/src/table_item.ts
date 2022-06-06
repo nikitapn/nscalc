@@ -98,6 +98,10 @@ export function TableModel<T extends Constructor<{}>, U extends TableItem>(TBase
 			this.items.push(item);
 		}
 
+		clear() {
+			this.items.clear();
+		}
+
 		get_by_id(item_id: number) : U | undefined {
 			return this.items.find(value => {return value.get_id() == item_id});
 		}

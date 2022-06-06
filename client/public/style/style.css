@@ -565,3 +565,87 @@ textarea {
 	margin-right: 10px;
 	margin-left: 10px;
 }
+
+.alarms_bar {
+  position: fixed;
+  bottom: 0;
+  height: 5%;
+  width: 100%;
+  background: darkgray;
+  z-index: 1;
+}
+
+.alarm_entry {
+	display: flex;
+	float: left;
+	height: 85%;
+	width: 16%;
+	border: 2px solid;
+	background: yellow;
+	text-align: left;
+	margin-top: 3px;
+	margin-left: 8px;
+	vertical-align: middle;
+	border-radius: 6px;
+	align-items: center;
+	animation: blinking 1.2s infinite;
+}
+
+.alarm_entry {
+	display: flex;
+	float: left;
+	height: 85%;
+	width: 16%;
+	border: 2px solid;
+	background: yellow;
+	text-align: left;
+	margin-top: 3px;
+	margin-left: 8px;
+	vertical-align: middle;
+	border-radius: 6px;
+	align-items: center;
+	animation: blinking 1.2s infinite;
+}
+
+.alarm_entry_confirmed {
+	animation: none;
+}
+
+.alarm_entry:hover {
+	background: gray;
+	cursor: pointer;
+}
+
+.alarm_entry_text {
+	margin-left: 10%;
+	font: bold italic large serif
+}
+
+@keyframes blinking {
+	0% { 
+		background-color: #ffe817;
+	}
+     49% { 
+		 background-color: #ffe817;
+	 }
+     50% { 
+		 background-color: #f9f9d5
+	 }
+    100% { 
+		background-color: #f9f9d5
+	}
+}
+
+.links_content {
+	font-size: 100px;
+	font-family: sans-serif;
+	display: inline-block;
+}
+
+a {
+	color:white
+}
+
+a:hover {
+	color:green;
+}

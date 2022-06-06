@@ -289,6 +289,39 @@ export class SolutionElement_Direct extends NPRPC.Flat.Flat {
   public set value(value: number) { this.buffer.dv.setFloat64(this.offset+8,value,true); }
 }
 } // namespace Flat 
+export const enum AlarmType { //u32
+  Info,
+  Warning = 1,
+  Critical = 2
+}
+export interface Alarm {
+  id: number/*u32*/;
+  type: AlarmType;
+  msg: string;
+}
+
+export namespace Flat_npkcalc {
+export class Alarm_Direct extends NPRPC.Flat.Flat {
+  public get id() { return this.buffer.dv.getUint32(this.offset+0,true); }
+  public set id(value: number) { this.buffer.dv.setUint32(this.offset+0,value,true); }
+  public get type() { return this.buffer.dv.getUint32(this.offset+4,true); }
+  public set type(value: AlarmType) { this.buffer.dv.setUint32(this.offset+4,value,true); }
+  public get msg() {
+    let enc = new TextDecoder("utf-8");
+    let v_begin = this.offset + 8;
+    let data_offset = v_begin + this.buffer.dv.getUint32(v_begin, true);
+    let bn = this.buffer.array_buffer.slice(data_offset, data_offset + this.buffer.dv.getUint32(v_begin + 4, true));
+    return enc.decode(bn);
+  }
+  public set msg(str: string) {
+    let enc = new TextEncoder();
+    let bytes = enc.encode(str);
+    let len = bytes.length;
+    let offset = NPRPC.Flat._alloc(this.buffer, this.offset + 8, len, 1, 1);
+    new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
+  }
+}
+} // namespace Flat 
 export class Authorizator extends NPRPC.ObjectProxy {
   public static get servant_t(): new() => _IAuthorizator_Servant {
     return _IAuthorizator_Servant;
@@ -848,37 +881,6 @@ export class RegisteredUser extends NPRPC.ObjectProxy {
     }
 }
 
-  public async Advise(obj: /*in*/NPRPC.detail.ObjectId): Promise<void> {
-    let interface_idx = (arguments.length == 1 ? 0 : arguments[arguments.length - 1]);
-    let buf = NPRPC.FlatBuffer.create();
-    buf.prepare(200);
-    buf.commit(72);
-    buf.write_msg_id(NPRPC.impl.MessageId.FunctionCall);
-    buf.write_msg_type(NPRPC.impl.MessageType.Request);
-    let __ch = new NPRPC.impl.Flat_nprpc_base.CallHeader_Direct(buf, 16);
-    __ch.object_id = this.data.object_id;
-    __ch.poa_idx = this.data.poa_idx;
-    __ch.interface_idx = interface_idx;
-    __ch.function_idx = 12;
-  let _ = new Flat_npkcalc.npkcalc_M11_Direct(buf,32);
-  _._1.object_id = obj.object_id;
-  _._1.ip4 = obj.ip4;
-  _._1.port = obj.port;
-  _._1.websocket_port = obj.websocket_port;
-  _._1.poa_idx = obj.poa_idx;
-  _._1.flags = obj.flags;
-  _._1.class_id = obj.class_id;
-  _._1.hostname = obj.hostname;
-    buf.write_len(buf.size - 4);
-    await NPRPC.rpc.call(
-      this.endpoint(), buf, this.timeout
-    );
-    let std_reply = NPRPC.handle_standart_reply(buf);
-    if (std_reply != 0) {
-      console.log("received an unusual reply for function with no output arguments");
-    }
-}
-
 };
 
 export interface IRegisteredUser_Servant
@@ -895,7 +897,6 @@ export interface IRegisteredUser_Servant
   SaveData(): void;
   UpdateCalculation(calculation: Flat_npkcalc.Calculation_Direct): number/*u32*/;
   DeleteCalculation(id: number): void;
-  Advise(obj: NPRPC.ObjectProxy): void;
 }
 
 export class _IRegisteredUser_Servant extends NPRPC.ObjectServant {
@@ -1011,12 +1012,6 @@ let __ret_val: number/*u32*/;
       NPRPC.make_simple_answer(buf, NPRPC.impl.MessageId.Success);
       break;
     }
-    case 12: {
-      let ia = new Flat_npkcalc.npkcalc_M11_Direct(buf, 32);
-      (obj as any).Advise(NPRPC.create_object_from_flat(ia._1, remote_endpoint.ip4));
-      NPRPC.make_simple_answer(buf, NPRPC.impl.MessageId.Success);
-      break;
-    }
     default:
       NPRPC.make_simple_answer(buf, NPRPC.impl.MessageId.Error_UnknownFunctionIdx);
   }
@@ -1053,11 +1048,38 @@ export class DataObserver extends NPRPC.ObjectProxy {
     }
 }
 
+  public async OnAlarm(alarm: /*in*/Alarm): Promise<void> {
+    let interface_idx = (arguments.length == 1 ? 0 : arguments[arguments.length - 1]);
+    let buf = NPRPC.FlatBuffer.create();
+    buf.prepare(176);
+    buf.commit(48);
+    buf.write_msg_id(NPRPC.impl.MessageId.FunctionCall);
+    buf.write_msg_type(NPRPC.impl.MessageType.Request);
+    let __ch = new NPRPC.impl.Flat_nprpc_base.CallHeader_Direct(buf, 16);
+    __ch.object_id = this.data.object_id;
+    __ch.poa_idx = this.data.poa_idx;
+    __ch.interface_idx = interface_idx;
+    __ch.function_idx = 1;
+  let _ = new Flat_npkcalc.npkcalc_M11_Direct(buf,32);
+  _._1.id = alarm.id;
+  _._1.type = alarm.type;
+  _._1.msg = alarm.msg;
+    buf.write_len(buf.size - 4);
+    await NPRPC.rpc.call(
+      this.endpoint(), buf, this.timeout
+    );
+    let std_reply = NPRPC.handle_standart_reply(buf);
+    if (std_reply != 0) {
+      console.log("received an unusual reply for function with no output arguments");
+    }
+}
+
 };
 
 export interface IDataObserver_Servant
 {
   DataChanged(idx: number): void;
+  OnAlarm(alarm: Flat_npkcalc.Alarm_Direct): void;
 }
 
 export class _IDataObserver_Servant extends NPRPC.ObjectServant {
@@ -1072,6 +1094,12 @@ export class _IDataObserver_Servant extends NPRPC.ObjectServant {
     case 0: {
       let ia = new Flat_npkcalc.npkcalc_M7_Direct(buf, 32);
       (obj as any).DataChanged(ia._1);
+      NPRPC.make_simple_answer(buf, NPRPC.impl.MessageId.Success);
+      break;
+    }
+    case 1: {
+      let ia = new Flat_npkcalc.npkcalc_M11_Direct(buf, 32);
+      (obj as any).OnAlarm(ia._1);
       NPRPC.make_simple_answer(buf, NPRPC.impl.MessageId.Success);
       break;
     }
@@ -1138,12 +1166,70 @@ export class Calculator extends NPRPC.ObjectProxy {
   images.value = out._1_vd();
 }
 
+  public async Subscribe(obj: /*in*/NPRPC.detail.ObjectId): Promise<void> {
+    let interface_idx = (arguments.length == 1 ? 0 : arguments[arguments.length - 1]);
+    let buf = NPRPC.FlatBuffer.create();
+    buf.prepare(200);
+    buf.commit(72);
+    buf.write_msg_id(NPRPC.impl.MessageId.FunctionCall);
+    buf.write_msg_type(NPRPC.impl.MessageType.Request);
+    let __ch = new NPRPC.impl.Flat_nprpc_base.CallHeader_Direct(buf, 16);
+    __ch.object_id = this.data.object_id;
+    __ch.poa_idx = this.data.poa_idx;
+    __ch.interface_idx = interface_idx;
+    __ch.function_idx = 2;
+  let _ = new Flat_npkcalc.npkcalc_M14_Direct(buf,32);
+  _._1.object_id = obj.object_id;
+  _._1.ip4 = obj.ip4;
+  _._1.port = obj.port;
+  _._1.websocket_port = obj.websocket_port;
+  _._1.poa_idx = obj.poa_idx;
+  _._1.flags = obj.flags;
+  _._1.class_id = obj.class_id;
+  _._1.hostname = obj.hostname;
+    buf.write_len(buf.size - 4);
+    await NPRPC.rpc.call(
+      this.endpoint(), buf, this.timeout
+    );
+    let std_reply = NPRPC.handle_standart_reply(buf);
+    if (std_reply != 0) {
+      console.log("received an unusual reply for function with no output arguments");
+    }
+}
+
+  public async GetGuestCalculations(calculations: /*out*/NPRPC.ref<NPRPC.Flat.Vector_Direct2<Flat_npkcalc.Calculation_Direct>>): Promise<void> {
+    let interface_idx = (arguments.length == 1 ? 0 : arguments[arguments.length - 1]);
+    let buf = NPRPC.FlatBuffer.create();
+    buf.prepare(32);
+    buf.commit(32);
+    buf.write_msg_id(NPRPC.impl.MessageId.FunctionCall);
+    buf.write_msg_type(NPRPC.impl.MessageType.Request);
+    let __ch = new NPRPC.impl.Flat_nprpc_base.CallHeader_Direct(buf, 16);
+    __ch.object_id = this.data.object_id;
+    __ch.poa_idx = this.data.poa_idx;
+    __ch.interface_idx = interface_idx;
+    __ch.function_idx = 3;
+    buf.write_len(buf.size - 4);
+    await NPRPC.rpc.call(
+      this.endpoint(), buf, this.timeout
+    );
+    let std_reply = NPRPC.handle_standart_reply(buf);
+    if (std_reply != -1) {
+      console.log("received an unusual reply for function with output arguments");
+      throw new NPRPC.Exception("Unknown Error");
+    }
+  let out = new Flat_npkcalc.npkcalc_M5_Direct(buf, 16);
+  calculations.value = out._1_vd();
+}
+
 };
 
 export interface ICalculator_Servant
 {
   GetData(solutions: NPRPC.Flat.Vector_Direct2<Flat_npkcalc.Solution_Direct>, fertilizers: NPRPC.Flat.Vector_Direct2<Flat_npkcalc.Fertilizer_Direct>): void;
   GetImages(images: NPRPC.Flat.Vector_Direct2<Flat_npkcalc.Media_Direct>): void;
+  Subscribe(obj: NPRPC.ObjectProxy): void;
+  GetGuestCalculations(calculations: NPRPC.Flat.Vector_Direct2<Flat_npkcalc.Calculation_Direct>): void;
 }
 
 export class _ICalculator_Servant extends NPRPC.ObjectServant {
@@ -1174,6 +1260,24 @@ export class _ICalculator_Servant extends NPRPC.ObjectServant {
       obuf.commit(24);
       let oa = new Flat_npkcalc.npkcalc_M13_Direct(obuf,16);
       (obj as any).GetImages(oa._1_vd);
+      obuf.write_len(obuf.size - 4);
+      obuf.write_msg_id(NPRPC.impl.MessageId.BlockResponse);
+      obuf.write_msg_type(NPRPC.impl.MessageType.Answer);
+      break;
+    }
+    case 2: {
+      let ia = new Flat_npkcalc.npkcalc_M14_Direct(buf, 32);
+      (obj as any).Subscribe(NPRPC.create_object_from_flat(ia._1, remote_endpoint.ip4));
+      NPRPC.make_simple_answer(buf, NPRPC.impl.MessageId.Success);
+      break;
+    }
+    case 3: {
+      let obuf = buf;
+      obuf.consume(obuf.size);
+      obuf.prepare(152);
+      obuf.commit(24);
+      let oa = new Flat_npkcalc.npkcalc_M5_Direct(obuf,16);
+      (obj as any).GetGuestCalculations(oa._1_vd);
       obuf.write_len(obuf.size - 4);
       obuf.write_msg_id(NPRPC.impl.MessageId.BlockResponse);
       obuf.write_msg_type(NPRPC.impl.MessageType.Answer);
@@ -1373,12 +1477,12 @@ export class npkcalc_M10_Direct extends NPRPC.Flat.Flat {
 }
 } // namespace Flat 
 export interface npkcalc_M11 {
-  _1: NPRPC.detail.ObjectId;
+  _1: Alarm;
 }
 
 export namespace Flat_npkcalc {
 export class npkcalc_M11_Direct extends NPRPC.Flat.Flat {
-  public get _1() { return new NPRPC.detail.Flat_nprpc_base.ObjectId_Direct(this.buffer, this.offset + 0); }
+  public get _1() { return new Alarm_Direct(this.buffer, this.offset + 0); }
 }
 } // namespace Flat 
 export interface npkcalc_M12 {
@@ -1408,5 +1512,14 @@ export class npkcalc_M13_Direct extends NPRPC.Flat.Flat {
     NPRPC.Flat._alloc(this.buffer, this.offset + 0, elements_size, 16, 4);
   }
   public _1_vd() { return new NPRPC.Flat.Vector_Direct2<Flat_npkcalc.Media_Direct>(this.buffer, this.offset + 0, 16, Flat_npkcalc.Media_Direct); }
+}
+} // namespace Flat 
+export interface npkcalc_M14 {
+  _1: NPRPC.detail.ObjectId;
+}
+
+export namespace Flat_npkcalc {
+export class npkcalc_M14_Direct extends NPRPC.Flat.Flat {
+  public get _1() { return new NPRPC.detail.Flat_nprpc_base.ObjectId_Direct(this.buffer, this.offset + 0); }
 }
 } // namespace Flat 

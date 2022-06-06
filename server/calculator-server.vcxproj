@@ -173,6 +173,7 @@
     <ClCompile Include="src\npkcalc.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="idl\idl.bat" />
     <None Include="idl\npkcalc.npidl" />
     <None Include="Makefile" />
   </ItemGroup>

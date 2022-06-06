@@ -32,11 +32,70 @@ export class MyIcons {
 		return URL.createObjectURL(new Blob([abuf], {type: type}));
 	}
 
+
 	public async fetch(obj: npkcalc.Calculator) {
+		let db: IDBDatabase;
+		let request = window.indexedDB.open("Cache", 1);
+		let promise = new NPRPC.MyPromise<boolean>();
+
+		request.onerror = event => {
+			promise.set_exception(new NPRPC.Exception("Why didn't you allow my web app to use IndexedDB?!"));
+		};
+
+		request.onsuccess = event => {
+			db = (event.target as any).result;
+			promise.set_promise(true);
+		};
+
+		request.onupgradeneeded = event => {
+			db = (event.target as any).result;
+			db.createObjectStore("images");
+		};
+
+		try {
+			await promise.$;
+
+			promise = new NPRPC.MyPromise<boolean>();
+			var transaction = db.transaction(["images"]);
+			var objectStore = transaction.objectStore("images");
+			let c = objectStore.openCursor();
+			
+			let images = this as any;
+
+			c.onsuccess = (event) => {
+				let cursor: IDBCursorWithValue = (event.target as any).result;
+				let has_images = false;
+				if(cursor) {
+					has_images = true;
+					images[cursor.key.toString()] = MyIcons.get_image_svg(cursor.value); 
+					cursor.continue();
+				}
+				promise.set_promise(has_images);
+			}
+			c.onerror = event => {
+				promise.set_promise(false);
+			}
+
+			if (await promise.$ === true) return;
+		} catch (e) {
+			console.log(e);
+		}
+		
 		let images = NPRPC.make_ref<NPRPC.Flat.Vector_Direct2<npkcalc.Flat_npkcalc.Media_Direct>>();
 		await obj.GetImages(images);
 		for (let img of images.value) {
 			(this as any)[img.name] = MyIcons.get_image_svg(img.data_vd().array_buffer);
+		}
+
+		if (db) {
+			var transaction = db.transaction(["images"], "readwrite");
+			transaction.oncomplete = event => {};
+			transaction.onerror = event => {};
+
+			var objectStore = transaction.objectStore("images");
+			for (let img of images.value) {
+				objectStore.add(img.data_vd().array_buffer, img.name);
+			}
 		}
 	}
 }

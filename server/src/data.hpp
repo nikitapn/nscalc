@@ -113,16 +113,12 @@ public:
 	}
 
 	T* get_by_id(int id) noexcept {
-		auto it = std::find_if(data_.begin(), data_.end(), [id](const auto& x) {
-			return x->id == id;
-			});
+		auto it = std::find_if(data_.begin(), data_.end(), [id](const auto& x) { return x->id == id; });
 		return (it == data_.end() ? nullptr : (*it).get());
 	}
 
 	void remove_by_id(int id) {
-		auto founded = std::find_if(data_.begin(), data_.end(), [id](const auto& x) {
-			return x->id == id;
-			});
+		auto founded = std::find_if(data_.begin(), data_.end(), [id](const auto& x) { return x->id == id; });
 		if (founded != data_.end()) data_.erase(founded);
 	}
 

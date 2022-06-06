@@ -302,12 +302,12 @@ public:
 } // namespace flat
 
 struct npkcalc_M11 {
-  nprpc::ObjectId _1;
+  npkcalc::Alarm _1;
 };
 
 namespace flat {
 struct npkcalc_M11 {
-  nprpc::detail::flat::ObjectId _1;
+  npkcalc::flat::Alarm _1;
 };
 
 class npkcalc_M11_Direct {
@@ -323,7 +323,7 @@ public:
     , offset_(offset)
   {
   }
-  auto _1() noexcept { return nprpc::detail::flat::ObjectId_Direct(buffer_, offset_ + offsetof(npkcalc_M11, _1)); }
+  auto _1() noexcept { return npkcalc::flat::Alarm_Direct(buffer_, offset_ + offsetof(npkcalc_M11, _1)); }
 };
 } // namespace flat
 
@@ -385,6 +385,32 @@ public:
   void _1(size_t elements_size) { new (&base()._1) ::flat::Vector<npkcalc::flat::Media>(buffer_, elements_size); }
   auto _1_vd() noexcept { return ::flat::Vector_Direct2<npkcalc::flat::Media, npkcalc::flat::Media_Direct>(buffer_, offset_ + offsetof(npkcalc_M13, _1)); }
   auto _1() noexcept { return ::flat::Span_ref<npkcalc::flat::Media, npkcalc::flat::Media_Direct>(buffer_, base()._1.range(buffer_.data().data())); }
+};
+} // namespace flat
+
+struct npkcalc_M14 {
+  nprpc::ObjectId _1;
+};
+
+namespace flat {
+struct npkcalc_M14 {
+  nprpc::detail::flat::ObjectId _1;
+};
+
+class npkcalc_M14_Direct {
+  boost::beast::flat_buffer& buffer_;
+  const size_t offset_;
+
+  auto& base() noexcept { return *reinterpret_cast<npkcalc_M14*>(reinterpret_cast<std::byte*>(buffer_.data().data()) + offset_); }
+  auto const& base() const noexcept { return *reinterpret_cast<const npkcalc_M14*>(reinterpret_cast<const std::byte*>(buffer_.data().data()) + offset_); }
+public:
+  void* __data() noexcept { return (void*)&base(); }
+  npkcalc_M14_Direct(boost::beast::flat_buffer& buffer, size_t offset)
+    : buffer_(buffer)
+    , offset_(offset)
+  {
+  }
+  auto _1() noexcept { return nprpc::detail::flat::ObjectId_Direct(buffer_, offset_ + offsetof(npkcalc_M14, _1)); }
 };
 } // namespace flat
 

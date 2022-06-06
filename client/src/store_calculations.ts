@@ -6,8 +6,7 @@ import global from './global'
 import * as NPRPC from './nprpc';
 import * as npkcalc from './npkcalc'
 import { TableModel } from './table_item'
-import { poa } from './rpc'
-import { TableModelWithCommands } from './table_model';
+import { calculator } from './rpc'
 
 class Table_Calculations extends TableModel(class {}, Calculation.Calculation) {
 	constructor() {
@@ -49,29 +48,25 @@ class Table_Calculations extends TableModel(class {}, Calculation.Calculation) {
 	public delete_calculation(calc: Calculation.Calculation) {
 		const [id, is_new] = [calc.get_id(), calc.is_new];
 		calculations.erase_by_id(id);
-		if (!is_new) global.user_data.reg_user.DeleteCalculation(id);
+		if (global.user_data.reg_user) {
+			if (!is_new) global.user_data.reg_user.DeleteCalculation(id);
+		}
 	}
 }
 
 export let calculations = new Table_Calculations();
 
-class DataObserverImpl extends npkcalc._IDataObserver_Servant implements npkcalc.IDataObserver_Servant {
-	DataChanged(idx: number): void {
-		// console.log("DataObserverImpl(): " + idx.toString());
-	}
-}
-
-export const fetch_user_data = async () => {
+export const get_calculations = async () => {
+	let calculations_data = NPRPC.make_ref<NPRPC.Flat.Vector_Direct2<npkcalc.Flat_npkcalc.Calculation_Direct>>();
 	if (global.user_data.reg_user) {
-		let calculations_data = NPRPC.make_ref<NPRPC.Flat.Vector_Direct2<npkcalc.Flat_npkcalc.Calculation_Direct>>();
 		await global.user_data.reg_user.GetMyCalculations(calculations_data);
-
-		for (let calc_data of calculations_data.value) {
-			calculations.add(Calculation.Calculation.create_from_data(calc_data));
-		}
-		
-		await global.user_data.reg_user.Advise(
-			poa.activate_object(new DataObserverImpl())
-		);
+	} else {
+		await calculator.GetGuestCalculations(calculations_data);
 	}
+
+	calculations.clear();
+	for (let calc_data of calculations_data.value) {
+		calculations.add(Calculation.Calculation.create_from_data(calc_data));
+	}
+	document.dispatchEvent(new CustomEvent("calc_clear"));
 }

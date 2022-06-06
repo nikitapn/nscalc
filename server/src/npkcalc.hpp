@@ -373,6 +373,49 @@ public:
 };
 } // namespace flat
 
+enum class AlarmType : uint32_t {
+  Info,
+  Warning = 1,
+  Critical = 2
+};
+struct Alarm {
+  uint32_t id;
+  AlarmType type;
+  std::string msg;
+};
+
+namespace flat {
+struct Alarm {
+  uint32_t id;
+  AlarmType type;
+  ::flat::String msg;
+};
+
+class Alarm_Direct {
+  boost::beast::flat_buffer& buffer_;
+  const size_t offset_;
+
+  auto& base() noexcept { return *reinterpret_cast<Alarm*>(reinterpret_cast<std::byte*>(buffer_.data().data()) + offset_); }
+  auto const& base() const noexcept { return *reinterpret_cast<const Alarm*>(reinterpret_cast<const std::byte*>(buffer_.data().data()) + offset_); }
+public:
+  void* __data() noexcept { return (void*)&base(); }
+  Alarm_Direct(boost::beast::flat_buffer& buffer, size_t offset)
+    : buffer_(buffer)
+    , offset_(offset)
+  {
+  }
+  const uint32_t& id() const noexcept { return base().id;}
+  uint32_t& id() noexcept { return base().id;}
+  const AlarmType& type() const noexcept { return base().type;}
+  AlarmType& type() noexcept { return base().type;}
+  void msg(const char* str) { new (&base().msg) ::flat::String(buffer_, str); }
+  void msg(const std::string& str) { new (&base().msg) ::flat::String(buffer_, str); }
+  auto msg() noexcept { return (::flat::Span<char>)base().msg; }
+  auto msg() const noexcept { return (::flat::Span<const char>)base().msg; }
+  auto msg_vd() noexcept {     return ::flat::String_Direct1(buffer_, offset_ + offsetof(Alarm, msg));  }
+};
+} // namespace flat
+
 class IAuthorizator_Servant
   : public virtual nprpc::ObjectServant
 {
@@ -417,7 +460,6 @@ public:
   virtual void SaveData () = 0;
   virtual uint32_t UpdateCalculation (npkcalc::flat::Calculation_Direct calculation) = 0;
   virtual void DeleteCalculation (uint32_t id) = 0;
-  virtual void Advise (nprpc::Object* obj) = 0;
 };
 
 class RegisteredUser
@@ -440,7 +482,6 @@ public:
   void SaveData ();
   uint32_t UpdateCalculation (/*in*/const npkcalc::Calculation& calculation);
   void DeleteCalculation (/*in*/uint32_t id);
-  void Advise (/*in*/const ObjectId& obj);
 };
 
 class IDataObserver_Servant
@@ -451,6 +492,7 @@ public:
   std::string_view get_class() const noexcept override { return IDataObserver_Servant::_get_class(); }
   void dispatch(nprpc::Buffers& bufs, nprpc::EndPoint remote_endpoint, bool from_parent, nprpc::ReferenceList& ref_list) override;
   virtual void DataChanged (uint32_t idx) = 0;
+  virtual void OnAlarm (npkcalc::flat::Alarm_Direct alarm) = 0;
 };
 
 class DataObserver
@@ -462,6 +504,7 @@ public:
 
   DataObserver(uint8_t interface_idx) : interface_idx_(interface_idx) {}
   void DataChanged (/*in*/uint32_t idx);
+  void OnAlarm (/*in*/const npkcalc::Alarm& alarm);
 };
 
 class ICalculator_Servant
@@ -473,6 +516,8 @@ public:
   void dispatch(nprpc::Buffers& bufs, nprpc::EndPoint remote_endpoint, bool from_parent, nprpc::ReferenceList& ref_list) override;
   virtual void GetData (/*out*/::flat::Vector_Direct2<npkcalc::flat::Solution, npkcalc::flat::Solution_Direct> solutions, /*out*/::flat::Vector_Direct2<npkcalc::flat::Fertilizer, npkcalc::flat::Fertilizer_Direct> fertilizers) = 0;
   virtual void GetImages (/*out*/::flat::Vector_Direct2<npkcalc::flat::Media, npkcalc::flat::Media_Direct> images) = 0;
+  virtual void Subscribe (nprpc::Object* obj) = 0;
+  virtual void GetGuestCalculations (/*out*/::flat::Vector_Direct2<npkcalc::flat::Calculation, npkcalc::flat::Calculation_Direct> calculations) = 0;
 };
 
 class Calculator
@@ -485,6 +530,8 @@ public:
   Calculator(uint8_t interface_idx) : interface_idx_(interface_idx) {}
   void GetData (/*out*/std::vector<npkcalc::Solution>& solutions, /*out*/std::vector<npkcalc::Fertilizer>& fertilizers);
   void GetImages (/*out*/std::vector<npkcalc::Media>& images);
+  void Subscribe (/*in*/const ObjectId& obj);
+  void GetGuestCalculations (/*out*/std::vector<npkcalc::Calculation>& calculations);
 };
 
 } // namespace npkcalc
@@ -521,6 +568,11 @@ inline void assign_from_flat_UpdateCalculation_calculation(npkcalc::flat::Calcul
   }
   dest.volume = src.volume();
   dest.mode = src.mode();
+}
+inline void assign_from_flat_OnAlarm_alarm(npkcalc::flat::Alarm_Direct& src, npkcalc::Alarm& dest) {
+  dest.id = src.id();
+  dest.type = src.type();
+  dest.msg = (std::string_view)src.msg();
 }
 template<::nprpc::IterableCollection T>
 void assign_from_cpp_GetData_solutions(/*out*/::flat::Vector_Direct2<npkcalc::flat::Solution, npkcalc::flat::Solution_Direct>& dest, const T & src) {

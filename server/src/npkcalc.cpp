@@ -22,9 +22,7 @@ UserData npkcalc::Authorizator::LogIn(/*in*/const std::string& login, /*in*/cons
   _._1(login);
   _._2(password);
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
-  ::nprpc::impl::g_orb->call(
-    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
-  );
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
   if (std_reply == 1) {
     npkcalc_throw_exception(buf);
@@ -57,9 +55,7 @@ UserData npkcalc::Authorizator::LogInWithSessionId(/*in*/const std::string& sess
   ::flat::npkcalc_M3_Direct _(buf,32);
   _._1(session_id);
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
-  ::nprpc::impl::g_orb->call(
-    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
-  );
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
   if (std_reply == 1) {
     npkcalc_throw_exception(buf);
@@ -92,9 +88,7 @@ bool npkcalc::Authorizator::LogOut(/*in*/const std::string& session_id) {
   ::flat::npkcalc_M3_Direct _(buf,32);
   _._1(session_id);
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
-  ::nprpc::impl::g_orb->call(
-    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
-  );
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
   if (std_reply != -1) {
     std::cerr << "received an unusual reply for function with output arguments\n";
@@ -211,9 +205,7 @@ void npkcalc::RegisteredUser::GetMyCalculations(/*out*/std::vector<npkcalc::Calc
   __ch.interface_idx() = interface_idx_;
   __ch.function_idx() = 0;
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
-  ::nprpc::impl::g_orb->call(
-    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
-  );
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
   if (std_reply != -1) {
     std::cerr << "received an unusual reply for function with output arguments\n";
@@ -243,9 +235,7 @@ uint32_t npkcalc::RegisteredUser::AddSolution(/*in*/const std::string& name, /*i
   _._1(name);
   memcpy(_._2().data(), elements.data(), elements.size() * 8);
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
-  ::nprpc::impl::g_orb->call(
-    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
-  );
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
   if (std_reply != -1) {
     std::cerr << "received an unusual reply for function with output arguments\n";
@@ -274,9 +264,7 @@ void npkcalc::RegisteredUser::SetSolutionName(/*in*/uint32_t id, /*in*/const std
   _._1() = id;
   _._2(name);
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
-  ::nprpc::impl::g_orb->call(
-    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
-  );
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
   if (std_reply != 0) {
     std::cerr << "received an unusual reply for function with no output arguments\n";
@@ -301,9 +289,7 @@ void npkcalc::RegisteredUser::SetSolutionElements(/*in*/uint32_t id, /*in*/::fla
   _._2(name.size());
   memcpy(_._2().data(), name.data(), name.size() * 16);
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
-  ::nprpc::impl::g_orb->call(
-    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
-  );
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
   if (std_reply != 0) {
     std::cerr << "received an unusual reply for function with no output arguments\n";
@@ -326,9 +312,7 @@ void npkcalc::RegisteredUser::DeleteSolution(/*in*/uint32_t id) {
   ::flat::npkcalc_M7_Direct _(buf,32);
   _._1() = id;
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
-  ::nprpc::impl::g_orb->call(
-    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
-  );
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
   if (std_reply != 0) {
     std::cerr << "received an unusual reply for function with no output arguments\n";
@@ -352,9 +336,7 @@ uint32_t npkcalc::RegisteredUser::AddFertilizer(/*in*/const std::string& name, /
   _._1(name);
   _._2(formula);
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
-  ::nprpc::impl::g_orb->call(
-    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
-  );
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
   if (std_reply != -1) {
     std::cerr << "received an unusual reply for function with output arguments\n";
@@ -383,9 +365,7 @@ void npkcalc::RegisteredUser::SetFertilizerName(/*in*/uint32_t id, /*in*/const s
   _._1() = id;
   _._2(name);
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
-  ::nprpc::impl::g_orb->call(
-    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
-  );
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
   if (std_reply != 0) {
     std::cerr << "received an unusual reply for function with no output arguments\n";
@@ -409,9 +389,7 @@ void npkcalc::RegisteredUser::SetFertilizerFormula(/*in*/uint32_t id, /*in*/cons
   _._1() = id;
   _._2(name);
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
-  ::nprpc::impl::g_orb->call(
-    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
-  );
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
   if (std_reply != 0) {
     std::cerr << "received an unusual reply for function with no output arguments\n";
@@ -434,9 +412,7 @@ void npkcalc::RegisteredUser::DeleteFertilizer(/*in*/uint32_t id) {
   ::flat::npkcalc_M7_Direct _(buf,32);
   _._1() = id;
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
-  ::nprpc::impl::g_orb->call(
-    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
-  );
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
   if (std_reply != 0) {
     std::cerr << "received an unusual reply for function with no output arguments\n";
@@ -457,9 +433,7 @@ void npkcalc::RegisteredUser::SaveData() {
   __ch.interface_idx() = interface_idx_;
   __ch.function_idx() = 9;
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
-  ::nprpc::impl::g_orb->call(
-    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
-  );
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
   if (std_reply != 0) {
     std::cerr << "received an unusual reply for function with no output arguments\n";
@@ -488,9 +462,7 @@ uint32_t npkcalc::RegisteredUser::UpdateCalculation(/*in*/const npkcalc::Calcula
   _._1().volume() = calculation.volume;
   _._1().mode() = calculation.mode;
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
-  ::nprpc::impl::g_orb->call(
-    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
-  );
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
   if (std_reply != -1) {
     std::cerr << "received an unusual reply for function with output arguments\n";
@@ -518,36 +490,7 @@ void npkcalc::RegisteredUser::DeleteCalculation(/*in*/uint32_t id) {
   ::flat::npkcalc_M7_Direct _(buf,32);
   _._1() = id;
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
-  ::nprpc::impl::g_orb->call(
-    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
-  );
-  auto std_reply = nprpc::impl::handle_standart_reply(buf);
-  if (std_reply != 0) {
-    std::cerr << "received an unusual reply for function with no output arguments\n";
-  }
-}
-
-void npkcalc::RegisteredUser::Advise(/*in*/const ObjectId& obj) {
-  boost::beast::flat_buffer buf;
-  {
-    auto mb = buf.prepare(200);
-    buf.commit(72);
-    static_cast<::nprpc::impl::Header*>(mb.data())->msg_id = ::nprpc::impl::MessageId::FunctionCall;
-    static_cast<::nprpc::impl::Header*>(mb.data())->msg_type = ::nprpc::impl::MessageType::Request;
-  }
-  ::nprpc::impl::flat::CallHeader_Direct __ch(buf, sizeof(::nprpc::impl::Header));
-  __ch.object_id() = this->_data().object_id;
-  __ch.poa_idx() = this->_data().poa_idx;
-  __ch.interface_idx() = interface_idx_;
-  __ch.function_idx() = 12;
-  ::flat::npkcalc_M11_Direct _(buf,32);
-  memcpy(_._1().__data(), &obj._data(), 24);
-  _._1().class_id(obj._data().class_id);
-  _._1().hostname(obj._data().hostname);
-  static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
-  ::nprpc::impl::g_orb->call(
-    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
-  );
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
   if (std_reply != 0) {
     std::cerr << "received an unusual reply for function with no output arguments\n";
@@ -661,12 +604,6 @@ uint32_t __ret_val;
       nprpc::impl::make_simple_answer(bufs(), nprpc::impl::MessageId::Success);
       break;
     }
-    case 12: {
-      ::flat::npkcalc_M11_Direct ia(bufs(), 32);
-      Advise(nprpc::impl::g_orb->create_object_from_flat(ia._1(), remote_endpoint));
-      nprpc::impl::make_simple_answer(bufs(), nprpc::impl::MessageId::Success);
-      break;
-    }
     default:
       nprpc::impl::make_simple_answer(bufs(), nprpc::impl::MessageId::Error_UnknownFunctionIdx);
   }
@@ -688,9 +625,32 @@ void npkcalc::DataObserver::DataChanged(/*in*/uint32_t idx) {
   ::flat::npkcalc_M7_Direct _(buf,32);
   _._1() = idx;
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
-  ::nprpc::impl::g_orb->call(
-    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
-  );
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
+  auto std_reply = nprpc::impl::handle_standart_reply(buf);
+  if (std_reply != 0) {
+    std::cerr << "received an unusual reply for function with no output arguments\n";
+  }
+}
+
+void npkcalc::DataObserver::OnAlarm(/*in*/const npkcalc::Alarm& alarm) {
+  boost::beast::flat_buffer buf;
+  {
+    auto mb = buf.prepare(176);
+    buf.commit(48);
+    static_cast<::nprpc::impl::Header*>(mb.data())->msg_id = ::nprpc::impl::MessageId::FunctionCall;
+    static_cast<::nprpc::impl::Header*>(mb.data())->msg_type = ::nprpc::impl::MessageType::Request;
+  }
+  ::nprpc::impl::flat::CallHeader_Direct __ch(buf, sizeof(::nprpc::impl::Header));
+  __ch.object_id() = this->_data().object_id;
+  __ch.poa_idx() = this->_data().poa_idx;
+  __ch.interface_idx() = interface_idx_;
+  __ch.function_idx() = 1;
+  ::flat::npkcalc_M11_Direct _(buf,32);
+  _._1().id() = alarm.id;
+  _._1().type() = alarm.type;
+  _._1().msg(alarm.msg);
+  static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
   if (std_reply != 0) {
     std::cerr << "received an unusual reply for function with no output arguments\n";
@@ -703,6 +663,12 @@ void npkcalc::IDataObserver_Servant::dispatch(nprpc::Buffers& bufs, nprpc::EndPo
     case 0: {
       ::flat::npkcalc_M7_Direct ia(bufs(), 32);
       DataChanged(ia._1());
+      nprpc::impl::make_simple_answer(bufs(), nprpc::impl::MessageId::Success);
+      break;
+    }
+    case 1: {
+      ::flat::npkcalc_M11_Direct ia(bufs(), 32);
+      OnAlarm(ia._1());
       nprpc::impl::make_simple_answer(bufs(), nprpc::impl::MessageId::Success);
       break;
     }
@@ -725,9 +691,7 @@ void npkcalc::Calculator::GetData(/*out*/std::vector<npkcalc::Solution>& solutio
   __ch.interface_idx() = interface_idx_;
   __ch.function_idx() = 0;
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
-  ::nprpc::impl::g_orb->call(
-    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
-  );
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
   if (std_reply != -1) {
     std::cerr << "received an unusual reply for function with output arguments\n";
@@ -758,9 +722,7 @@ void npkcalc::Calculator::GetImages(/*out*/std::vector<npkcalc::Media>& images) 
   __ch.interface_idx() = interface_idx_;
   __ch.function_idx() = 1;
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
-  ::nprpc::impl::g_orb->call(
-    nprpc::EndPoint(this->_data().ip4, this->_data().port), buf, this->get_timeout()
-  );
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
   if (std_reply != -1) {
     std::cerr << "received an unusual reply for function with output arguments\n";
@@ -770,6 +732,58 @@ void npkcalc::Calculator::GetImages(/*out*/std::vector<npkcalc::Media>& images) 
   {
     auto span = out._1();
     images.resize(span.size());
+  }
+}
+
+void npkcalc::Calculator::Subscribe(/*in*/const ObjectId& obj) {
+  boost::beast::flat_buffer buf;
+  {
+    auto mb = buf.prepare(200);
+    buf.commit(72);
+    static_cast<::nprpc::impl::Header*>(mb.data())->msg_id = ::nprpc::impl::MessageId::FunctionCall;
+    static_cast<::nprpc::impl::Header*>(mb.data())->msg_type = ::nprpc::impl::MessageType::Request;
+  }
+  ::nprpc::impl::flat::CallHeader_Direct __ch(buf, sizeof(::nprpc::impl::Header));
+  __ch.object_id() = this->_data().object_id;
+  __ch.poa_idx() = this->_data().poa_idx;
+  __ch.interface_idx() = interface_idx_;
+  __ch.function_idx() = 2;
+  ::flat::npkcalc_M14_Direct _(buf,32);
+  memcpy(_._1().__data(), &obj._data(), 24);
+  _._1().class_id(obj._data().class_id);
+  _._1().hostname(obj._data().hostname);
+  static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
+  auto std_reply = nprpc::impl::handle_standart_reply(buf);
+  if (std_reply != 0) {
+    std::cerr << "received an unusual reply for function with no output arguments\n";
+  }
+}
+
+void npkcalc::Calculator::GetGuestCalculations(/*out*/std::vector<npkcalc::Calculation>& calculations) {
+  boost::beast::flat_buffer buf;
+  {
+    auto mb = buf.prepare(32);
+    buf.commit(32);
+    static_cast<::nprpc::impl::Header*>(mb.data())->msg_id = ::nprpc::impl::MessageId::FunctionCall;
+    static_cast<::nprpc::impl::Header*>(mb.data())->msg_type = ::nprpc::impl::MessageType::Request;
+  }
+  ::nprpc::impl::flat::CallHeader_Direct __ch(buf, sizeof(::nprpc::impl::Header));
+  __ch.object_id() = this->_data().object_id;
+  __ch.poa_idx() = this->_data().poa_idx;
+  __ch.interface_idx() = interface_idx_;
+  __ch.function_idx() = 3;
+  static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
+  auto std_reply = nprpc::impl::handle_standart_reply(buf);
+  if (std_reply != -1) {
+    std::cerr << "received an unusual reply for function with output arguments\n";
+    throw nprpc::Exception("Unknown Error");
+  }
+  ::flat::npkcalc_M5_Direct out(buf, sizeof(::nprpc::impl::Header));
+  {
+    auto span = out._1();
+    calculations.resize(span.size());
   }
 }
 
@@ -795,6 +809,24 @@ void npkcalc::ICalculator_Servant::dispatch(nprpc::Buffers& bufs, nprpc::EndPoin
       obuf.commit(24);
       ::flat::npkcalc_M13_Direct oa(obuf,16);
       GetImages(oa._1_vd());
+      static_cast<::nprpc::impl::Header*>(obuf.data().data())->size = static_cast<uint32_t>(obuf.size() - 4);
+      static_cast<::nprpc::impl::Header*>(obuf.data().data())->msg_id = ::nprpc::impl::MessageId::BlockResponse;
+      static_cast<::nprpc::impl::Header*>(obuf.data().data())->msg_type = ::nprpc::impl::MessageType::Answer;
+      break;
+    }
+    case 2: {
+      ::flat::npkcalc_M14_Direct ia(bufs(), 32);
+      Subscribe(nprpc::impl::g_orb->create_object_from_flat(ia._1(), remote_endpoint));
+      nprpc::impl::make_simple_answer(bufs(), nprpc::impl::MessageId::Success);
+      break;
+    }
+    case 3: {
+      auto& obuf = bufs.flip();
+      obuf.consume(obuf.size());
+      obuf.prepare(152);
+      obuf.commit(24);
+      ::flat::npkcalc_M5_Direct oa(obuf,16);
+      GetGuestCalculations(oa._1_vd());
       static_cast<::nprpc::impl::Header*>(obuf.data().data())->size = static_cast<uint32_t>(obuf.size() - 4);
       static_cast<::nprpc::impl::Header*>(obuf.data().data())->msg_id = ::nprpc::impl::MessageId::BlockResponse;
       static_cast<::nprpc::impl::Header*>(obuf.data().data())->msg_type = ::nprpc::impl::MessageType::Answer;

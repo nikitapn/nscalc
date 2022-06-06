@@ -6,7 +6,7 @@
 #include <concepts>
 #include <cassert>
 #include <filesystem>
-
+#include <set>
 #include <boost/asio/signal_set.hpp>
 #include <boost/beast/core/error.hpp>
 #include <boost/uuid/random_generator.hpp>
@@ -14,14 +14,72 @@
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/program_options.hpp>
-#include <set>
-
 #include <openssl/sha.h>
-
 #include "npkcalc.hpp"
 #include "data.hpp"
-
+#include "thread_pool.hpp"
 #include <nprpc/serialization/oarchive.h>
+#include <boost/asio/strand.hpp>
+
+using thread_pool = nplib::thread_pool<3>;
+
+
+class Observers {
+	boost::asio::io_context ioc_;
+	boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard_;
+
+	uint32_t alarm_id_ = 0;
+	std::vector<std::unique_ptr<npkcalc::DataObserver>> observers;
+
+	npkcalc::Alarm make_alarm(npkcalc::AlarmType type, const std::string& msg) {
+		return { alarm_id_++, type, msg };
+	}
+
+	void add_impl(npkcalc::DataObserver* user) {
+		observers.emplace_back(user);
+	}
+
+	template<typename T, typename... Args>
+	void broadcast(T fn, const Args&... args) {
+		for (auto it = std::begin(observers); it != observers.end(); ) {
+			try {
+				std::mem_fn(fn)(*it, args...);
+				it = std::next(it);
+			} catch (nprpc::Exception&) {
+				it = observers.erase(it);
+			}
+		}
+	}
+
+	void alarm_info_impl(std::string msg) {
+		broadcast(&npkcalc::DataObserver::OnAlarm, make_alarm(npkcalc::AlarmType::Warning, msg));
+	}
+	void alarm_warning_impl(std::string msg) {
+		broadcast(&npkcalc::DataObserver::OnAlarm, make_alarm(npkcalc::AlarmType::Info, msg));
+	}
+	void alarm_critical_impl(std::string msg) {
+		broadcast(&npkcalc::DataObserver::OnAlarm, make_alarm(npkcalc::AlarmType::Critical, msg));
+	}
+public:
+	void add(npkcalc::DataObserver* user) {
+		nplib::async<false>(ioc_, &Observers::add_impl, this, user);
+	}
+	void alarm_info(const std::string& msg) {
+		nplib::async<false>(ioc_, &Observers::alarm_info_impl, this, msg);
+	}
+	void alarm_warning(const std::string& msg) {
+		nplib::async<false>(ioc_, &Observers::alarm_warning_impl, this, msg);
+	}
+	void alarm_critical(const std::string& msg) {
+		nplib::async<false>(ioc_, &Observers::alarm_critical_impl, this, msg);
+	}
+
+	void stop() { ioc_.stop(); }
+
+	Observers() : work_guard_(boost::asio::make_work_guard(ioc_)) {
+		std::thread([this]() { ioc_.run(); }).detach();
+	}
+} observers;
 
 enum class Tables {
 	Solutions,
@@ -89,8 +147,6 @@ struct User {
 		ar& user_name;
 	}
 };
-
-std::vector<npkcalc::DataObserver*> observers;
 
 class RegisteredUser : public npkcalc::IRegisteredUser_Servant {
 	friend class CalculatorImpl;
@@ -184,23 +240,6 @@ public:
 		data_manager->fertilizers.remove_by_id(id);
 	}
 
-	virtual void Advise(nprpc::Object* obj) {
-		// std::cerr << "Advise():\n" << *obj << '\n';
-		auto data_observer = nprpc::narrow<npkcalc::DataObserver>(obj);
-		if (data_observer) {
-			data_observer->add_ref();
-			observers.push_back(data_observer);
-			//			std::jthread([](npkcalc::DataObserver* data_observer) { 
-			//				uint32_t i = 0;
-			//				while (true) {
-			//					data_observer->DataChanged(i++);
-			//					using namespace std::chrono_literals;
-			//					std::this_thread::sleep_for(1s);
-			//				}
-			//				}, data_observer).detach();
-		}
-	}
-
 	virtual void SaveData() {
 		// std::cerr << "SaveData() solutions_changed: " << solutions_changed << ", fertilizers_changed: " << fertilizers_changed << '\n';
 
@@ -273,6 +312,21 @@ public:
 	{
 		npkcalc::helper::assign_from_cpp_GetImages_images(images, data_manager->icons);
 	}
+
+	virtual void Subscribe(nprpc::Object* obj) {
+		static int i = 0;
+		observers.alarm_info("User #" + std::to_string(++i) + " connected");
+		auto user = nprpc::narrow<npkcalc::DataObserver>(obj);
+		if (user) {
+			user->add_ref();
+			user->set_timeout(250);
+			observers.add(user);
+		}
+	}
+	virtual void GetGuestCalculations(
+		/*out*/::flat::Vector_Direct2<npkcalc::flat::Calculation, npkcalc::flat::Calculation_Direct> calculations) {
+		npkcalc::helper::assign_from_cpp_GetMyCalculations_calculations(calculations, data_manager->get_calculations("Guest").data());
+	}
 };
 
 class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
@@ -322,6 +376,7 @@ class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
 			it != users_db_.end())
 		{
 			if (!user_password.empty() && (*it)->password_sha256 != sha256(user_password)) {
+				observers.alarm_warning("User \"" + (*it)->user_name + "\" forgot his password");
 				throw npkcalc::AuthorizationFailed(npkcalc::AuthorizationFailed_Reason::incorrect_password);
 			}
 
@@ -331,6 +386,8 @@ class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
 			Session s;
 			do { s.sid = create_uuid(); } while (sessions_.find(s) != sessions_.end());
 			s.email = user_email;
+
+			observers.alarm_info("User \"" + (*it)->user_name + "\" has logged in");
 
 			return {(*it)->user_name, sessions_.emplace(std::move(s)).first->sid, oid};
 		} else {
@@ -344,8 +401,10 @@ public:
 
 		//std::cout << user_email << " " << user_password << std::endl;
 
-		if (user_password.empty())
+		if (user_password.empty()) {
+			observers.alarm_warning("User is trying to log in with empty password");
 			throw npkcalc::AuthorizationFailed(npkcalc::AuthorizationFailed_Reason::incorrect_password);
+		}
 
 		return try_login(user_email, user_password);
 	}
@@ -400,7 +459,6 @@ public:
 		for (auto& user : users_db_) {
 			std::cout << "{ email: " << user->email << ", user_name: " << user->user_name << " }\n";
 		}
-		std::cout.flush();
 	}
 
 	void store_users() noexcept {
@@ -421,13 +479,12 @@ public:
 		//		}
 	}
 
-	AuthorizatorImpl(nprpc::Rpc* rpc, const std::string& data_root_dir)
+	AuthorizatorImpl(nprpc::Rpc& rpc, const std::string& data_root_dir)
 		: data_root_dir_(data_root_dir)
 	{
-		assert(rpc);
 		load_users();
 		auto policy = std::make_unique<nprpc::Policy_Lifespan>(nprpc::Policy_Lifespan::Transient);
-		user_poa = rpc->create_poa(1024, {policy.get()});
+		user_poa = rpc.create_poa(1024, {policy.get()});
 	}
 };
 
@@ -458,26 +515,21 @@ int main(int argc, char* argv[]) {
 
 	HostJson host_json;
 
-	std::string hostname;
-	std::string http_root;
-	std::string data_root;
+	std::string hostname, http_root, data_root, public_key, private_key, dh_params;
 	unsigned short port;
 	bool use_ssl;
-	std::string public_key;
-	std::string private_key;
-	std::string dh_params;
 
 	po::options_description desc("Allowed options");
 	desc.add_options()
 		("help", "produce help message")
-		("hostname", po::value<std::string>(&hostname))
+		("hostname", po::value<std::string>(&hostname)->default_value(""), "Hostname")
 		("root_dir", po::value<std::string>(&http_root)->
 			default_value("\\\\wsl$\\Debian\\home\\png\\projects\\npk-calculator\\client\\public"), "HTTP root directory")
 		("data_dir", po::value<std::string>(&data_root)->default_value("./data"), "Data root directory")
-		("port", po::value<unsigned short>(&port)->default_value(33252), "Port to listen")
-		("use_ssl", po::value<bool>(&use_ssl)->default_value(false), "Port to listen")
-		("public_key", po::value<std::string>(&public_key)->default_value(""), "Path to the public key")
-		("private_key", po::value<std::string>(&private_key)->default_value(""), "Path to the private key")
+		("port", po::value<unsigned short>(&port)->default_value(8080), "Port to listen")
+		("use_ssl", po::value<bool>(&use_ssl)->default_value(false), "Use SSL")
+		("public_key", po::value<std::string>(&public_key)->default_value(""), "Path to public key")
+		("private_key", po::value<std::string>(&private_key)->default_value(""), "Path to private key")
 		("dh_params", po::value<std::string>(&dh_params)->default_value(""), "Path to Diffie-Hellman parameters")
 		;
 
@@ -496,11 +548,13 @@ int main(int argc, char* argv[]) {
 
 	host_json.secured = use_ssl;
 
-	boost::asio::io_context ioc;
-	
+
 	// Capture SIGINT and SIGTERM to perform a clean shutdown
-	boost::asio::signal_set signals(ioc, SIGINT, SIGTERM);
-	signals.async_wait([&](boost::beast::error_code const&, int) { ioc.stop(); });
+	boost::asio::signal_set signals(thread_pool::get_instance().ctx(), SIGINT, SIGTERM);
+	signals.async_wait([&](boost::beast::error_code const&, int) { 
+		observers.stop();
+		thread_pool::get_instance().stop(); 
+	});
 	
 	try {
 		nprpc::Config rpc_cfg;
@@ -514,20 +568,21 @@ int main(int argc, char* argv[]) {
 		rpc_cfg.ssl_dh_params = dh_params;
 		rpc_cfg.hostname = hostname;
 
-		auto rpc = nprpc::init(ioc, std::move(rpc_cfg));
+		auto rpc = nprpc::init(thread_pool::get_instance().ctx(), std::move(rpc_cfg));
 
 		// static poa
 		auto policy = std::make_unique<nprpc::Policy_Lifespan>(nprpc::Policy_Lifespan::Persistent);
 		auto poa = rpc->create_poa(2, {policy.get()});
 
 		CalculatorImpl calc{data_root};
-		AuthorizatorImpl autorizator(rpc, data_root);
+		AuthorizatorImpl autorizator(*rpc, data_root);
 
 		host_json.objects.calculator = poa->activate_object(&calc);
 		host_json.objects.authorizator = poa->activate_object(&autorizator);
 
-		std::cerr << "calculator  - poa: " << calc.poa_index() << ", oid: " << calc.oid() << "\n";
-		std::cerr << "autorizator - poa: " << autorizator.poa_index() << ", oid: " << autorizator.oid() << "\n";
+		std::cout << "calculator  - poa: " << calc.poa_index() << ", oid: " << calc.oid() << "\n";
+		std::cout << "autorizator - poa: " << autorizator.poa_index() << ", oid: " << autorizator.oid() << "\n";
+		std::cout.flush();
 
 		{
 			std::ofstream os(std::filesystem::path(http_root) / "host.json");
@@ -536,7 +591,8 @@ int main(int argc, char* argv[]) {
 		}
 		
 		rpc->start();
-		ioc.run();
+		thread_pool::get_instance().ctx().run();
+		rpc->destroy();
 	} catch (std::exception& ex) {
 		std::cerr << ex.what();
 		return EXIT_FAILURE;
