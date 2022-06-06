@@ -1,6 +1,7 @@
 # nscalc
 
-A Nutrient Solution Calculator done right.
+A Nutrient Solution Calculator done right.\
+Try it! https://hydrosoft.uk
 
 # Docker
 It only works on localhost. Also the port should be 33252.
