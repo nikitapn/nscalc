@@ -98,7 +98,7 @@ export function TableModelWithCommands<T extends TableItem>(unused: { new(is_new
 				cmd.commit();
 			}
 
-			this.clear();
+			this.commands_clear();
 			this.sort();
 
 			global.user_data.reg_user.SaveData();

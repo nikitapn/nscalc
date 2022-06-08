@@ -89,6 +89,23 @@ Alarm: flat {
 	msg: string;
 }
 
+
+enum ChatAttachmentType {
+	Picture,
+	File
+}
+
+ChatAttachment: flat {
+	type: ChatAttachmentType;
+	name: string;
+	data: vector<u8>;
+}
+
+ChatMessage: flat {
+	date: u32;
+	str: string;
+}
+
 interface Authorizator {
 	UserData LogIn(login: in string, password: in string) raises(AuthorizationFailed);
 	UserData LogInWithSessionId(session_id: in string) raises(AuthorizationFailed);
@@ -117,6 +134,17 @@ interface DataObserver {
 	void DataChanged(idx: in u32);
 	void OnAlarm(alarm: in Alarm);
 }
+
+interface Chat {
+	void Connect(obj: in object);
+	boolean	Send(msg: in ChatMessage);
+	
+}
+
+interface ChatListener {
+	void OnMessage(msg: in ChatMessage);
+}
+
 
 interface Calculator {
 	void GetData(solutions: out direct vector<Solution>, fertilizers: out direct vector<Fertilizer>);

@@ -328,14 +328,12 @@ public:
 } // namespace flat
 
 struct npkcalc_M12 {
-  std::vector<npkcalc::Solution> _1;
-  std::vector<npkcalc::Fertilizer> _2;
+  nprpc::ObjectId _1;
 };
 
 namespace flat {
 struct npkcalc_M12 {
-  ::flat::Vector<npkcalc::flat::Solution> _1;
-  ::flat::Vector<npkcalc::flat::Fertilizer> _2;
+  nprpc::detail::flat::ObjectId _1;
 };
 
 class npkcalc_M12_Direct {
@@ -351,22 +349,17 @@ public:
     , offset_(offset)
   {
   }
-  void _1(size_t elements_size) { new (&base()._1) ::flat::Vector<npkcalc::flat::Solution>(buffer_, elements_size); }
-  auto _1_vd() noexcept { return ::flat::Vector_Direct2<npkcalc::flat::Solution, npkcalc::flat::Solution_Direct>(buffer_, offset_ + offsetof(npkcalc_M12, _1)); }
-  auto _1() noexcept { return ::flat::Span_ref<npkcalc::flat::Solution, npkcalc::flat::Solution_Direct>(buffer_, base()._1.range(buffer_.data().data())); }
-  void _2(size_t elements_size) { new (&base()._2) ::flat::Vector<npkcalc::flat::Fertilizer>(buffer_, elements_size); }
-  auto _2_vd() noexcept { return ::flat::Vector_Direct2<npkcalc::flat::Fertilizer, npkcalc::flat::Fertilizer_Direct>(buffer_, offset_ + offsetof(npkcalc_M12, _2)); }
-  auto _2() noexcept { return ::flat::Span_ref<npkcalc::flat::Fertilizer, npkcalc::flat::Fertilizer_Direct>(buffer_, base()._2.range(buffer_.data().data())); }
+  auto _1() noexcept { return nprpc::detail::flat::ObjectId_Direct(buffer_, offset_ + offsetof(npkcalc_M12, _1)); }
 };
 } // namespace flat
 
 struct npkcalc_M13 {
-  std::vector<npkcalc::Media> _1;
+  npkcalc::ChatMessage _1;
 };
 
 namespace flat {
 struct npkcalc_M13 {
-  ::flat::Vector<npkcalc::flat::Media> _1;
+  npkcalc::flat::ChatMessage _1;
 };
 
 class npkcalc_M13_Direct {
@@ -382,19 +375,19 @@ public:
     , offset_(offset)
   {
   }
-  void _1(size_t elements_size) { new (&base()._1) ::flat::Vector<npkcalc::flat::Media>(buffer_, elements_size); }
-  auto _1_vd() noexcept { return ::flat::Vector_Direct2<npkcalc::flat::Media, npkcalc::flat::Media_Direct>(buffer_, offset_ + offsetof(npkcalc_M13, _1)); }
-  auto _1() noexcept { return ::flat::Span_ref<npkcalc::flat::Media, npkcalc::flat::Media_Direct>(buffer_, base()._1.range(buffer_.data().data())); }
+  auto _1() noexcept { return npkcalc::flat::ChatMessage_Direct(buffer_, offset_ + offsetof(npkcalc_M13, _1)); }
 };
 } // namespace flat
 
 struct npkcalc_M14 {
-  nprpc::ObjectId _1;
+  std::vector<npkcalc::Solution> _1;
+  std::vector<npkcalc::Fertilizer> _2;
 };
 
 namespace flat {
 struct npkcalc_M14 {
-  nprpc::detail::flat::ObjectId _1;
+  ::flat::Vector<npkcalc::flat::Solution> _1;
+  ::flat::Vector<npkcalc::flat::Fertilizer> _2;
 };
 
 class npkcalc_M14_Direct {
@@ -410,7 +403,40 @@ public:
     , offset_(offset)
   {
   }
-  auto _1() noexcept { return nprpc::detail::flat::ObjectId_Direct(buffer_, offset_ + offsetof(npkcalc_M14, _1)); }
+  void _1(size_t elements_size) { new (&base()._1) ::flat::Vector<npkcalc::flat::Solution>(buffer_, elements_size); }
+  auto _1_vd() noexcept { return ::flat::Vector_Direct2<npkcalc::flat::Solution, npkcalc::flat::Solution_Direct>(buffer_, offset_ + offsetof(npkcalc_M14, _1)); }
+  auto _1() noexcept { return ::flat::Span_ref<npkcalc::flat::Solution, npkcalc::flat::Solution_Direct>(buffer_, base()._1.range(buffer_.data().data())); }
+  void _2(size_t elements_size) { new (&base()._2) ::flat::Vector<npkcalc::flat::Fertilizer>(buffer_, elements_size); }
+  auto _2_vd() noexcept { return ::flat::Vector_Direct2<npkcalc::flat::Fertilizer, npkcalc::flat::Fertilizer_Direct>(buffer_, offset_ + offsetof(npkcalc_M14, _2)); }
+  auto _2() noexcept { return ::flat::Span_ref<npkcalc::flat::Fertilizer, npkcalc::flat::Fertilizer_Direct>(buffer_, base()._2.range(buffer_.data().data())); }
+};
+} // namespace flat
+
+struct npkcalc_M15 {
+  std::vector<npkcalc::Media> _1;
+};
+
+namespace flat {
+struct npkcalc_M15 {
+  ::flat::Vector<npkcalc::flat::Media> _1;
+};
+
+class npkcalc_M15_Direct {
+  boost::beast::flat_buffer& buffer_;
+  const size_t offset_;
+
+  auto& base() noexcept { return *reinterpret_cast<npkcalc_M15*>(reinterpret_cast<std::byte*>(buffer_.data().data()) + offset_); }
+  auto const& base() const noexcept { return *reinterpret_cast<const npkcalc_M15*>(reinterpret_cast<const std::byte*>(buffer_.data().data()) + offset_); }
+public:
+  void* __data() noexcept { return (void*)&base(); }
+  npkcalc_M15_Direct(boost::beast::flat_buffer& buffer, size_t offset)
+    : buffer_(buffer)
+    , offset_(offset)
+  {
+  }
+  void _1(size_t elements_size) { new (&base()._1) ::flat::Vector<npkcalc::flat::Media>(buffer_, elements_size); }
+  auto _1_vd() noexcept { return ::flat::Vector_Direct2<npkcalc::flat::Media, npkcalc::flat::Media_Direct>(buffer_, offset_ + offsetof(npkcalc_M15, _1)); }
+  auto _1() noexcept { return ::flat::Span_ref<npkcalc::flat::Media, npkcalc::flat::Media_Direct>(buffer_, base()._1.range(buffer_.data().data())); }
 };
 } // namespace flat
 

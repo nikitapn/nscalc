@@ -1,5 +1,8 @@
 import * as NPRPC from './nprpc'
 
+const u8enc = new TextEncoder();
+const u8dec = new TextDecoder();
+
 export const enum ELEMENT { //u32
   N_NO3,
   N_NH4 = 1,
@@ -44,31 +47,23 @@ export class Solution_Direct extends NPRPC.Flat.Flat {
   public get id() { return this.buffer.dv.getUint32(this.offset+0,true); }
   public set id(value: number) { this.buffer.dv.setUint32(this.offset+0,value,true); }
   public get name() {
-    let enc = new TextDecoder("utf-8");
-    let v_begin = this.offset + 4;
-    let data_offset = v_begin + this.buffer.dv.getUint32(v_begin, true);
-    let bn = this.buffer.array_buffer.slice(data_offset, data_offset + this.buffer.dv.getUint32(v_begin + 4, true));
-    return enc.decode(bn);
+    const offset = this.offset + 4;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
   public set name(str: string) {
-    let enc = new TextEncoder();
-    let bytes = enc.encode(str);
-    let len = bytes.length;
-    let offset = NPRPC.Flat._alloc(this.buffer, this.offset + 4, len, 1, 1);
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 4, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
   public get owner() {
-    let enc = new TextDecoder("utf-8");
-    let v_begin = this.offset + 12;
-    let data_offset = v_begin + this.buffer.dv.getUint32(v_begin, true);
-    let bn = this.buffer.array_buffer.slice(data_offset, data_offset + this.buffer.dv.getUint32(v_begin + 4, true));
-    return enc.decode(bn);
+    const offset = this.offset + 12;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
   public set owner(str: string) {
-    let enc = new TextEncoder();
-    let bytes = enc.encode(str);
-    let len = bytes.length;
-    let offset = NPRPC.Flat._alloc(this.buffer, this.offset + 12, len, 1, 1);
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 12, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
   public elements_vd() { return new NPRPC.Flat.Array_Direct1_float64(this.buffer, this.offset + 24, 14); }
@@ -96,45 +91,33 @@ export class Fertilizer_Direct extends NPRPC.Flat.Flat {
   public get id() { return this.buffer.dv.getUint32(this.offset+0,true); }
   public set id(value: number) { this.buffer.dv.setUint32(this.offset+0,value,true); }
   public get name() {
-    let enc = new TextDecoder("utf-8");
-    let v_begin = this.offset + 4;
-    let data_offset = v_begin + this.buffer.dv.getUint32(v_begin, true);
-    let bn = this.buffer.array_buffer.slice(data_offset, data_offset + this.buffer.dv.getUint32(v_begin + 4, true));
-    return enc.decode(bn);
+    const offset = this.offset + 4;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
   public set name(str: string) {
-    let enc = new TextEncoder();
-    let bytes = enc.encode(str);
-    let len = bytes.length;
-    let offset = NPRPC.Flat._alloc(this.buffer, this.offset + 4, len, 1, 1);
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 4, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
   public get owner() {
-    let enc = new TextDecoder("utf-8");
-    let v_begin = this.offset + 12;
-    let data_offset = v_begin + this.buffer.dv.getUint32(v_begin, true);
-    let bn = this.buffer.array_buffer.slice(data_offset, data_offset + this.buffer.dv.getUint32(v_begin + 4, true));
-    return enc.decode(bn);
+    const offset = this.offset + 12;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
   public set owner(str: string) {
-    let enc = new TextEncoder();
-    let bytes = enc.encode(str);
-    let len = bytes.length;
-    let offset = NPRPC.Flat._alloc(this.buffer, this.offset + 12, len, 1, 1);
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 12, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
   public get formula() {
-    let enc = new TextDecoder("utf-8");
-    let v_begin = this.offset + 20;
-    let data_offset = v_begin + this.buffer.dv.getUint32(v_begin, true);
-    let bn = this.buffer.array_buffer.slice(data_offset, data_offset + this.buffer.dv.getUint32(v_begin + 4, true));
-    return enc.decode(bn);
+    const offset = this.offset + 20;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
   public set formula(str: string) {
-    let enc = new TextEncoder();
-    let bytes = enc.encode(str);
-    let len = bytes.length;
-    let offset = NPRPC.Flat._alloc(this.buffer, this.offset + 20, len, 1, 1);
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 20, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
 }
@@ -169,17 +152,13 @@ export class Calculation_Direct extends NPRPC.Flat.Flat {
   public get id() { return this.buffer.dv.getUint32(this.offset+0,true); }
   public set id(value: number) { this.buffer.dv.setUint32(this.offset+0,value,true); }
   public get name() {
-    let enc = new TextDecoder("utf-8");
-    let v_begin = this.offset + 4;
-    let data_offset = v_begin + this.buffer.dv.getUint32(v_begin, true);
-    let bn = this.buffer.array_buffer.slice(data_offset, data_offset + this.buffer.dv.getUint32(v_begin + 4, true));
-    return enc.decode(bn);
+    const offset = this.offset + 4;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
   public set name(str: string) {
-    let enc = new TextEncoder();
-    let bytes = enc.encode(str);
-    let len = bytes.length;
-    let offset = NPRPC.Flat._alloc(this.buffer, this.offset + 4, len, 1, 1);
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 4, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
   public elements_vd() { return new NPRPC.Flat.Array_Direct2<Flat_npkcalc.TargetElement_Direct>(this.buffer, this.offset + 16, 24, Flat_npkcalc.TargetElement_Direct, 14); }
@@ -201,17 +180,13 @@ export interface Media {
 export namespace Flat_npkcalc {
 export class Media_Direct extends NPRPC.Flat.Flat {
   public get name() {
-    let enc = new TextDecoder("utf-8");
-    let v_begin = this.offset + 0;
-    let data_offset = v_begin + this.buffer.dv.getUint32(v_begin, true);
-    let bn = this.buffer.array_buffer.slice(data_offset, data_offset + this.buffer.dv.getUint32(v_begin + 4, true));
-    return enc.decode(bn);
+    const offset = this.offset + 0;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
   public set name(str: string) {
-    let enc = new TextEncoder();
-    let bytes = enc.encode(str);
-    let len = bytes.length;
-    let offset = NPRPC.Flat._alloc(this.buffer, this.offset + 0, len, 1, 1);
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 0, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
   public data(elements_size: number): void { 
@@ -246,31 +221,23 @@ export interface UserData {
 export namespace Flat_npkcalc {
 export class UserData_Direct extends NPRPC.Flat.Flat {
   public get name() {
-    let enc = new TextDecoder("utf-8");
-    let v_begin = this.offset + 0;
-    let data_offset = v_begin + this.buffer.dv.getUint32(v_begin, true);
-    let bn = this.buffer.array_buffer.slice(data_offset, data_offset + this.buffer.dv.getUint32(v_begin + 4, true));
-    return enc.decode(bn);
+    const offset = this.offset + 0;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
   public set name(str: string) {
-    let enc = new TextEncoder();
-    let bytes = enc.encode(str);
-    let len = bytes.length;
-    let offset = NPRPC.Flat._alloc(this.buffer, this.offset + 0, len, 1, 1);
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 0, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
   public get session_id() {
-    let enc = new TextDecoder("utf-8");
-    let v_begin = this.offset + 8;
-    let data_offset = v_begin + this.buffer.dv.getUint32(v_begin, true);
-    let bn = this.buffer.array_buffer.slice(data_offset, data_offset + this.buffer.dv.getUint32(v_begin + 4, true));
-    return enc.decode(bn);
+    const offset = this.offset + 8;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
   public set session_id(str: string) {
-    let enc = new TextEncoder();
-    let bytes = enc.encode(str);
-    let len = bytes.length;
-    let offset = NPRPC.Flat._alloc(this.buffer, this.offset + 8, len, 1, 1);
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 8, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
   public get db() { return new NPRPC.detail.Flat_nprpc_base.ObjectId_Direct(this.buffer, this.offset + 16); }
@@ -307,17 +274,64 @@ export class Alarm_Direct extends NPRPC.Flat.Flat {
   public get type() { return this.buffer.dv.getUint32(this.offset+4,true); }
   public set type(value: AlarmType) { this.buffer.dv.setUint32(this.offset+4,value,true); }
   public get msg() {
-    let enc = new TextDecoder("utf-8");
-    let v_begin = this.offset + 8;
-    let data_offset = v_begin + this.buffer.dv.getUint32(v_begin, true);
-    let bn = this.buffer.array_buffer.slice(data_offset, data_offset + this.buffer.dv.getUint32(v_begin + 4, true));
-    return enc.decode(bn);
+    const offset = this.offset + 8;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
   public set msg(str: string) {
-    let enc = new TextEncoder();
-    let bytes = enc.encode(str);
-    let len = bytes.length;
-    let offset = NPRPC.Flat._alloc(this.buffer, this.offset + 8, len, 1, 1);
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 8, bytes.length, 1, 1);
+    new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
+  }
+}
+} // namespace Flat 
+export const enum ChatAttachmentType { //u32
+  Picture,
+  File = 1
+}
+export interface ChatAttachment {
+  type: ChatAttachmentType;
+  name: string;
+  data: Array<number/*u8*/>;
+}
+
+export namespace Flat_npkcalc {
+export class ChatAttachment_Direct extends NPRPC.Flat.Flat {
+  public get type() { return this.buffer.dv.getUint32(this.offset+0,true); }
+  public set type(value: ChatAttachmentType) { this.buffer.dv.setUint32(this.offset+0,value,true); }
+  public get name() {
+    const offset = this.offset + 4;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
+  }
+  public set name(str: string) {
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 4, bytes.length, 1, 1);
+    new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
+  }
+  public data(elements_size: number): void { 
+    NPRPC.Flat._alloc(this.buffer, this.offset + 12, elements_size, 1, 1);
+  }
+  public data_vd() { return new NPRPC.Flat.Vector_Direct1_u8(this.buffer, this.offset + 12); }
+}
+} // namespace Flat 
+export interface ChatMessage {
+  date: number/*u32*/;
+  str: string;
+}
+
+export namespace Flat_npkcalc {
+export class ChatMessage_Direct extends NPRPC.Flat.Flat {
+  public get date() { return this.buffer.dv.getUint32(this.offset+0,true); }
+  public set date(value: number) { this.buffer.dv.setUint32(this.offset+0,value,true); }
+  public get str() {
+    const offset = this.offset + 4;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
+  }
+  public set str(str: string) {
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 4, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
 }
@@ -1109,6 +1123,176 @@ export class _IDataObserver_Servant extends NPRPC.ObjectServant {
   }
 }
 
+export class Chat extends NPRPC.ObjectProxy {
+  public static get servant_t(): new() => _IChat_Servant {
+    return _IChat_Servant;
+  }
+
+
+  public async Connect(obj: /*in*/NPRPC.detail.ObjectId): Promise<void> {
+    let interface_idx = (arguments.length == 1 ? 0 : arguments[arguments.length - 1]);
+    let buf = NPRPC.FlatBuffer.create();
+    buf.prepare(200);
+    buf.commit(72);
+    buf.write_msg_id(NPRPC.impl.MessageId.FunctionCall);
+    buf.write_msg_type(NPRPC.impl.MessageType.Request);
+    let __ch = new NPRPC.impl.Flat_nprpc_base.CallHeader_Direct(buf, 16);
+    __ch.object_id = this.data.object_id;
+    __ch.poa_idx = this.data.poa_idx;
+    __ch.interface_idx = interface_idx;
+    __ch.function_idx = 0;
+  let _ = new Flat_npkcalc.npkcalc_M12_Direct(buf,32);
+  _._1.object_id = obj.object_id;
+  _._1.ip4 = obj.ip4;
+  _._1.port = obj.port;
+  _._1.websocket_port = obj.websocket_port;
+  _._1.poa_idx = obj.poa_idx;
+  _._1.flags = obj.flags;
+  _._1.class_id = obj.class_id;
+  _._1.hostname = obj.hostname;
+    buf.write_len(buf.size - 4);
+    await NPRPC.rpc.call(
+      this.endpoint(), buf, this.timeout
+    );
+    let std_reply = NPRPC.handle_standart_reply(buf);
+    if (std_reply != 0) {
+      console.log("received an unusual reply for function with no output arguments");
+    }
+}
+
+  public async Send(msg: /*in*/ChatMessage): Promise<boolean/*boolean*/> {
+    let interface_idx = (arguments.length == 1 ? 0 : arguments[arguments.length - 1]);
+    let buf = NPRPC.FlatBuffer.create();
+    buf.prepare(172);
+    buf.commit(44);
+    buf.write_msg_id(NPRPC.impl.MessageId.FunctionCall);
+    buf.write_msg_type(NPRPC.impl.MessageType.Request);
+    let __ch = new NPRPC.impl.Flat_nprpc_base.CallHeader_Direct(buf, 16);
+    __ch.object_id = this.data.object_id;
+    __ch.poa_idx = this.data.poa_idx;
+    __ch.interface_idx = interface_idx;
+    __ch.function_idx = 1;
+  let _ = new Flat_npkcalc.npkcalc_M13_Direct(buf,32);
+  _._1.date = msg.date;
+  _._1.str = msg.str;
+    buf.write_len(buf.size - 4);
+    await NPRPC.rpc.call(
+      this.endpoint(), buf, this.timeout
+    );
+    let std_reply = NPRPC.handle_standart_reply(buf);
+    if (std_reply != -1) {
+      console.log("received an unusual reply for function with output arguments");
+      throw new NPRPC.Exception("Unknown Error");
+    }
+  let out = new Flat_npkcalc.npkcalc_M4_Direct(buf, 16);
+  let __ret_value: boolean/*boolean*/;
+  __ret_value = out._1;
+  return __ret_value;
+}
+
+};
+
+export interface IChat_Servant
+{
+  Connect(obj: NPRPC.ObjectProxy): void;
+  Send(msg: Flat_npkcalc.ChatMessage_Direct): boolean/*boolean*/;
+}
+
+export class _IChat_Servant extends NPRPC.ObjectServant {
+  public static _get_class(): string { return "npkcalc/npkcalc.Chat"; }
+  public readonly get_class = () => { return _IChat_Servant._get_class(); }
+  public readonly dispatch = (buf: NPRPC.FlatBuffer, remote_endpoint: NPRPC.EndPoint, from_parent: boolean) => {
+    _IChat_Servant._dispatch(this, buf, remote_endpoint, from_parent);
+  }
+  static _dispatch(obj: _IChat_Servant, buf: NPRPC.FlatBuffer, remote_endpoint: NPRPC.EndPoint, from_parent: boolean): void {
+  let __ch = new NPRPC.impl.Flat_nprpc_base.CallHeader_Direct(buf, 16);
+  switch(__ch.function_idx) {
+    case 0: {
+      let ia = new Flat_npkcalc.npkcalc_M12_Direct(buf, 32);
+      (obj as any).Connect(NPRPC.create_object_from_flat(ia._1, remote_endpoint.ip4));
+      NPRPC.make_simple_answer(buf, NPRPC.impl.MessageId.Success);
+      break;
+    }
+    case 1: {
+      let ia = new Flat_npkcalc.npkcalc_M13_Direct(buf, 32);
+let __ret_val: boolean/*boolean*/;
+      __ret_val = (obj as any).Send(ia._1);
+      let obuf = buf;
+      obuf.consume(obuf.size);
+      obuf.prepare(17);
+      obuf.commit(17);
+      let oa = new Flat_npkcalc.npkcalc_M4_Direct(obuf,16);
+  oa._1 = __ret_val;
+      obuf.write_len(obuf.size - 4);
+      obuf.write_msg_id(NPRPC.impl.MessageId.BlockResponse);
+      obuf.write_msg_type(NPRPC.impl.MessageType.Answer);
+      break;
+    }
+    default:
+      NPRPC.make_simple_answer(buf, NPRPC.impl.MessageId.Error_UnknownFunctionIdx);
+  }
+  }
+}
+
+export class ChatListener extends NPRPC.ObjectProxy {
+  public static get servant_t(): new() => _IChatListener_Servant {
+    return _IChatListener_Servant;
+  }
+
+
+  public async OnMessage(msg: /*in*/ChatMessage): Promise<void> {
+    let interface_idx = (arguments.length == 1 ? 0 : arguments[arguments.length - 1]);
+    let buf = NPRPC.FlatBuffer.create();
+    buf.prepare(172);
+    buf.commit(44);
+    buf.write_msg_id(NPRPC.impl.MessageId.FunctionCall);
+    buf.write_msg_type(NPRPC.impl.MessageType.Request);
+    let __ch = new NPRPC.impl.Flat_nprpc_base.CallHeader_Direct(buf, 16);
+    __ch.object_id = this.data.object_id;
+    __ch.poa_idx = this.data.poa_idx;
+    __ch.interface_idx = interface_idx;
+    __ch.function_idx = 0;
+  let _ = new Flat_npkcalc.npkcalc_M13_Direct(buf,32);
+  _._1.date = msg.date;
+  _._1.str = msg.str;
+    buf.write_len(buf.size - 4);
+    await NPRPC.rpc.call(
+      this.endpoint(), buf, this.timeout
+    );
+    let std_reply = NPRPC.handle_standart_reply(buf);
+    if (std_reply != 0) {
+      console.log("received an unusual reply for function with no output arguments");
+    }
+}
+
+};
+
+export interface IChatListener_Servant
+{
+  OnMessage(msg: Flat_npkcalc.ChatMessage_Direct): void;
+}
+
+export class _IChatListener_Servant extends NPRPC.ObjectServant {
+  public static _get_class(): string { return "npkcalc/npkcalc.ChatListener"; }
+  public readonly get_class = () => { return _IChatListener_Servant._get_class(); }
+  public readonly dispatch = (buf: NPRPC.FlatBuffer, remote_endpoint: NPRPC.EndPoint, from_parent: boolean) => {
+    _IChatListener_Servant._dispatch(this, buf, remote_endpoint, from_parent);
+  }
+  static _dispatch(obj: _IChatListener_Servant, buf: NPRPC.FlatBuffer, remote_endpoint: NPRPC.EndPoint, from_parent: boolean): void {
+  let __ch = new NPRPC.impl.Flat_nprpc_base.CallHeader_Direct(buf, 16);
+  switch(__ch.function_idx) {
+    case 0: {
+      let ia = new Flat_npkcalc.npkcalc_M13_Direct(buf, 32);
+      (obj as any).OnMessage(ia._1);
+      NPRPC.make_simple_answer(buf, NPRPC.impl.MessageId.Success);
+      break;
+    }
+    default:
+      NPRPC.make_simple_answer(buf, NPRPC.impl.MessageId.Error_UnknownFunctionIdx);
+  }
+  }
+}
+
 export class Calculator extends NPRPC.ObjectProxy {
   public static get servant_t(): new() => _ICalculator_Servant {
     return _ICalculator_Servant;
@@ -1136,7 +1320,7 @@ export class Calculator extends NPRPC.ObjectProxy {
       console.log("received an unusual reply for function with output arguments");
       throw new NPRPC.Exception("Unknown Error");
     }
-  let out = new Flat_npkcalc.npkcalc_M12_Direct(buf, 16);
+  let out = new Flat_npkcalc.npkcalc_M14_Direct(buf, 16);
   solutions.value = out._1_vd();
   fertilizers.value = out._2_vd();
 }
@@ -1162,7 +1346,7 @@ export class Calculator extends NPRPC.ObjectProxy {
       console.log("received an unusual reply for function with output arguments");
       throw new NPRPC.Exception("Unknown Error");
     }
-  let out = new Flat_npkcalc.npkcalc_M13_Direct(buf, 16);
+  let out = new Flat_npkcalc.npkcalc_M15_Direct(buf, 16);
   images.value = out._1_vd();
 }
 
@@ -1178,7 +1362,7 @@ export class Calculator extends NPRPC.ObjectProxy {
     __ch.poa_idx = this.data.poa_idx;
     __ch.interface_idx = interface_idx;
     __ch.function_idx = 2;
-  let _ = new Flat_npkcalc.npkcalc_M14_Direct(buf,32);
+  let _ = new Flat_npkcalc.npkcalc_M12_Direct(buf,32);
   _._1.object_id = obj.object_id;
   _._1.ip4 = obj.ip4;
   _._1.port = obj.port;
@@ -1246,7 +1430,7 @@ export class _ICalculator_Servant extends NPRPC.ObjectServant {
       obuf.consume(obuf.size);
       obuf.prepare(160);
       obuf.commit(32);
-      let oa = new Flat_npkcalc.npkcalc_M12_Direct(obuf,16);
+      let oa = new Flat_npkcalc.npkcalc_M14_Direct(obuf,16);
       (obj as any).GetData(oa._1_vd, oa._2_vd);
       obuf.write_len(obuf.size - 4);
       obuf.write_msg_id(NPRPC.impl.MessageId.BlockResponse);
@@ -1258,7 +1442,7 @@ export class _ICalculator_Servant extends NPRPC.ObjectServant {
       obuf.consume(obuf.size);
       obuf.prepare(152);
       obuf.commit(24);
-      let oa = new Flat_npkcalc.npkcalc_M13_Direct(obuf,16);
+      let oa = new Flat_npkcalc.npkcalc_M15_Direct(obuf,16);
       (obj as any).GetImages(oa._1_vd);
       obuf.write_len(obuf.size - 4);
       obuf.write_msg_id(NPRPC.impl.MessageId.BlockResponse);
@@ -1266,7 +1450,7 @@ export class _ICalculator_Servant extends NPRPC.ObjectServant {
       break;
     }
     case 2: {
-      let ia = new Flat_npkcalc.npkcalc_M14_Direct(buf, 32);
+      let ia = new Flat_npkcalc.npkcalc_M12_Direct(buf, 32);
       (obj as any).Subscribe(NPRPC.create_object_from_flat(ia._1, remote_endpoint.ip4));
       NPRPC.make_simple_answer(buf, NPRPC.impl.MessageId.Success);
       break;
@@ -1311,31 +1495,23 @@ export interface npkcalc_M1 {
 export namespace Flat_npkcalc {
 export class npkcalc_M1_Direct extends NPRPC.Flat.Flat {
   public get _1() {
-    let enc = new TextDecoder("utf-8");
-    let v_begin = this.offset + 0;
-    let data_offset = v_begin + this.buffer.dv.getUint32(v_begin, true);
-    let bn = this.buffer.array_buffer.slice(data_offset, data_offset + this.buffer.dv.getUint32(v_begin + 4, true));
-    return enc.decode(bn);
+    const offset = this.offset + 0;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
   public set _1(str: string) {
-    let enc = new TextEncoder();
-    let bytes = enc.encode(str);
-    let len = bytes.length;
-    let offset = NPRPC.Flat._alloc(this.buffer, this.offset + 0, len, 1, 1);
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 0, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
   public get _2() {
-    let enc = new TextDecoder("utf-8");
-    let v_begin = this.offset + 8;
-    let data_offset = v_begin + this.buffer.dv.getUint32(v_begin, true);
-    let bn = this.buffer.array_buffer.slice(data_offset, data_offset + this.buffer.dv.getUint32(v_begin + 4, true));
-    return enc.decode(bn);
+    const offset = this.offset + 8;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
   public set _2(str: string) {
-    let enc = new TextEncoder();
-    let bytes = enc.encode(str);
-    let len = bytes.length;
-    let offset = NPRPC.Flat._alloc(this.buffer, this.offset + 8, len, 1, 1);
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 8, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
 }
@@ -1356,17 +1532,13 @@ export interface npkcalc_M3 {
 export namespace Flat_npkcalc {
 export class npkcalc_M3_Direct extends NPRPC.Flat.Flat {
   public get _1() {
-    let enc = new TextDecoder("utf-8");
-    let v_begin = this.offset + 0;
-    let data_offset = v_begin + this.buffer.dv.getUint32(v_begin, true);
-    let bn = this.buffer.array_buffer.slice(data_offset, data_offset + this.buffer.dv.getUint32(v_begin + 4, true));
-    return enc.decode(bn);
+    const offset = this.offset + 0;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
   public set _1(str: string) {
-    let enc = new TextEncoder();
-    let bytes = enc.encode(str);
-    let len = bytes.length;
-    let offset = NPRPC.Flat._alloc(this.buffer, this.offset + 0, len, 1, 1);
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 0, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
 }
@@ -1401,17 +1573,13 @@ export interface npkcalc_M6 {
 export namespace Flat_npkcalc {
 export class npkcalc_M6_Direct extends NPRPC.Flat.Flat {
   public get _1() {
-    let enc = new TextDecoder("utf-8");
-    let v_begin = this.offset + 0;
-    let data_offset = v_begin + this.buffer.dv.getUint32(v_begin, true);
-    let bn = this.buffer.array_buffer.slice(data_offset, data_offset + this.buffer.dv.getUint32(v_begin + 4, true));
-    return enc.decode(bn);
+    const offset = this.offset + 0;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
   public set _1(str: string) {
-    let enc = new TextEncoder();
-    let bytes = enc.encode(str);
-    let len = bytes.length;
-    let offset = NPRPC.Flat._alloc(this.buffer, this.offset + 0, len, 1, 1);
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 0, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
   public _2_vd() { return new NPRPC.Flat.Array_Direct1_float64(this.buffer, this.offset + 8, 14); }
@@ -1437,17 +1605,13 @@ export class npkcalc_M8_Direct extends NPRPC.Flat.Flat {
   public get _1() { return this.buffer.dv.getUint32(this.offset+0,true); }
   public set _1(value: number) { this.buffer.dv.setUint32(this.offset+0,value,true); }
   public get _2() {
-    let enc = new TextDecoder("utf-8");
-    let v_begin = this.offset + 4;
-    let data_offset = v_begin + this.buffer.dv.getUint32(v_begin, true);
-    let bn = this.buffer.array_buffer.slice(data_offset, data_offset + this.buffer.dv.getUint32(v_begin + 4, true));
-    return enc.decode(bn);
+    const offset = this.offset + 4;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
   public set _2(str: string) {
-    let enc = new TextEncoder();
-    let bytes = enc.encode(str);
-    let len = bytes.length;
-    let offset = NPRPC.Flat._alloc(this.buffer, this.offset + 4, len, 1, 1);
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 4, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
 }
@@ -1486,12 +1650,30 @@ export class npkcalc_M11_Direct extends NPRPC.Flat.Flat {
 }
 } // namespace Flat 
 export interface npkcalc_M12 {
+  _1: NPRPC.detail.ObjectId;
+}
+
+export namespace Flat_npkcalc {
+export class npkcalc_M12_Direct extends NPRPC.Flat.Flat {
+  public get _1() { return new NPRPC.detail.Flat_nprpc_base.ObjectId_Direct(this.buffer, this.offset + 0); }
+}
+} // namespace Flat 
+export interface npkcalc_M13 {
+  _1: ChatMessage;
+}
+
+export namespace Flat_npkcalc {
+export class npkcalc_M13_Direct extends NPRPC.Flat.Flat {
+  public get _1() { return new ChatMessage_Direct(this.buffer, this.offset + 0); }
+}
+} // namespace Flat 
+export interface npkcalc_M14 {
   _1: Array<Solution>;
   _2: Array<Fertilizer>;
 }
 
 export namespace Flat_npkcalc {
-export class npkcalc_M12_Direct extends NPRPC.Flat.Flat {
+export class npkcalc_M14_Direct extends NPRPC.Flat.Flat {
   public _1(elements_size: number): void { 
     NPRPC.Flat._alloc(this.buffer, this.offset + 0, elements_size, 136, 8);
   }
@@ -1502,24 +1684,15 @@ export class npkcalc_M12_Direct extends NPRPC.Flat.Flat {
   public _2_vd() { return new NPRPC.Flat.Vector_Direct2<Flat_npkcalc.Fertilizer_Direct>(this.buffer, this.offset + 8, 28, Flat_npkcalc.Fertilizer_Direct); }
 }
 } // namespace Flat 
-export interface npkcalc_M13 {
+export interface npkcalc_M15 {
   _1: Array<Media>;
 }
 
 export namespace Flat_npkcalc {
-export class npkcalc_M13_Direct extends NPRPC.Flat.Flat {
+export class npkcalc_M15_Direct extends NPRPC.Flat.Flat {
   public _1(elements_size: number): void { 
     NPRPC.Flat._alloc(this.buffer, this.offset + 0, elements_size, 16, 4);
   }
   public _1_vd() { return new NPRPC.Flat.Vector_Direct2<Flat_npkcalc.Media_Direct>(this.buffer, this.offset + 0, 16, Flat_npkcalc.Media_Direct); }
-}
-} // namespace Flat 
-export interface npkcalc_M14 {
-  _1: NPRPC.detail.ObjectId;
-}
-
-export namespace Flat_npkcalc {
-export class npkcalc_M14_Direct extends NPRPC.Flat.Flat {
-  public get _1() { return new NPRPC.detail.Flat_nprpc_base.ObjectId_Direct(this.buffer, this.offset + 0); }
 }
 } // namespace Flat 

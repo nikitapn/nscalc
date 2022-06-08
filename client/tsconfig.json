@@ -1,23 +1,27 @@
 {
+	"$schema": "https://json.schemastore.org/tsconfig",
+	"display": "Svelte",
+  "_version": "2.0.0",
+
 	"compilerOptions": {
+		"moduleResolution": "node",
+		"target": "esnext",
+		"module": "esnext",
+		"types": ["node", "svelte"],
 		"esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+		"isolatedModules": false,
 		"experimentalDecorators": true,
 		"outDir": "build",
 		"sourceMap": true,
-		"noImplicitAny": true,
-		"module": "commonjs",
-		"target": "esnext",
+		//"noImplicitAny": true,
 		"jsx": "react",
 		"typeRoots": [
-			"./node_modules/@types",
-			"./types"
+			"node_modules/@types",
+			"./types/*"
 		]
 	},
-	"include": [
-		"./src/**/*"
-	],
-	"exclude": [
-		"node_modules",
-		"typings"
-	]
+	"include": ["src/**/*"],
+	"exclude": ["node_modules/*", "__sapper__/*", "public/*"]
 }

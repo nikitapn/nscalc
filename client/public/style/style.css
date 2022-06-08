@@ -1,4 +1,5 @@
-html,body {
+html,
+body {
 	margin: 0;
 	background-color: #313131;
 	display: grid;
@@ -7,7 +8,7 @@ html,body {
 #page-container {
 	position: relative;
 	min-height: 100vh;
-    
+
 }
 
 #content-wrap {
@@ -121,7 +122,8 @@ td:first-child+td {
 	width: 100%;
 }
 
-th, td {
+th,
+td {
 	text-align: center;
 	padding: 5px;
 	border: none;
@@ -202,6 +204,7 @@ th, td {
 	background-color: #edece5d9;
 	border-radius: 2px;
 }
+
 .fert-elem-text {
 	vertical-align: bottom;
 }
@@ -263,6 +266,7 @@ th, td {
 	.sidenav {
 		padding-top: 15px;
 	}
+
 	.sidenav a {
 		font-size: 18px;
 	}
@@ -290,9 +294,9 @@ th, td {
 	height: 16px;
 }
 
-.fert-cost  {
-    vertical-align: bottom;
-    border-right: 5px solid #4c4c4c
+.fert-cost {
+	vertical-align: bottom;
+	border-right: 5px solid #4c4c4c
 }
 
 .fert-cost input {
@@ -479,7 +483,7 @@ textarea {
 .calc-c {
 	margin: 0 auto;
 	display: flex;
-	max-width: max-content;	
+	max-width: max-content;
 	width: fit-content;
 	height: fit-content;
 }
@@ -491,22 +495,27 @@ textarea {
 	text-align: right;
 	padding-right: 10px;
 }
+
 .tab_tiv {
 	text-align: left;
-    padding-right: 5px;
+	padding-right: 5px;
 }
+
 .tab_tivs {
 	text-align: left;
-    width: 100%;  
+	width: 100%;
 }
+
 .tab-tsep {
 	border-top: black 1px solid;
 	padding-bottom: 10px
 }
+
 .font_big {
 	font-size: 36px;
 	padding-right: 5px;
 }
+
 .out_big {
 	width: 100px;
 	height: 36px;
@@ -551,7 +560,7 @@ textarea {
 	color: white;
 }
 
-.wlogin label { 
+.wlogin label {
 	margin-left: 10px;
 }
 
@@ -566,74 +575,111 @@ textarea {
 	margin-left: 10px;
 }
 
+
+@keyframes blinking_blue {
+	0% {
+		background-color: #2cffea;
+	}
+
+	49% {
+		background-color: #2cffea;
+	}
+
+	50% {
+		background-color: #f9f9d5
+	}
+
+	100% {
+		background-color: #f9f9d5
+	}
+}
+
+@keyframes blinking_yellow {
+	0% {
+		background-color: #ffe817;
+	}
+
+	49% {
+		background-color: #ffe817;
+	}
+
+	50% {
+		background-color: #f9f9d5
+	}
+
+	100% {
+		background-color: #f9f9d5
+	}
+}
+
+@keyframes blinking_red {
+	0% {
+		background-color: #ff1717;
+	}
+
+	49% {
+		background-color: #ff1717;
+	}
+
+	50% {
+		background-color: #f9f9d5
+	}
+
+	100% {
+		background-color: #f9f9d5
+	}
+}
+
 .alarms_bar {
-  position: fixed;
-  bottom: 0;
-  height: 5%;
-  width: 100%;
-  background: darkgray;
-  z-index: 1;
+	position: fixed;
+	bottom: 0;
+	height: 5%;
+	width: 100%;
+	background: darkgray;
+	z-index: 1;
 }
 
-.alarm_entry {
-	display: flex;
-	float: left;
-	height: 85%;
-	width: 16%;
-	border: 2px solid;
-	background: yellow;
-	text-align: left;
-	margin-top: 3px;
-	margin-left: 8px;
-	vertical-align: middle;
-	border-radius: 6px;
-	align-items: center;
-	animation: blinking 1.2s infinite;
-}
-
-.alarm_entry {
-	display: flex;
-	float: left;
-	height: 85%;
-	width: 16%;
-	border: 2px solid;
-	background: yellow;
-	text-align: left;
-	margin-top: 3px;
-	margin-left: 8px;
-	vertical-align: middle;
-	border-radius: 6px;
-	align-items: center;
-	animation: blinking 1.2s infinite;
-}
-
-.alarm_entry_confirmed {
-	animation: none;
-}
-
-.alarm_entry:hover {
+.alarm:hover {
 	background: gray;
 	cursor: pointer;
 }
 
-.alarm_entry_text {
-	margin-left: 10%;
+.alarm_text {
+	margin-left: 5%;
 	font: bold italic large serif
 }
 
-@keyframes blinking {
-	0% { 
-		background-color: #ffe817;
-	}
-     49% { 
-		 background-color: #ffe817;
-	 }
-     50% { 
-		 background-color: #f9f9d5
-	 }
-    100% { 
-		background-color: #f9f9d5
-	}
+.alarm {
+	display: flex;
+	float: left;
+	height: 85%;
+	width: 16%;
+	border: 2px solid;
+	text-align: left;
+	margin-top: 3px;
+	margin-left: 8px;
+	vertical-align: middle;
+	border-radius: 6px;
+	align-items: center;
+}
+
+.alarm_info {
+	background: #2cffea;
+	animation: blinking_blue 1.2s infinite;
+}
+
+.alarm_warning {
+	background: #ffe817;
+	animation: blinking_yellow 1.2s infinite;
+}
+
+.alarm_critical {
+	background: #ff1717;
+	animation: blinking_red 1.2s infinite;
+}
+
+.alarm_confirmed {
+	animation: none;
 }
 
 .links_content {
@@ -643,9 +689,14 @@ textarea {
 }
 
 a {
-	color:white
+	color: white
 }
 
 a:hover {
-	color:green;
+	color: green;
+}
+
+.alarm_bell {
+	margin-left: 3%;
+	height: inherit;
 }

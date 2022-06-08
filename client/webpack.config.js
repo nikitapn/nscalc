@@ -1,6 +1,7 @@
 const path = require('path');
 const webpack = require('webpack');
 const TerserPlugin = require('terser-webpack-plugin');
+const sveltePreprocess = require('svelte-preprocess');
 
 module.exports = env => {
 	let production = env.production ? true : false;
@@ -39,6 +40,17 @@ module.exports = env => {
 		},
 		module: {
 			rules: [
+				{
+					test: /\.svelte$/,
+					use: {
+						loader: 'svelte-loader',
+						options: {
+							emitCss: true,
+              hotReload: true,
+							preprocess: sveltePreprocess({ sourceMap: !production })
+						}
+					}
+				},
 				{ test: /\.txt$/, use: 'raw-loader' },
 				{ test: /\.tsx?$/, loader: "ts-loader" },
 				{ enforce: "pre", test: /\.js$/, loader: "source-map-loader" },
@@ -47,7 +59,8 @@ module.exports = env => {
 			]
 		},
 		resolve: {
-			extensions: ['.ts', '.tsx', ".js", ".jsx"]
+			extensions: ['.ts', '.tsx', ".js", ".jsx", ".svelte"],
+			mainFields: ['svelte', 'browser', 'module', 'main']
 		},
 		plugins: [
 			new webpack.DefinePlugin({

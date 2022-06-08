@@ -416,6 +416,83 @@ public:
 };
 } // namespace flat
 
+enum class ChatAttachmentType : uint32_t {
+  Picture,
+  File = 1
+};
+struct ChatAttachment {
+  ChatAttachmentType type;
+  std::string name;
+  std::vector<uint8_t> data;
+};
+
+namespace flat {
+struct ChatAttachment {
+  ChatAttachmentType type;
+  ::flat::String name;
+  ::flat::Vector<uint8_t> data;
+};
+
+class ChatAttachment_Direct {
+  boost::beast::flat_buffer& buffer_;
+  const size_t offset_;
+
+  auto& base() noexcept { return *reinterpret_cast<ChatAttachment*>(reinterpret_cast<std::byte*>(buffer_.data().data()) + offset_); }
+  auto const& base() const noexcept { return *reinterpret_cast<const ChatAttachment*>(reinterpret_cast<const std::byte*>(buffer_.data().data()) + offset_); }
+public:
+  void* __data() noexcept { return (void*)&base(); }
+  ChatAttachment_Direct(boost::beast::flat_buffer& buffer, size_t offset)
+    : buffer_(buffer)
+    , offset_(offset)
+  {
+  }
+  const ChatAttachmentType& type() const noexcept { return base().type;}
+  ChatAttachmentType& type() noexcept { return base().type;}
+  void name(const char* str) { new (&base().name) ::flat::String(buffer_, str); }
+  void name(const std::string& str) { new (&base().name) ::flat::String(buffer_, str); }
+  auto name() noexcept { return (::flat::Span<char>)base().name; }
+  auto name() const noexcept { return (::flat::Span<const char>)base().name; }
+  auto name_vd() noexcept {     return ::flat::String_Direct1(buffer_, offset_ + offsetof(ChatAttachment, name));  }
+  void data(size_t elements_size) { new (&base().data) ::flat::Vector<uint8_t>(buffer_, elements_size); }
+  auto data_vd() noexcept { return ::flat::Vector_Direct1<uint8_t>(buffer_, offset_ + offsetof(ChatAttachment, data)); }
+  auto data() noexcept { return (::flat::Span<uint8_t>)base().data; }
+};
+} // namespace flat
+
+struct ChatMessage {
+  uint32_t date;
+  std::string str;
+};
+
+namespace flat {
+struct ChatMessage {
+  uint32_t date;
+  ::flat::String str;
+};
+
+class ChatMessage_Direct {
+  boost::beast::flat_buffer& buffer_;
+  const size_t offset_;
+
+  auto& base() noexcept { return *reinterpret_cast<ChatMessage*>(reinterpret_cast<std::byte*>(buffer_.data().data()) + offset_); }
+  auto const& base() const noexcept { return *reinterpret_cast<const ChatMessage*>(reinterpret_cast<const std::byte*>(buffer_.data().data()) + offset_); }
+public:
+  void* __data() noexcept { return (void*)&base(); }
+  ChatMessage_Direct(boost::beast::flat_buffer& buffer, size_t offset)
+    : buffer_(buffer)
+    , offset_(offset)
+  {
+  }
+  const uint32_t& date() const noexcept { return base().date;}
+  uint32_t& date() noexcept { return base().date;}
+  void str(const char* str) { new (&base().str) ::flat::String(buffer_, str); }
+  void str(const std::string& str) { new (&base().str) ::flat::String(buffer_, str); }
+  auto str() noexcept { return (::flat::Span<char>)base().str; }
+  auto str() const noexcept { return (::flat::Span<const char>)base().str; }
+  auto str_vd() noexcept {     return ::flat::String_Direct1(buffer_, offset_ + offsetof(ChatMessage, str));  }
+};
+} // namespace flat
+
 class IAuthorizator_Servant
   : public virtual nprpc::ObjectServant
 {
@@ -507,6 +584,50 @@ public:
   void OnAlarm (/*in*/const npkcalc::Alarm& alarm);
 };
 
+class IChat_Servant
+  : public virtual nprpc::ObjectServant
+{
+public:
+  static std::string_view _get_class() noexcept { return "npkcalc/npkcalc.Chat"; }
+  std::string_view get_class() const noexcept override { return IChat_Servant::_get_class(); }
+  void dispatch(nprpc::Buffers& bufs, nprpc::EndPoint remote_endpoint, bool from_parent, nprpc::ReferenceList& ref_list) override;
+  virtual void Connect (nprpc::Object* obj) = 0;
+  virtual bool Send (npkcalc::flat::ChatMessage_Direct msg) = 0;
+};
+
+class Chat
+  : public virtual nprpc::Object
+{
+  const uint8_t interface_idx_;
+public:
+  using servant_t = IChat_Servant;
+
+  Chat(uint8_t interface_idx) : interface_idx_(interface_idx) {}
+  void Connect (/*in*/const ObjectId& obj);
+  bool Send (/*in*/const npkcalc::ChatMessage& msg);
+};
+
+class IChatListener_Servant
+  : public virtual nprpc::ObjectServant
+{
+public:
+  static std::string_view _get_class() noexcept { return "npkcalc/npkcalc.ChatListener"; }
+  std::string_view get_class() const noexcept override { return IChatListener_Servant::_get_class(); }
+  void dispatch(nprpc::Buffers& bufs, nprpc::EndPoint remote_endpoint, bool from_parent, nprpc::ReferenceList& ref_list) override;
+  virtual void OnMessage (npkcalc::flat::ChatMessage_Direct msg) = 0;
+};
+
+class ChatListener
+  : public virtual nprpc::Object
+{
+  const uint8_t interface_idx_;
+public:
+  using servant_t = IChatListener_Servant;
+
+  ChatListener(uint8_t interface_idx) : interface_idx_(interface_idx) {}
+  void OnMessage (/*in*/const npkcalc::ChatMessage& msg);
+};
+
 class ICalculator_Servant
   : public virtual nprpc::ObjectServant
 {
@@ -573,6 +694,10 @@ inline void assign_from_flat_OnAlarm_alarm(npkcalc::flat::Alarm_Direct& src, npk
   dest.id = src.id();
   dest.type = src.type();
   dest.msg = (std::string_view)src.msg();
+}
+inline void assign_from_flat_Send_msg(npkcalc::flat::ChatMessage_Direct& src, npkcalc::ChatMessage& dest) {
+  dest.date = src.date();
+  dest.str = (std::string_view)src.str();
 }
 template<::nprpc::IterableCollection T>
 void assign_from_cpp_GetData_solutions(/*out*/::flat::Vector_Direct2<npkcalc::flat::Solution, npkcalc::flat::Solution_Direct>& dest, const T & src) {

@@ -8,6 +8,7 @@ import { View_NutrientSolutions } from './view_solutions'
 import { View_Fertilizers } from './view_fertilizers'
 import { View_Calculator } from './view_calculator'
 import { View_Links } from './view_links'
+import { View_Chat } from './view_chat'
 import { WLogin, set_user_data } from './wlogin'
 import * as NPRPC from './nprpc';
 import * as npkcalc from './npkcalc'
@@ -20,6 +21,11 @@ import { get_calculations } from './store_calculations'
 import { calculator, authorizator, init_rpc, poa } from './rpc'
 import { observer } from 'mobx-react'
 import { alarms, Alarm } from './alarm'
+import { connect_to_room } from './chat'
+
+
+
+let root = document.getElementById('root') as HTMLDivElement;
 
 @observer
 class AlarmEntry extends React.Component<{ alarm: Alarm }, {}> {
@@ -43,8 +49,16 @@ class AlarmEntry extends React.Component<{ alarm: Alarm }, {}> {
 	}
 
 	render() : JSX.Element {
+		let style;
+		switch(this.props.alarm.type) {
+				case npkcalc.AlarmType.Info: style = "alarm alarm_info"; break;
+				case npkcalc.AlarmType.Warning: style = "alarm alarm_warning"; break;
+				case npkcalc.AlarmType.Critical: style = "alarm alarm_critical"; break;
+		}
+		if (this.props.alarm.confirmed) style += " alarm_confirmed";
 		return (
-			<div className={this.props.alarm.confirmed ? "alarm_entry alarm_entry_confirmed" : "alarm_entry"} onClick={this.handle_onClick.bind(this)}>
+			<div className={style} onClick={this.handle_onClick.bind(this)}>
+				<img className="alarm_bell" src={global.icons.bell}/>
 				<div className="alarm_entry_text">{this.props.alarm.msg}</div>
 			</div>
 		);
@@ -73,6 +87,7 @@ class App extends TabPane {
 		this.add_view(View_NutrientSolutions, "SOLUTIONS", false);
 		this.add_view(View_Fertilizers, "FERTILIZERS", false);
 		this.add_view(View_Links, "LINKS", false);
+		this.add_view(View_Chat, "CHAT", false);
 	}
 	componentDidMount() {
 		super.componentDidMount();
@@ -108,13 +123,6 @@ class App extends TabPane {
 	}
 }
 
-//async function ping() {
-//	await obj.Ping();
-//	console.log("ping");
-//	setTimeout(ping, 5000);
-//}
-
-
 class DataObserverImpl extends npkcalc._IDataObserver_Servant implements npkcalc.IDataObserver_Servant {
 	DataChanged(idx: number): void {
 		// console.log("DataObserverImpl(): " + idx.toString());
@@ -132,12 +140,11 @@ class DataObserverImpl extends npkcalc._IDataObserver_Servant implements npkcalc
 
 }
 
-
 async function fetch_data() {
 	let solutions = NPRPC.make_ref<NPRPC.Flat.Vector_Direct2<npkcalc.Flat_npkcalc.Solution_Direct>>();
 	let fertilizers = NPRPC.make_ref<NPRPC.Flat.Vector_Direct2<npkcalc.Flat_npkcalc.Fertilizer_Direct>>();
+	
 	//let t0 = performance.now()
-
 	try {
 		await (global.icons as MyIcons).fetch(calculator);
 		await calculator.GetData(solutions, fertilizers);
@@ -155,20 +162,18 @@ async function fetch_data() {
 		await calculator.Subscribe(
 			poa.activate_object(new DataObserverImpl())
 		);
-
-		(window as any).root.dispatchEvent(new Event("ce_data_recieved"));
+		root.dispatchEvent(new Event("ce_data_recieved"));
+		
+		connect_to_room();
 	} catch (e) {
 		console.log(e);
 	}
 	//let t1 = performance.now();
 	//console.log("Call to RPC took " + (t1 - t0) + " milliseconds.");
-  // setTimeout(ping, 5000);
 }
 
-let root = document.getElementById('root') as HTMLDivElement;
-(window as any).root = root;
-
-root.addEventListener("ce_data_recieved", () => {
+root.addEventListener("ce_data_recieved", (ev:  Event) => {
+	ev.stopPropagation();
 	ReactDOM.render(
 		<App menu_className="tab" dynamic={false} />,
 		root

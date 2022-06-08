@@ -135,7 +135,7 @@ export class UndoRedo {
 		}
 	}
 
-	public clear() {
+	public commands_clear() {
 		this.commands = new Array<ICommand>();
 		if (this.pos === -1) this.pos = 0;
 		this.pos = -1;

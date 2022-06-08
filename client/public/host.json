@@ -20,6 +20,16 @@
 			"flags": 1,
 			"class_id": "npkcalc/npkcalc.Authorizator",
 			"hostname": ""
+		},
+		"chat": {
+			"object_id": 2,
+			"ip4": 2130706433,
+			"port": 52244,
+			"websocket_port": 8080,
+			"poa_idx": 0,
+			"flags": 1,
+			"class_id": "npkcalc/npkcalc.Chat",
+			"hostname": ""
 		}
 	}
 }

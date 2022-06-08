@@ -30,6 +30,7 @@ class Observers {
 
 	uint32_t alarm_id_ = 0;
 	std::vector<std::unique_ptr<npkcalc::DataObserver>> observers;
+	std::vector<std::unique_ptr<npkcalc::ChatListener>> chat_listeners;
 
 	npkcalc::Alarm make_alarm(npkcalc::AlarmType type, const std::string& msg) {
 		return { alarm_id_++, type, msg };
@@ -37,6 +38,10 @@ class Observers {
 
 	void add_impl(npkcalc::DataObserver* user) {
 		observers.emplace_back(user);
+	}
+
+	void add_chat_listener_impl(npkcalc::ChatListener* listener) {
+		chat_listeners.emplace_back(listener);
 	}
 
 	template<typename T, typename... Args>
@@ -51,27 +56,20 @@ class Observers {
 		}
 	}
 
-	void alarm_info_impl(std::string msg) {
-		broadcast(&npkcalc::DataObserver::OnAlarm, make_alarm(npkcalc::AlarmType::Warning, msg));
-	}
-	void alarm_warning_impl(std::string msg) {
-		broadcast(&npkcalc::DataObserver::OnAlarm, make_alarm(npkcalc::AlarmType::Info, msg));
-	}
-	void alarm_critical_impl(std::string msg) {
-		broadcast(&npkcalc::DataObserver::OnAlarm, make_alarm(npkcalc::AlarmType::Critical, msg));
+	void alarm_impl(npkcalc::AlarmType type, std::string msg) {
+		broadcast(&npkcalc::DataObserver::OnAlarm, make_alarm(type, msg));
 	}
 public:
 	void add(npkcalc::DataObserver* user) {
 		nplib::async<false>(ioc_, &Observers::add_impl, this, user);
 	}
-	void alarm_info(const std::string& msg) {
-		nplib::async<false>(ioc_, &Observers::alarm_info_impl, this, msg);
+
+	void add(npkcalc::ChatListener* listener) {
+		nplib::async<false>(ioc_, &Observers::add_chat_listener_impl, this, listener);
 	}
-	void alarm_warning(const std::string& msg) {
-		nplib::async<false>(ioc_, &Observers::alarm_warning_impl, this, msg);
-	}
-	void alarm_critical(const std::string& msg) {
-		nplib::async<false>(ioc_, &Observers::alarm_critical_impl, this, msg);
+
+	void alarm(npkcalc::AlarmType type, std::string&& msg) {
+		nplib::async<false>(ioc_, &Observers::alarm_impl, this, type, msg);
 	}
 
 	void stop() { ioc_.stop(); }
@@ -80,6 +78,48 @@ public:
 		std::thread([this]() { ioc_.run(); }).detach();
 	}
 } observers;
+
+
+class Chat {
+	boost::asio::io_context ioc_;
+	boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard_;
+
+	std::vector<std::unique_ptr<npkcalc::ChatListener>> chat_listeners;
+
+	void add_impl(npkcalc::ChatListener* listener) {
+		chat_listeners.emplace_back(listener);
+	}
+	
+	void send_impl(npkcalc::ChatMessage msg) {
+		broadcast(&npkcalc::ChatListener::OnMessage, std::ref(msg));
+	}
+
+	template<typename T, typename... Args>
+	void broadcast(T fn, const Args&... args) {
+		for (auto it = std::begin(chat_listeners); it != chat_listeners.end(); ) {
+			try {
+				std::mem_fn(fn)(*it, args...);
+				it = std::next(it);
+			} catch (nprpc::Exception&) {
+				it = chat_listeners.erase(it);
+			}
+		}
+	}
+public:
+	void add(npkcalc::ChatListener* listener) {
+		nplib::async<false>(ioc_, &Chat::add_impl, this, listener);
+	}
+
+	void send(npkcalc::ChatMessage&& msg) {
+		nplib::async<false>(ioc_, &Chat::send_impl, this, std::move(msg));
+	}
+
+	void stop() { ioc_.stop(); }
+
+	Chat() : work_guard_(boost::asio::make_work_guard(ioc_)) {
+		std::thread([this]() { ioc_.run(); }).detach();
+	}
+} chat_room;
 
 enum class Tables {
 	Solutions,
@@ -96,7 +136,6 @@ public:
 	Fertilizers fertilizers;
 
 	std::vector<npkcalc::Media> icons;
-
 
 	Calculations get_calculations(std::string owner) const noexcept {
 		Calculations calcs{data_root_dir_ + "/calculations/" + owner + ".bin"};
@@ -119,7 +158,7 @@ public:
 		fertilizers.load();
 		fertilizers.sort();
 
-		constexpr std::string_view icon_list[] = {"add", "save", "redo", "undo", "gear"};
+		constexpr std::string_view icon_list[] = {"add", "save", "redo", "undo", "gear", "bell"};
 		const auto root = std::string(data_root_dir + "/icons/");
 		const auto svg = std::string(".svg");
 
@@ -131,6 +170,23 @@ public:
 			icons.back().name = s;
 			icons.back().data = {std::istreambuf_iterator<char>(is), std::istreambuf_iterator<char>()};
 		}
+	}
+};
+
+class ChatImpl 
+	: public npkcalc::IChat_Servant {
+public:
+	virtual void Connect(nprpc::Object* obj) {
+		auto listener = nprpc::narrow<npkcalc::ChatListener>(obj);
+		if (listener) {
+			listener->add_ref();
+			listener->set_timeout(250);
+			chat_room.add(listener);
+		}
+	}
+	virtual bool Send(npkcalc::flat::ChatMessage_Direct msg) {
+		chat_room.send(npkcalc::ChatMessage{ msg.date(), (std::string)msg.str() });
+		return true;
 	}
 };
 
@@ -176,6 +232,9 @@ public:
 		s->name = name;
 		s->owner = user_data_.user_name;
 		std::transform(elements.begin(), elements.end(), s->elements.begin(), [](auto x) { return x; });
+
+		observers.alarm(npkcalc::AlarmType::Info, user_data().user_name + " added solution \"" + s->name + "\"");
+
 		return s->id;
 	}
 
@@ -200,8 +259,18 @@ public:
 
 	virtual void DeleteSolution(uint32_t id) {
 		solutions_changed = true;
-		std::lock_guard<std::mutex> lk(data_manager->mut_solutions);
-		data_manager->solutions.remove_by_id(id);
+		std::string name;
+		bool deleted = false;
+		{
+			std::lock_guard<std::mutex> lk(data_manager->mut_solutions);
+			if (auto s = data_manager->solutions.get_by_id(id); s) {
+				name = std::move(s->name);
+				data_manager->solutions.remove_by_id(id);
+				deleted = true;
+			}
+		}
+		if (deleted)
+			observers.alarm(npkcalc::AlarmType::Critical, user_data().user_name + " deleted solution \"" + name + "\"");
 	}
 
 	virtual uint32_t AddFertilizer(::flat::Span<char> name, ::flat::Span<char> formula) {
@@ -315,7 +384,7 @@ public:
 
 	virtual void Subscribe(nprpc::Object* obj) {
 		static int i = 0;
-		observers.alarm_info("User #" + std::to_string(++i) + " connected");
+		observers.alarm(npkcalc::AlarmType::Info, "User #" + std::to_string(++i) + " connected");
 		auto user = nprpc::narrow<npkcalc::DataObserver>(obj);
 		if (user) {
 			user->add_ref();
@@ -376,7 +445,7 @@ class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
 			it != users_db_.end())
 		{
 			if (!user_password.empty() && (*it)->password_sha256 != sha256(user_password)) {
-				observers.alarm_warning("User \"" + (*it)->user_name + "\" forgot his password");
+				observers.alarm(npkcalc::AlarmType::Warning, "User \"" + (*it)->user_name + "\" forgot his password");
 				throw npkcalc::AuthorizationFailed(npkcalc::AuthorizationFailed_Reason::incorrect_password);
 			}
 
@@ -387,7 +456,7 @@ class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
 			do { s.sid = create_uuid(); } while (sessions_.find(s) != sessions_.end());
 			s.email = user_email;
 
-			observers.alarm_info("User \"" + (*it)->user_name + "\" has logged in");
+			observers.alarm(npkcalc::AlarmType::Info, "User \"" + (*it)->user_name + "\" has logged in");
 
 			return {(*it)->user_name, sessions_.emplace(std::move(s)).first->sid, oid};
 		} else {
@@ -402,7 +471,7 @@ public:
 		//std::cout << user_email << " " << user_password << std::endl;
 
 		if (user_password.empty()) {
-			observers.alarm_warning("User is trying to log in with empty password");
+			observers.alarm(npkcalc::AlarmType::Warning, "User is trying to log in with an empty password");
 			throw npkcalc::AuthorizationFailed(npkcalc::AuthorizationFailed_Reason::incorrect_password);
 		}
 
@@ -494,10 +563,12 @@ struct HostJson {
 	struct {
 		nprpc::ObjectId calculator;
 		nprpc::ObjectId authorizator;
+		nprpc::ObjectId chat;
 		template<typename Archive>
 		void serialize(Archive& ar) {
 			ar& NVP(calculator);
 			ar& NVP(authorizator);
+			ar& NVP(chat);
 		}
 	} objects;
 
@@ -548,11 +619,11 @@ int main(int argc, char* argv[]) {
 
 	host_json.secured = use_ssl;
 
-
 	// Capture SIGINT and SIGTERM to perform a clean shutdown
 	boost::asio::signal_set signals(thread_pool::get_instance().ctx(), SIGINT, SIGTERM);
 	signals.async_wait([&](boost::beast::error_code const&, int) { 
 		observers.stop();
+		chat_room.stop();
 		thread_pool::get_instance().stop(); 
 	});
 	
@@ -572,16 +643,19 @@ int main(int argc, char* argv[]) {
 
 		// static poa
 		auto policy = std::make_unique<nprpc::Policy_Lifespan>(nprpc::Policy_Lifespan::Persistent);
-		auto poa = rpc->create_poa(2, {policy.get()});
+		auto poa = rpc->create_poa(3, {policy.get()});
 
 		CalculatorImpl calc{data_root};
 		AuthorizatorImpl autorizator(*rpc, data_root);
+		ChatImpl chat;
 
 		host_json.objects.calculator = poa->activate_object(&calc);
 		host_json.objects.authorizator = poa->activate_object(&autorizator);
+		host_json.objects.chat = poa->activate_object(&chat);
 
 		std::cout << "calculator  - poa: " << calc.poa_index() << ", oid: " << calc.oid() << "\n";
 		std::cout << "autorizator - poa: " << autorizator.poa_index() << ", oid: " << autorizator.oid() << "\n";
+		std::cout << "chat - poa: " << chat.poa_index() << ", oid: " << chat.oid() << "\n";
 		std::cout.flush();
 
 		{
@@ -589,6 +663,14 @@ int main(int argc, char* argv[]) {
 			nprpc::serialization::json_oarchive oa(os);
 			oa << host_json;
 		}
+		std::thread([] {
+			using namespace std::chrono_literals;
+			while (1) {
+				static int i = 0;
+				chat_room.send(npkcalc::ChatMessage{ 32432, "msg:" + std::to_string(i++) });
+				std::this_thread::sleep_for(1s);
+			}
+			}).detach();
 		
 		rpc->start();
 		thread_pool::get_instance().ctx().run();
