@@ -1,34 +1,48 @@
+<svelte:options accessors/>
+
 <script lang="ts">
+	import Button, { Label } from '@smui/button';
+	import Textfield from '@smui/textfield';
 	import { Message, chat_messages } from '../../chat'
+	import { chat } from '../../rpc'
 	import ChatMessage from './ChatMessage.svelte';
-	//import TodayDivider from './TodayDivider.svelte';
-	//import Fa from 'svelte-fa';
-	//import { faUsers, faCompressArrowsAlt, faComments, faEnvelope } from '@fortawesome/free-solid-svg-icons';
-
-	//let nameMe='Me';
-	//let profilePicMe='https://p0.pikist.com/photos/474/706/boy-portrait-outdoors-facial-men-s-young-t-shirt-hair-person-thumbnail.jpg';
-
-	//let nameChatPartner='John Doe';
-	//let profilePicChatPartner='https://storage.needpix.com/rsynced_images/male-teacher-cartoon.jpg';
 	
-	let messages = [
-		{"messageId":416,"message":"abc","timestamp":1587139022488.826,"sentByMe":false,"timeRead":1587139025367.015},
-		{"messageId":417,"message":"test","timestamp":1587139034294.678,"sentByMe":true,"timeRead":1587139048713.461},
-		{"messageId":418,"message":"a","timestamp":1587139047495.052,"sentByMe":true,"timeRead":1587139048713.461},
-		{"messageId":419,"message":"testset","timestamp":1587139312376.663,"sentByMe":true,"timeRead":1587139336397.5078},
-		{"messageId":420,"message":"tatta","timestamp":1587139349155.217,"sentByMe":false,"timeRead":1587139359024.353},
-		{"messageId":426,"message":"t","timestamp":1587577393781.811,"sentByMe":false,"timeRead":1587686514958.049},
-		{"messageId":427,"message":"aaa","timestamp":1587577411018.97,"sentByMe":false,"timeRead":1587686514958.049},
-		{"messageId":431,"message":"a","timestamp":1587652540004.281,"sentByMe":false,"timeRead":1587686514958.049},
-		{"messageId":432,"message":"u","timestamp":1587686520069.1272,"sentByMe":true,"timeRead":1587687940655.5369},
-		{"messageId":433,"message":"a","timestamp":1587782491376.533,"sentByMe":false,"timeRead":1589814592979.757}
-	];
+	let text;
+	let input_str = "";
+	let list: HTMLDivElement;
+
+	export const onSend = () => {
+		if (input_str.length == 0) return;
+		chat.Send({timestamp: 0, str: input_str});
+		chat_messages.update(ar => {ar.push({date: new Date(), str: input_str, sent_by_me: true}); return ar;})
+		input_str = "";
+		text.focus();
+		
+	}
+
+	export const set_focus = () => {
+		text.focus();
+		console.log(text);
+	}
+
+	let unsubscribe = chat_messages.subscribe(() => {
+		setTimeout(() => list.scrollTo(0, list.scrollHeight), 0);
+	});
+
+	
+
 </script>
 
-
-
 <style>
-	.direct-chat .card-body {
+	.chat {
+		margin: 40px;
+		border-radius: 20px;
+		padding-top: 1%;
+		background-image: linear-gradient(rgb(249, 199, 142), rgb(5, 210, 179));
+		width: 50%;
+	}
+
+	.card-body {
 		overflow-x: hidden;
 		padding: 0;
 		position: relative;
@@ -40,10 +54,21 @@
 		height: 400px;
 		overflow: auto;
 		padding: 10px;
+	
 		transition: -webkit-transform .5s ease-in-out;
 		transition: transform .5s ease-in-out;
 		transition: transform .5s ease-in-out, -webkit-transform .5s ease-in-out;
 	}
+
+	.controls {
+		position: relative;
+		padding: 1%;
+		height: 50px;
+	}
+
+	.Absolute-Center {
+  margin: auto;position: absolute;top: 0; left: 0; bottom: 0; right: 0;
+}
 
 	.contacts-img {
 		border-radius: 50%;
@@ -54,35 +79,66 @@
 		margin-left: 15px;
 		font-weight: 600;
 	}
+
+	:global(.vcentered) {
+  	position: absolute;
+  	top: 50%;
+  	-webkit-transform: translateY(-50%);
+    -ms-transform: translateY(-50%);
+    transform: translateY(-50%);
+	}
+
+  *
+    :global(.shaped-outlined
+      .mdc-notched-outline
+      .mdc-notched-outline__leading) {
+    border-radius: 28px 0 0 28px;
+    width: 28px;
+  }
+  *
+    :global(.shaped-outlined
+      .mdc-notched-outline
+      .mdc-notched-outline__trailing) {
+    border-radius: 0 28px 28px 0;
+  }
+  * :global(.shaped-outlined .mdc-notched-outline .mdc-notched-outline__notch) {
+    max-width: calc(100% - 28px * 2);
+  }
+  *
+    :global(.shaped-outlined.mdc-text-field--with-leading-icon:not(.mdc-text-field--label-floating)
+      .mdc-floating-label) {
+    left: 16px;
+  }
+  * :global(.shaped-outlined + .mdc-text-field-helper-line) {
+    padding-left: 32px;
+    padding-right: 28px;
+  }
 </style>
 
 <svelte:head>
-  <!-- <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"> -->
+	<link rel="stylesheet" href="style/svelte-material-ui/bare.css" />
 </svelte:head>
 
-<div class="card card-danger direct-chat direct-chat-danger">
-    <div class="card-header">
-        <div class="card-tools d-flex">
-            <!--<img class="contacts-img" src={profilePicChatPartner} alt="profilePic">
-            <span class="contacts-name">{nameChatPartner}</span> -->
-            <span class="mr-auto"></span>
-            <!-- <button type="button" class="btn btn-tool" title="Contacts"><Fa icon={faUsers} /></button>
-            <button type="button" class="btn btn-tool"><Fa icon={faCompressArrowsAlt} /></button> -->
-        </div>
-    </div>
-    <div class="card-body">
-        <div class="direct-chat-messages">
-            {#each $chat_messages as msg}
-                <ChatMessage msg={msg}/>
-            {/each}
-        </div>
-    </div>
-    <div class="card-footer">
-        <div class="input-group">
-            <input type="text" placeholder="Type Message ..." class="form-control">
-            <span class="input-group-append">
-                <button type="button" class="btn btn-primary">Send</button>
-            </span>
-        </div>
-    </div>
+<div class="chat">
+	<div class="card-body">
+		<div bind:this={list} class="direct-chat-messages">
+			{#each $chat_messages as msg}
+				<ChatMessage msg={msg}/>
+			{/each}
+		</div>
+	</div>
+	<div>
+		<div class="controls">
+			<Textfield style="float:left;width:100%;" 
+				helperLine$style="width:100%;" 
+				class="shaped-outlined vcentered" 
+				variant="outlined" 
+				bind:this={text} 
+				bind:value={input_str} 
+				label="Type a message..."/>
+			<!--<Button class="vcentered" style="float:right;" on:click={onSend} variant="raised">
+				<Label>Send</Label>
+			</Button>-->
+		</div>
+	</div>
 </div>

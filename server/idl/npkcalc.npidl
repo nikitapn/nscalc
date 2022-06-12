@@ -102,7 +102,7 @@ ChatAttachment: flat {
 }
 
 ChatMessage: flat {
-	date: u32;
+	timestamp: u32;
 	str: string;
 }
 
@@ -138,10 +138,9 @@ interface DataObserver {
 interface Chat {
 	void Connect(obj: in object);
 	boolean	Send(msg: in ChatMessage);
-	
 }
 
-interface ChatListener {
+interface ChatParticipant {
 	void OnMessage(msg: in ChatMessage);
 }
 

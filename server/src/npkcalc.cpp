@@ -1,6 +1,6 @@
 #include "npkcalc.hpp"
 #include "npkcalc_m.hpp"
-#include <nprpc/nprpc_impl.hpp>
+#include <nprpc/impl/nprpc_impl.hpp>
 
 void npkcalc_throw_exception(boost::beast::flat_buffer& buf);
 
@@ -716,7 +716,7 @@ bool npkcalc::Chat::Send(/*in*/const npkcalc::ChatMessage& msg) {
   __ch.interface_idx() = interface_idx_;
   __ch.function_idx() = 1;
   ::flat::npkcalc_M13_Direct _(buf,32);
-  _._1().date() = msg.date;
+  _._1().timestamp() = msg.timestamp;
   _._1().str(msg.str);
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
   ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
@@ -760,7 +760,7 @@ bool __ret_val;
   }
 }
 
-void npkcalc::ChatListener::OnMessage(/*in*/const npkcalc::ChatMessage& msg) {
+void npkcalc::ChatParticipant::OnMessage(/*in*/const npkcalc::ChatMessage& msg) {
   boost::beast::flat_buffer buf;
   {
     auto mb = buf.prepare(172);
@@ -774,7 +774,7 @@ void npkcalc::ChatListener::OnMessage(/*in*/const npkcalc::ChatMessage& msg) {
   __ch.interface_idx() = interface_idx_;
   __ch.function_idx() = 0;
   ::flat::npkcalc_M13_Direct _(buf,32);
-  _._1().date() = msg.date;
+  _._1().timestamp() = msg.timestamp;
   _._1().str(msg.str);
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
   ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
@@ -784,7 +784,7 @@ void npkcalc::ChatListener::OnMessage(/*in*/const npkcalc::ChatMessage& msg) {
   }
 }
 
-void npkcalc::IChatListener_Servant::dispatch(nprpc::Buffers& bufs, nprpc::EndPoint remote_endpoint, bool from_parent, nprpc::ReferenceList& ref_list) {
+void npkcalc::IChatParticipant_Servant::dispatch(nprpc::Buffers& bufs, nprpc::EndPoint remote_endpoint, bool from_parent, nprpc::ReferenceList& ref_list) {
   nprpc::impl::flat::CallHeader_Direct __ch(bufs(), sizeof(::nprpc::impl::Header));
   switch(__ch.function_idx()) {
     case 0: {

@@ -13,9 +13,19 @@ export class View_Chat extends View {
       props: {}
     });
   }
+
+  onKeyDown = function(event: KeyboardEvent) {
+		if (event.keyCode == 13) {
+      this.chat.onSend();
+    }
+	}
+
+  protected onWindowShow() {
+    this.chat.set_focus();
+  }
   
   paint(): JSX.Element {
-    return (<div ref={this.ref}></div>);
+    return (<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center'}} ref={this.ref}></div>);
   }
 }
 

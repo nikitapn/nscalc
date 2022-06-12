@@ -36,7 +36,7 @@
       <Filter>idl</Filter>
     </None>
     <None Include="Makefile" />
-    <None Include="idl\idl.bat">
+    <None Include="idl\make.bat">
       <Filter>idl</Filter>
     </None>
   </ItemGroup>

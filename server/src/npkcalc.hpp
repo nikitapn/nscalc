@@ -460,13 +460,13 @@ public:
 } // namespace flat
 
 struct ChatMessage {
-  uint32_t date;
+  uint32_t timestamp;
   std::string str;
 };
 
 namespace flat {
 struct ChatMessage {
-  uint32_t date;
+  uint32_t timestamp;
   ::flat::String str;
 };
 
@@ -483,8 +483,8 @@ public:
     , offset_(offset)
   {
   }
-  const uint32_t& date() const noexcept { return base().date;}
-  uint32_t& date() noexcept { return base().date;}
+  const uint32_t& timestamp() const noexcept { return base().timestamp;}
+  uint32_t& timestamp() noexcept { return base().timestamp;}
   void str(const char* str) { new (&base().str) ::flat::String(buffer_, str); }
   void str(const std::string& str) { new (&base().str) ::flat::String(buffer_, str); }
   auto str() noexcept { return (::flat::Span<char>)base().str; }
@@ -607,24 +607,24 @@ public:
   bool Send (/*in*/const npkcalc::ChatMessage& msg);
 };
 
-class IChatListener_Servant
+class IChatParticipant_Servant
   : public virtual nprpc::ObjectServant
 {
 public:
-  static std::string_view _get_class() noexcept { return "npkcalc/npkcalc.ChatListener"; }
-  std::string_view get_class() const noexcept override { return IChatListener_Servant::_get_class(); }
+  static std::string_view _get_class() noexcept { return "npkcalc/npkcalc.ChatParticipant"; }
+  std::string_view get_class() const noexcept override { return IChatParticipant_Servant::_get_class(); }
   void dispatch(nprpc::Buffers& bufs, nprpc::EndPoint remote_endpoint, bool from_parent, nprpc::ReferenceList& ref_list) override;
   virtual void OnMessage (npkcalc::flat::ChatMessage_Direct msg) = 0;
 };
 
-class ChatListener
+class ChatParticipant
   : public virtual nprpc::Object
 {
   const uint8_t interface_idx_;
 public:
-  using servant_t = IChatListener_Servant;
+  using servant_t = IChatParticipant_Servant;
 
-  ChatListener(uint8_t interface_idx) : interface_idx_(interface_idx) {}
+  ChatParticipant(uint8_t interface_idx) : interface_idx_(interface_idx) {}
   void OnMessage (/*in*/const npkcalc::ChatMessage& msg);
 };
 
@@ -696,7 +696,7 @@ inline void assign_from_flat_OnAlarm_alarm(npkcalc::flat::Alarm_Direct& src, npk
   dest.msg = (std::string_view)src.msg();
 }
 inline void assign_from_flat_Send_msg(npkcalc::flat::ChatMessage_Direct& src, npkcalc::ChatMessage& dest) {
-  dest.date = src.date();
+  dest.timestamp = src.timestamp();
   dest.str = (std::string_view)src.str();
 }
 template<::nprpc::IterableCollection T>

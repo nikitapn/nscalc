@@ -8,24 +8,30 @@ export class View extends React.Component<{
 },{
 
 }> {
-	private div_ref: React.RefObject<HTMLDivElement>;
-	protected onKeyDown: (event: KeyboardEvent) => void;
-	private onKeyDownCallback:  (event: KeyboardEvent) => void;
-
 	constructor(props:any) {
 		super(props);
 		this.div_ref = React.createRef<HTMLDivElement>();
 	}
+
+	private div_ref: React.RefObject<HTMLDivElement>;
+	private onKeyDownCallback: (event: KeyboardEvent) => void;
 	
+	protected onKeyDown: (event: KeyboardEvent) => void;
+	protected onWindowShow() {};
+
 	show_window(show: boolean) {
 		this.div_ref.current.style.display = (show ? 'block' : 'none');
 		if (this.onKeyDown) {
 			if (!this.onKeyDownCallback) {
 				this.onKeyDownCallback = this.onKeyDown.bind(this);
 			}
-			if (show) document.addEventListener("keydown", this.onKeyDownCallback);
-			else document.removeEventListener("keydown", this.onKeyDownCallback);
+			if (show) {
+				document.addEventListener("keydown", this.onKeyDownCallback);
+			} else {
+				document.removeEventListener("keydown", this.onKeyDownCallback);
+			}
 		}
+		if (show) this.onWindowShow();
  	}
 
 	// final

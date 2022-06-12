@@ -20,33 +20,47 @@
 #include "thread_pool.hpp"
 #include <nprpc/serialization/oarchive.h>
 #include <boost/asio/strand.hpp>
+#include <nprpc/session_context.h>
 
-using thread_pool = nplib::thread_pool<3>;
+using thread_pool = nplib::thread_pool<8>;
 
-
-class Observers {
+template<typename T>
+class ObserversT {
+protected:
 	boost::asio::io_context ioc_;
 	boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard_;
+	std::vector<std::unique_ptr<T>> observers;
 
-	uint32_t alarm_id_ = 0;
-	std::vector<std::unique_ptr<npkcalc::DataObserver>> observers;
-	std::vector<std::unique_ptr<npkcalc::ChatListener>> chat_listeners;
+	struct no_condition_t {
+		bool operator()(std::unique_ptr<T>&) { 
+			return false; 
+		}
+	};
 
-	npkcalc::Alarm make_alarm(npkcalc::AlarmType type, const std::string& msg) {
-		return { alarm_id_++, type, msg };
-	}
+	struct not_equal_t {
+		T* target;
+		bool operator()(std::unique_ptr<T>& obj) const noexcept {
+			return target == obj.get();
+		}
+	};
 
-	void add_impl(npkcalc::DataObserver* user) {
-		observers.emplace_back(user);
-	}
+	struct not_equal_to_endpoint_t {
+		nprpc::EndPoint& endpoint;
+		bool operator()(std::unique_ptr<T>& obj) const noexcept { 
+			return obj->_data().ip4 == endpoint.ip4 &&
+				obj->_data().port == endpoint.port; 
+		}
+	};
 
-	void add_chat_listener_impl(npkcalc::ChatListener* listener) {
-		chat_listeners.emplace_back(listener);
-	}
+	static constexpr auto no_condition = no_condition_t{};
 
-	template<typename T, typename... Args>
-	void broadcast(T fn, const Args&... args) {
+	template<typename F, typename Condition, typename... Args>
+	void broadcast(F fn, Condition cond, const Args&... args) {
 		for (auto it = std::begin(observers); it != observers.end(); ) {
+			if (cond(*it)) {
+				it = std::next(it);
+				continue;
+			}
 			try {
 				std::mem_fn(fn)(*it, args...);
 				it = std::next(it);
@@ -56,74 +70,57 @@ class Observers {
 		}
 	}
 
+	void add_impl(T* observer) { observers.emplace_back(observer); }
+public:
+	void stop() { ioc_.stop(); }
+	void add(T* observer) { nplib::async<false>(ioc_, &ObserversT::add_impl, this, observer); }
+
+	ObserversT() : work_guard_(boost::asio::make_work_guard(ioc_)) {
+		std::thread([this]() { ioc_.run(); }).detach();
+	}
+};
+
+class DataObservers : public ObserversT<npkcalc::DataObserver> {
+	uint32_t alarm_id_ = 0;
+
+	npkcalc::Alarm make_alarm(npkcalc::AlarmType type, const std::string& msg) {
+		return { alarm_id_++, type, msg };
+	}
+
 	void alarm_impl(npkcalc::AlarmType type, std::string msg) {
-		broadcast(&npkcalc::DataObserver::OnAlarm, make_alarm(type, msg));
+		broadcast(&npkcalc::DataObserver::OnAlarm, no_condition, make_alarm(type, msg));
 	}
 public:
-	void add(npkcalc::DataObserver* user) {
-		nplib::async<false>(ioc_, &Observers::add_impl, this, user);
-	}
-
-	void add(npkcalc::ChatListener* listener) {
-		nplib::async<false>(ioc_, &Observers::add_chat_listener_impl, this, listener);
-	}
-
 	void alarm(npkcalc::AlarmType type, std::string&& msg) {
-		nplib::async<false>(ioc_, &Observers::alarm_impl, this, type, msg);
-	}
-
-	void stop() { ioc_.stop(); }
-
-	Observers() : work_guard_(boost::asio::make_work_guard(ioc_)) {
-		std::thread([this]() { ioc_.run(); }).detach();
+		nplib::async<false>(ioc_, &DataObservers::alarm_impl, this, type, msg);
 	}
 } observers;
 
-
-class Chat {
-	boost::asio::io_context ioc_;
-	boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard_;
-
-	std::vector<std::unique_ptr<npkcalc::ChatListener>> chat_listeners;
-
-	void add_impl(npkcalc::ChatListener* listener) {
-		chat_listeners.emplace_back(listener);
+class ChatImpl
+	: public npkcalc::IChat_Servant
+	, public ObserversT<npkcalc::ChatParticipant>
+{
+	void send_to_all_impl(npkcalc::ChatMessage msg, nprpc::EndPoint endpoint) {
+		broadcast(&npkcalc::ChatParticipant::OnMessage, not_equal_to_endpoint_t{ endpoint }, std::ref(msg));
 	}
-	
-	void send_impl(npkcalc::ChatMessage msg) {
-		broadcast(&npkcalc::ChatListener::OnMessage, std::ref(msg));
-	}
-
-	template<typename T, typename... Args>
-	void broadcast(T fn, const Args&... args) {
-		for (auto it = std::begin(chat_listeners); it != chat_listeners.end(); ) {
-			try {
-				std::mem_fn(fn)(*it, args...);
-				it = std::next(it);
-			} catch (nprpc::Exception&) {
-				it = chat_listeners.erase(it);
-			}
-		}
+	void send_to_all(npkcalc::ChatMessage&& msg, nprpc::EndPoint endpoint) {
+		nplib::async<false>(ioc_, &ChatImpl::send_to_all_impl, this, std::move(msg), std::move(endpoint));
 	}
 public:
-	void add(npkcalc::ChatListener* listener) {
-		nplib::async<false>(ioc_, &Chat::add_impl, this, listener);
+	virtual void Connect(nprpc::Object* obj) {
+		if (auto participant = nprpc::narrow<npkcalc::ChatParticipant>(obj); participant) {
+			participant->add_ref();
+			participant->set_timeout(250);
+			add(participant);
+		}
 	}
 
-	void send(npkcalc::ChatMessage&& msg) {
-		nplib::async<false>(ioc_, &Chat::send_impl, this, std::move(msg));
+	virtual bool Send(npkcalc::flat::ChatMessage_Direct msg) {
+		auto timestamp = static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::minutes>(
+			std::chrono::system_clock::now().time_since_epoch()).count());
+		send_to_all(npkcalc::ChatMessage{ timestamp, (std::string)msg.str() }, nprpc::get_context().remote_endpoint);
+		return true;
 	}
-
-	void stop() { ioc_.stop(); }
-
-	Chat() : work_guard_(boost::asio::make_work_guard(ioc_)) {
-		std::thread([this]() { ioc_.run(); }).detach();
-	}
-} chat_room;
-
-enum class Tables {
-	Solutions,
-	Fertilizers
 };
 
 class DataManager {
@@ -173,24 +170,6 @@ public:
 	}
 };
 
-class ChatImpl 
-	: public npkcalc::IChat_Servant {
-public:
-	virtual void Connect(nprpc::Object* obj) {
-		auto listener = nprpc::narrow<npkcalc::ChatListener>(obj);
-		if (listener) {
-			listener->add_ref();
-			listener->set_timeout(250);
-			chat_room.add(listener);
-		}
-	}
-	virtual bool Send(npkcalc::flat::ChatMessage_Direct msg) {
-		chat_room.send(npkcalc::ChatMessage{ msg.date(), (std::string)msg.str() });
-		return true;
-	}
-};
-
-
 struct User {
 	std::string email;
 	std::string password_sha256;
@@ -227,6 +206,7 @@ public:
 
 	virtual uint32_t AddSolution(::flat::Span<char> name, ::flat::Span<double> elements) {
 		solutions_changed = true;
+
 		std::lock_guard<std::mutex> lk(data_manager->mut_solutions);
 		auto s = data_manager->solutions.create();
 		s->name = name;
@@ -310,8 +290,6 @@ public:
 	}
 
 	virtual void SaveData() {
-		// std::cerr << "SaveData() solutions_changed: " << solutions_changed << ", fertilizers_changed: " << fertilizers_changed << '\n';
-
 		if (solutions_changed) {
 			std::lock_guard<std::mutex> lk(data_manager->mut_solutions);
 			data_manager->solutions.store();
@@ -350,10 +328,6 @@ public:
 		, calculations(data_manager->get_calculations(_user_data.user_name))
 	{
 	}
-
-	~RegisteredUser() {
-		// std::cerr << "~RegisteredUser()\n";
-	}
 };
 
 class CalculatorImpl : public npkcalc::ICalculator_Servant {
@@ -385,13 +359,13 @@ public:
 	virtual void Subscribe(nprpc::Object* obj) {
 		static int i = 0;
 		observers.alarm(npkcalc::AlarmType::Info, "User #" + std::to_string(++i) + " connected");
-		auto user = nprpc::narrow<npkcalc::DataObserver>(obj);
-		if (user) {
+		if (auto user = nprpc::narrow<npkcalc::DataObserver>(obj); user) {
 			user->add_ref();
 			user->set_timeout(250);
 			observers.add(user);
 		}
 	}
+
 	virtual void GetGuestCalculations(
 		/*out*/::flat::Vector_Direct2<npkcalc::flat::Calculation, npkcalc::flat::Calculation_Direct> calculations) {
 		npkcalc::helper::assign_from_cpp_GetMyCalculations_calculations(calculations, data_manager->get_calculations("Guest").data());
@@ -399,8 +373,6 @@ public:
 };
 
 class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
-	const std::string& data_root_dir_;
-
 	struct Session {
 		std::string sid;
 		std::string email;
@@ -416,6 +388,7 @@ class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
 		}
 	};
 
+	const std::string& data_root_dir_;
 	nprpc::Poa* user_poa;
 	std::vector<std::unique_ptr<User>> users_db_;
 	std::set<Session> sessions_;
@@ -450,7 +423,7 @@ class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
 			}
 
 			auto new_user = new RegisteredUser(*(*it).get());
-			auto oid = user_poa->activate_object(new_user);
+			auto oid = user_poa->activate_object(new_user, &nprpc::get_context());
 
 			Session s;
 			do { s.sid = create_uuid(); } while (sessions_.find(s) != sessions_.end());
@@ -463,51 +436,8 @@ class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
 			throw npkcalc::AuthorizationFailed(npkcalc::AuthorizationFailed_Reason::email_does_not_exist);
 		}
 	}
-public:
-	virtual npkcalc::UserData LogIn(::flat::Span<char> login, ::flat::Span<char> password) {
-		auto user_email = (std::string_view)login;
-		auto user_password = (std::string_view)password;
-
-		//std::cout << user_email << " " << user_password << std::endl;
-
-		if (user_password.empty()) {
-			observers.alarm(npkcalc::AlarmType::Warning, "User is trying to log in with an empty password");
-			throw npkcalc::AuthorizationFailed(npkcalc::AuthorizationFailed_Reason::incorrect_password);
-		}
-
-		return try_login(user_email, user_password);
-	}
-
-	virtual npkcalc::UserData LogInWithSessionId(::flat::Span<char> session_id) {
-		auto sid = (std::string_view)session_id;
-		//std::cerr << "LogInWithSessionId(" << sid << ");\n";
-		thread_local static Session s;
-		s.sid.reserve(sid.size());
-		s.sid.assign(sid.data(), sid.size());
-		if (auto it = sessions_.find(s); it != sessions_.end()) {
-			auto const& user_email = it->email;
-			if (auto it = std::find_if(users_db_.begin(), users_db_.end(),
-				[user_email](const std::unique_ptr<User>& u) { return u->email == user_email; });
-				it != users_db_.end())
-			{
-				return try_login(user_email, {});
-			}
-			throw npkcalc::AuthorizationFailed(npkcalc::AuthorizationFailed_Reason::email_does_not_exist);
-		}
-		throw npkcalc::AuthorizationFailed(npkcalc::AuthorizationFailed_Reason::session_does_not_exist);
-	}
-
-	virtual bool LogOut(::flat::Span<char> session_id) {
-		auto sid = (std::string_view)session_id;
-		//std::cerr << "LogOut(" << sid << ");\n";
-		thread_local static Session s;
-		s.sid.reserve(sid.size());
-		s.sid.assign(sid.data(), sid.size());
-		return static_cast<bool>(sessions_.erase(s));
-	}
 
 	void load_users() noexcept {
-		//store_users();
 		try {
 			std::ifstream is(data_root_dir_ + "/users.txt");
 			boost::archive::text_iarchive ar(is, boost::archive::no_header | boost::archive::no_tracking);
@@ -515,14 +445,6 @@ public:
 		} catch (std::exception& ex) {
 			std::cerr << ex.what() << '\n';
 		}
-
-		//		try {
-		//			std::ifstream is(data_root_dir_ + "/sessions.txt");
-		//			boost::archive::text_iarchive ar(is, boost::archive::no_header | boost::archive::no_tracking);
-		//			ar >> sessions_;
-		//		} catch (std::exception& ex) {
-		//			std::cerr << ex.what() << '\n';
-		//		}
 
 		std::cout << "Users:\n";
 		for (auto& user : users_db_) {
@@ -539,13 +461,42 @@ public:
 		} catch (std::exception& ex) {
 			std::cerr << ex.what() << '\n';
 		}
-		//		try {
-		//			std::ofstream ofs(data_root_dir_ + "/sessions.txt");
-		//			boost::archive::text_oarchive ar(ofs, boost::archive::no_header | boost::archive::no_tracking);
-		//			ar << sessions_;
-		//		} catch (std::exception& ex) {
-		//			std::cerr << ex.what() << '\n';
-		//		}
+	}
+public:
+	virtual npkcalc::UserData LogIn(::flat::Span<char> login, ::flat::Span<char> password) {
+		auto user_email = (std::string_view)login;
+		auto user_password = (std::string_view)password;
+
+		if (user_password.empty()) {
+			observers.alarm(npkcalc::AlarmType::Warning, "User is trying to log in with an empty password");
+			throw npkcalc::AuthorizationFailed(npkcalc::AuthorizationFailed_Reason::incorrect_password);
+		}
+
+		return try_login(user_email, user_password);
+	}
+
+	virtual npkcalc::UserData LogInWithSessionId(::flat::Span<char> session_id) {
+		auto sid = (std::string_view)session_id;
+		Session s;
+		s.sid.assign(sid.data(), sid.size());
+		if (auto it = sessions_.find(s); it != sessions_.end()) {
+			auto const& user_email = it->email;
+			if (auto it = std::find_if(users_db_.begin(), users_db_.end(),
+				[user_email](const std::unique_ptr<User>& u) { return u->email == user_email; });
+				it != users_db_.end())
+			{
+				return try_login(user_email, {});
+			}
+			throw npkcalc::AuthorizationFailed(npkcalc::AuthorizationFailed_Reason::email_does_not_exist);
+		}
+		throw npkcalc::AuthorizationFailed(npkcalc::AuthorizationFailed_Reason::session_does_not_exist);
+	}
+
+	virtual bool LogOut(::flat::Span<char> session_id) {
+		auto sid = (std::string_view)session_id;
+		Session s;
+		s.sid.assign(sid.data(), sid.size());
+		return static_cast<bool>(sessions_.erase(s));
 	}
 
 	AuthorizatorImpl(nprpc::Rpc& rpc, const std::string& data_root_dir)
@@ -564,6 +515,7 @@ struct HostJson {
 		nprpc::ObjectId calculator;
 		nprpc::ObjectId authorizator;
 		nprpc::ObjectId chat;
+
 		template<typename Archive>
 		void serialize(Archive& ar) {
 			ar& NVP(calculator);
@@ -617,16 +569,6 @@ int main(int argc, char* argv[]) {
 		return -1;
 	}
 
-	host_json.secured = use_ssl;
-
-	// Capture SIGINT and SIGTERM to perform a clean shutdown
-	boost::asio::signal_set signals(thread_pool::get_instance().ctx(), SIGINT, SIGTERM);
-	signals.async_wait([&](boost::beast::error_code const&, int) { 
-		observers.stop();
-		chat_room.stop();
-		thread_pool::get_instance().stop(); 
-	});
-	
 	try {
 		nprpc::Config rpc_cfg;
 		rpc_cfg.debug_level = nprpc::DebugLevel::DebugLevel_Critical;
@@ -649,6 +591,15 @@ int main(int argc, char* argv[]) {
 		AuthorizatorImpl autorizator(*rpc, data_root);
 		ChatImpl chat;
 
+		// Capture SIGINT and SIGTERM to perform a clean shutdown
+		boost::asio::signal_set signals(thread_pool::get_instance().ctx(), SIGINT, SIGTERM);
+		signals.async_wait([&](boost::beast::error_code const&, int) {
+			observers.stop();
+			chat.stop();
+			thread_pool::get_instance().stop();
+		});
+
+		host_json.secured = use_ssl;
 		host_json.objects.calculator = poa->activate_object(&calc);
 		host_json.objects.authorizator = poa->activate_object(&autorizator);
 		host_json.objects.chat = poa->activate_object(&chat);
@@ -663,15 +614,7 @@ int main(int argc, char* argv[]) {
 			nprpc::serialization::json_oarchive oa(os);
 			oa << host_json;
 		}
-		std::thread([] {
-			using namespace std::chrono_literals;
-			while (1) {
-				static int i = 0;
-				chat_room.send(npkcalc::ChatMessage{ 32432, "msg:" + std::to_string(i++) });
-				std::this_thread::sleep_for(1s);
-			}
-			}).detach();
-		
+	
 		rpc->start();
 		thread_pool::get_instance().ctx().run();
 		rpc->destroy();

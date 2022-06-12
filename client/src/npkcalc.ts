@@ -316,14 +316,14 @@ export class ChatAttachment_Direct extends NPRPC.Flat.Flat {
 }
 } // namespace Flat 
 export interface ChatMessage {
-  date: number/*u32*/;
+  timestamp: number/*u32*/;
   str: string;
 }
 
 export namespace Flat_npkcalc {
 export class ChatMessage_Direct extends NPRPC.Flat.Flat {
-  public get date() { return this.buffer.dv.getUint32(this.offset+0,true); }
-  public set date(value: number) { this.buffer.dv.setUint32(this.offset+0,value,true); }
+  public get timestamp() { return this.buffer.dv.getUint32(this.offset+0,true); }
+  public set timestamp(value: number) { this.buffer.dv.setUint32(this.offset+0,value,true); }
   public get str() {
     const offset = this.offset + 4;
     const n = this.buffer.dv.getUint32(offset + 4, true);
@@ -1173,7 +1173,7 @@ export class Chat extends NPRPC.ObjectProxy {
     __ch.interface_idx = interface_idx;
     __ch.function_idx = 1;
   let _ = new Flat_npkcalc.npkcalc_M13_Direct(buf,32);
-  _._1.date = msg.date;
+  _._1.timestamp = msg.timestamp;
   _._1.str = msg.str;
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
@@ -1234,9 +1234,9 @@ let __ret_val: boolean/*boolean*/;
   }
 }
 
-export class ChatListener extends NPRPC.ObjectProxy {
-  public static get servant_t(): new() => _IChatListener_Servant {
-    return _IChatListener_Servant;
+export class ChatParticipant extends NPRPC.ObjectProxy {
+  public static get servant_t(): new() => _IChatParticipant_Servant {
+    return _IChatParticipant_Servant;
   }
 
 
@@ -1253,7 +1253,7 @@ export class ChatListener extends NPRPC.ObjectProxy {
     __ch.interface_idx = interface_idx;
     __ch.function_idx = 0;
   let _ = new Flat_npkcalc.npkcalc_M13_Direct(buf,32);
-  _._1.date = msg.date;
+  _._1.timestamp = msg.timestamp;
   _._1.str = msg.str;
     buf.write_len(buf.size - 4);
     await NPRPC.rpc.call(
@@ -1267,18 +1267,18 @@ export class ChatListener extends NPRPC.ObjectProxy {
 
 };
 
-export interface IChatListener_Servant
+export interface IChatParticipant_Servant
 {
   OnMessage(msg: Flat_npkcalc.ChatMessage_Direct): void;
 }
 
-export class _IChatListener_Servant extends NPRPC.ObjectServant {
-  public static _get_class(): string { return "npkcalc/npkcalc.ChatListener"; }
-  public readonly get_class = () => { return _IChatListener_Servant._get_class(); }
+export class _IChatParticipant_Servant extends NPRPC.ObjectServant {
+  public static _get_class(): string { return "npkcalc/npkcalc.ChatParticipant"; }
+  public readonly get_class = () => { return _IChatParticipant_Servant._get_class(); }
   public readonly dispatch = (buf: NPRPC.FlatBuffer, remote_endpoint: NPRPC.EndPoint, from_parent: boolean) => {
-    _IChatListener_Servant._dispatch(this, buf, remote_endpoint, from_parent);
+    _IChatParticipant_Servant._dispatch(this, buf, remote_endpoint, from_parent);
   }
-  static _dispatch(obj: _IChatListener_Servant, buf: NPRPC.FlatBuffer, remote_endpoint: NPRPC.EndPoint, from_parent: boolean): void {
+  static _dispatch(obj: _IChatParticipant_Servant, buf: NPRPC.FlatBuffer, remote_endpoint: NPRPC.EndPoint, from_parent: boolean): void {
   let __ch = new NPRPC.impl.Flat_nprpc_base.CallHeader_Direct(buf, 16);
   switch(__ch.function_idx) {
     case 0: {

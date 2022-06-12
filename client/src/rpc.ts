@@ -13,7 +13,7 @@ export const init_rpc = async (): Promise<void> => {
 	NPRPC.set_debug_level(NPRPC.DebugLevel.DebugLevel_Critical);
 	let rpc = await NPRPC.init();
 	poa = rpc.create_poa(10);
-	calculator = new npkcalc.Calculator(rpc.host_info.objects.calculator);
-	authorizator = new npkcalc.Authorizator(rpc.host_info.objects.authorizator);
-	chat = new npkcalc.Chat(rpc.host_info.objects.chat);
+	calculator = NPRPC.narrow(rpc.host_info.objects.calculator, npkcalc.Calculator);
+	authorizator = NPRPC.narrow(rpc.host_info.objects.authorizator, npkcalc.Authorizator);
+	chat = NPRPC.narrow(rpc.host_info.objects.chat, npkcalc.Chat);
 }
