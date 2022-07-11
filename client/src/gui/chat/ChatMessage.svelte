@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Message } from '../../chat';
+	import { Message } from 'misc/chat';
 
 	export let msg: Message;
     //export let nameChatPartner;
@@ -47,6 +47,7 @@
 	color: rgb(255, 255, 255);
 	margin-right: 50px;
 	width: fit-content;
+	border-radius: 20px;
 }
 
 .direct-chat-text:after,

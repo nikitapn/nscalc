@@ -3,32 +3,55 @@
 <script lang="ts">
 	import Button, { Label } from '@smui/button';
 	import Textfield from '@smui/textfield';
-	import { Message, chat_messages } from '../../chat'
-	import { chat } from '../../rpc'
+	import { Message, chat_messages } from 'misc/chat'
+	import { chat } from 'rpc/rpc'
 	import ChatMessage from './ChatMessage.svelte';
-	
+	import * as npkcalc from 'rpc/npkcalc'
+	import { onMount } from 'svelte';
+
 	let text;
 	let input_str = "";
 	let list: HTMLDivElement;
 
 	export const onSend = () => {
 		if (input_str.length == 0) return;
-		chat.Send({timestamp: 0, str: input_str});
+		chat.Send({timestamp: 0, str: input_str, attachment: {
+			type: 0,
+			name: input_str,
+			data: [1, 2 , 3, 4] 
+		}
+	});
 		chat_messages.update(ar => {ar.push({date: new Date(), str: input_str, sent_by_me: true}); return ar;})
 		input_str = "";
 		text.focus();
-		
 	}
 
 	export const set_focus = () => {
 		text.focus();
-		console.log(text);
 	}
 
 	let unsubscribe = chat_messages.subscribe(() => {
 		setTimeout(() => list.scrollTo(0, list.scrollHeight), 0);
 	});
 
+//	onMount(async () => {});
+
+const on_paste = (evt) => {
+	// Get the data of clipboard
+  const clipboardItems = evt.clipboardData.items;
+  const items = [].slice.call(clipboardItems).filter(function (item) {
+		// Filter the image items only
+		return item.type.indexOf('image') !== -1;
+	});
+
+	if (items.length === 0) {
+		 return;
+  }
+
+  const item = items[0];
+  // Get the blob of image
+  const blob = item.getAsFile();
+};
 	
 
 </script>
@@ -40,6 +63,14 @@
 		padding-top: 1%;
 		background-image: linear-gradient(rgb(249, 199, 142), rgb(5, 210, 179));
 		width: 50%;
+
+		scrollbar-width: initial;
+		scroll-behavior: smooth;
+		scrollbar-color: 'red';
+		scroll-margin: 100px;
+		scrollbar-arrow-color: blue;
+		scrollbar-width: 100px;
+		scrollbar-base-color: blueviolet;
 	}
 
 	.card-body {
@@ -58,6 +89,14 @@
 		transition: -webkit-transform .5s ease-in-out;
 		transition: transform .5s ease-in-out;
 		transition: transform .5s ease-in-out, -webkit-transform .5s ease-in-out;
+
+		scrollbar-width: initial;
+		scroll-behavior: smooth;
+		scrollbar-color: 'red';
+		scroll-margin: 100px;
+		scrollbar-arrow-color: blue;
+		scrollbar-width: 100px;
+		scrollbar-base-color: blueviolet;
 	}
 
 	.controls {
@@ -115,10 +154,6 @@
   }
 </style>
 
-<svelte:head>
-	<link rel="stylesheet" href="style/svelte-material-ui/bare.css" />
-</svelte:head>
-
 <div class="chat">
 	<div class="card-body">
 		<div bind:this={list} class="direct-chat-messages">
@@ -135,6 +170,7 @@
 				variant="outlined" 
 				bind:this={text} 
 				bind:value={input_str} 
+				on:paste={on_paste}
 				label="Type a message..."/>
 			<!--<Button class="vcentered" style="float:right;" on:click={onSend} variant="raised">
 				<Label>Send</Label>
