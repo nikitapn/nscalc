@@ -7,7 +7,7 @@ var jison = require("jison");
 var bnf = fs.readFileSync("grammar.jison", "utf8");
 var parser = new jison.Parser(bnf);
 var parserSource = parser.generate();
-fs.writeFile("../src/parser.js", parserSource, (err) => {
+fs.writeFile("../src/parser/parser.js", parserSource, (err) => {
 	if (err) throw err;
 	console.log('The file has been saved!');
   });

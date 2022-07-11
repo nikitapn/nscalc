@@ -65,6 +65,21 @@ AuthorizationFailed: exception {
 	reason: AuthorizationFailed_Reason;
 }
 
+enum RegistrationFailed_Reason: u8 {
+	username_already_exist,
+	email_already_registered,
+	incorrect_code,
+	invalid_username
+}
+
+RegistrationFailed: exception {
+	reason: RegistrationFailed_Reason;
+}
+
+PermissionViolation: exception {
+	msg: string;
+}
+
 UserData: flat {
 	name: string;
 	session_id: string;
@@ -75,7 +90,6 @@ SolutionElement: flat {
 	index: u32;
 	value: float64;
 }
-
 
 enum AlarmType {
 	Info,
@@ -88,7 +102,6 @@ Alarm: flat {
 	type: AlarmType;
 	msg: string;
 }
-
 
 enum ChatAttachmentType {
 	Picture,
@@ -104,26 +117,34 @@ ChatAttachment: flat {
 ChatMessage: flat {
 	timestamp: u32;
 	str: string;
+	attachment?: ChatAttachment;
 }
 
+[trusted=false]
 interface Authorizator {
 	UserData LogIn(login: in string, password: in string) raises(AuthorizationFailed);
 	UserData LogInWithSessionId(session_id: in string) raises(AuthorizationFailed);
 	boolean LogOut(session_id: in string);
+	
+	boolean CheckUsername(username: in string);
+	boolean CheckEmail(email: in string);
+	void RegisterStepOne(username: in string, email: in string, password: in string) raises(RegistrationFailed);
+	void RegisterStepTwo(username: in string, code: in u32) raises(RegistrationFailed);
 }
 
+[trusted=false]
 interface RegisteredUser {
 	void GetMyCalculations(calculations: out direct vector<Calculation>);
 	
 	u32 AddSolution(name: in string, elements: in float64[14]);
-	void SetSolutionName(id: in u32, name: in string);
-	void SetSolutionElements(id: in u32, name: in vector<SolutionElement>);
-	void DeleteSolution(id: in u32);
+	void SetSolutionName(id: in u32, name: in string) raises(PermissionViolation);
+	void SetSolutionElements(id: in u32, name: in vector<SolutionElement>) raises(PermissionViolation);
+	void DeleteSolution(id: in u32) raises(PermissionViolation);
 	
 	u32 AddFertilizer(name: in string, formula: in string);
-	void SetFertilizerName(id: in u32, name: in string);
-	void SetFertilizerFormula(id: in u32, name: in string);
-	void DeleteFertilizer(id: in u32);
+	void SetFertilizerName(id: in u32, name: in string) raises(PermissionViolation);
+	void SetFertilizerFormula(id: in u32, name: in string) raises(PermissionViolation);
+	void DeleteFertilizer(id: in u32) raises(PermissionViolation);
 	void SaveData();
 	
 	u32 UpdateCalculation(calculation: in Calculation);
@@ -135,6 +156,7 @@ interface DataObserver {
 	void OnAlarm(alarm: in Alarm);
 }
 
+[trusted=false]
 interface Chat {
 	void Connect(obj: in object);
 	boolean	Send(msg: in ChatMessage);
@@ -144,7 +166,7 @@ interface ChatParticipant {
 	void OnMessage(msg: in ChatMessage);
 }
 
-
+[trusted=false]
 interface Calculator {
 	void GetData(solutions: out direct vector<Solution>, fertilizers: out direct vector<Fertilizer>);
 	void GetImages(images: out direct vector<Media>);

@@ -4,6 +4,7 @@
   "_version": "2.0.0",
 
 	"compilerOptions": {
+    "baseUrl": "src",
 		"moduleResolution": "node",
 		"target": "esnext",
 		"module": "esnext",

@@ -59,6 +59,10 @@ module.exports = env => {
 			]
 		},
 		resolve: {
+			modules: [
+				path.resolve(__dirname + '/src'),
+				path.resolve(__dirname + '/node_modules')
+			],
 			extensions: ['.ts', '.tsx', ".js", ".jsx", ".svelte"],
 			mainFields: ['svelte', 'browser', 'module', 'main']
 		},

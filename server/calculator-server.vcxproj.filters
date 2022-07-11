@@ -16,9 +16,6 @@
     <ClInclude Include="src\data.hpp">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\npkcalc_m.hpp">
-      <Filter>src\proxy</Filter>
-    </ClInclude>
     <ClInclude Include="src\npkcalc.hpp">
       <Filter>src\proxy</Filter>
     </ClInclude>

@@ -7,6 +7,7 @@
 #include <cassert>
 #include <filesystem>
 #include <set>
+#include <algorithm>
 #include <boost/asio/signal_set.hpp>
 #include <boost/beast/core/error.hpp>
 #include <boost/uuid/random_generator.hpp>
@@ -21,15 +22,17 @@
 #include <nprpc/serialization/oarchive.h>
 #include <boost/asio/strand.hpp>
 #include <nprpc/session_context.h>
+#include <random>
 
-using thread_pool = nplib::thread_pool<8>;
+using thread_pool = nplib::thread_pool_4;
 
 template<typename T>
 class ObserversT {
+	boost::asio::io_context::strand strand_;
 protected:
-	boost::asio::io_context ioc_;
-	boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard_;
 	std::vector<std::unique_ptr<T>> observers;
+
+	auto& executor() { return strand_; }
 
 	struct no_condition_t {
 		bool operator()(std::unique_ptr<T>&) { 
@@ -72,12 +75,9 @@ protected:
 
 	void add_impl(T* observer) { observers.emplace_back(observer); }
 public:
-	void stop() { ioc_.stop(); }
-	void add(T* observer) { nplib::async<false>(ioc_, &ObserversT::add_impl, this, observer); }
+	void add(T* observer) { nplib::async<false>(executor(), &ObserversT::add_impl, this, observer); }
 
-	ObserversT() : work_guard_(boost::asio::make_work_guard(ioc_)) {
-		std::thread([this]() { ioc_.run(); }).detach();
-	}
+	ObserversT() : strand_{ thread_pool::get_instance().make_strand() } {}
 };
 
 class DataObservers : public ObserversT<npkcalc::DataObserver> {
@@ -92,7 +92,7 @@ class DataObservers : public ObserversT<npkcalc::DataObserver> {
 	}
 public:
 	void alarm(npkcalc::AlarmType type, std::string&& msg) {
-		nplib::async<false>(ioc_, &DataObservers::alarm_impl, this, type, msg);
+		nplib::async<false>(executor(), &DataObservers::alarm_impl, this, type, msg);
 	}
 } observers;
 
@@ -104,7 +104,7 @@ class ChatImpl
 		broadcast(&npkcalc::ChatParticipant::OnMessage, not_equal_to_endpoint_t{ endpoint }, std::ref(msg));
 	}
 	void send_to_all(npkcalc::ChatMessage&& msg, nprpc::EndPoint endpoint) {
-		nplib::async<false>(ioc_, &ChatImpl::send_to_all_impl, this, std::move(msg), std::move(endpoint));
+		nplib::async<false>(executor(), &ChatImpl::send_to_all_impl, this, std::move(msg), std::move(endpoint));
 	}
 public:
 	virtual void Connect(nprpc::Object* obj) {
@@ -194,19 +194,37 @@ class RegisteredUser : public npkcalc::IRegisteredUser_Servant {
 	bool fertilizers_changed = false;
 
 	Calculations calculations;
+
+	npkcalc::Solution* get_solution(std::uint32_t id) {
+		auto item = data_manager->solutions.get_by_id(id);
+		if (item && item->owner != user_data_.user_name) {
+			observers.alarm(npkcalc::AlarmType::Critical, user_data_.user_name + " is fiddeling with \"" + item->name + 
+				"\": please report this incident to the authority");
+			throw npkcalc::PermissionViolation{ "You don't have rights to fiddle with this solution." };
+		}
+		return item;
+	}
+
+	npkcalc::Fertilizer* get_fertilizer(std::uint32_t id) {
+		auto item = data_manager->fertilizers.get_by_id(id);
+		if (item && item->owner != user_data_.user_name) {
+			observers.alarm(npkcalc::AlarmType::Critical, user_data_.user_name + " is fiddeling with \"" + item->name +
+				"\": please report this incident to the authority");
+			throw npkcalc::PermissionViolation{ "You don't have rights to fiddle with this fertilizer." };
+		}
+		return item;
+	}
 public:
 	const User& user_data() const noexcept {
 		return user_data_;
 	}
 
 	virtual void GetMyCalculations(
-		/*out*/::flat::Vector_Direct2<npkcalc::flat::Calculation, npkcalc::flat::Calculation_Direct> calculations) {
+		/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Calculation, npkcalc::flat::Calculation_Direct> calculations) {
 		npkcalc::helper::assign_from_cpp_GetMyCalculations_calculations(calculations, this->calculations.data());
 	}
 
-	virtual uint32_t AddSolution(::flat::Span<char> name, ::flat::Span<double> elements) {
-		solutions_changed = true;
-
+	virtual uint32_t AddSolution(::nprpc::flat::Span<char> name, ::nprpc::flat::Span<double> elements) {
 		std::lock_guard<std::mutex> lk(data_manager->mut_solutions);
 		auto s = data_manager->solutions.create();
 		s->name = name;
@@ -214,46 +232,48 @@ public:
 		std::transform(elements.begin(), elements.end(), s->elements.begin(), [](auto x) { return x; });
 
 		observers.alarm(npkcalc::AlarmType::Info, user_data().user_name + " added solution \"" + s->name + "\"");
+		solutions_changed = true;
 
 		return s->id;
 	}
 
-	virtual void SetSolutionName(uint32_t id, ::flat::Span<char> name) {
-		solutions_changed = true;
+	virtual void SetSolutionName(uint32_t id, ::nprpc::flat::Span<char> name) {
 		std::lock_guard<std::mutex> lk(data_manager->mut_solutions);
-		if (auto item = data_manager->solutions.get_by_id(id); item) {
+		if (auto item = get_solution(id); item) {
 			item->name = (std::string_view)name;
+			solutions_changed = true;
 		}
 	}
 
-	virtual void SetSolutionElements(uint32_t id, ::flat::Span_ref<npkcalc::flat::SolutionElement, npkcalc::flat::SolutionElement_Direct> name) {
-		solutions_changed = true;
+	virtual void SetSolutionElements(uint32_t id, ::nprpc::flat::Span_ref<npkcalc::flat::SolutionElement, npkcalc::flat::SolutionElement_Direct> name) {
 		std::lock_guard<std::mutex> lk(data_manager->mut_solutions);
-		if (auto s = data_manager->solutions.get_by_id(id); s) {
+		if (auto s = get_solution(id); s) {
 			for (auto e : name) {
 				if (e.index() >= 14) continue;
 				s->elements[e.index()] = e.value();
 			}
+			solutions_changed = true;
 		}
 	}
 
 	virtual void DeleteSolution(uint32_t id) {
-		solutions_changed = true;
 		std::string name;
 		bool deleted = false;
 		{
 			std::lock_guard<std::mutex> lk(data_manager->mut_solutions);
-			if (auto s = data_manager->solutions.get_by_id(id); s) {
+			if (auto s = get_solution(id); s) {
 				name = std::move(s->name);
 				data_manager->solutions.remove_by_id(id);
 				deleted = true;
 			}
 		}
-		if (deleted)
-			observers.alarm(npkcalc::AlarmType::Critical, user_data().user_name + " deleted solution \"" + name + "\"");
+		if (deleted) {
+			solutions_changed = true;
+			observers.alarm(npkcalc::AlarmType::Info, user_data().user_name + " has deleted solution \"" + name + "\"");
+		}
 	}
 
-	virtual uint32_t AddFertilizer(::flat::Span<char> name, ::flat::Span<char> formula) {
+	virtual uint32_t AddFertilizer(::nprpc::flat::Span<char> name, ::nprpc::flat::Span<char> formula) {
 		fertilizers_changed = true;
 		std::lock_guard<std::mutex> lk(data_manager->mut_fertilizers);
 		auto f = data_manager->fertilizers.create();
@@ -263,30 +283,40 @@ public:
 		return f->id;
 	}
 
-	virtual void SetFertilizerName(uint32_t id, ::flat::Span<char> name) {
-		fertilizers_changed = true;
+	virtual void SetFertilizerName(uint32_t id, ::nprpc::flat::Span<char> name) {
 		std::lock_guard<std::mutex> lk(data_manager->mut_fertilizers);
-		if (auto item = data_manager->fertilizers.get_by_id(id); item) {
+		if (auto item = get_fertilizer(id); item) {
 			item->name = (std::string_view)name;
+			fertilizers_changed = true;
 		} else {
 			std::cerr << "fertilizer with id = " << id << " was not found..\n";
 		}
 	}
 
-	virtual void SetFertilizerFormula(uint32_t id, ::flat::Span<char> name) {
-		fertilizers_changed = true;
+	virtual void SetFertilizerFormula(uint32_t id, ::nprpc::flat::Span<char> name) {
 		std::lock_guard<std::mutex> lk(data_manager->mut_fertilizers);
-		if (auto item = data_manager->fertilizers.get_by_id(id); item) {
+		if (auto item = get_fertilizer(id); item) {
 			item->formula = name;
+			fertilizers_changed = true;
 		} else {
 			std::cerr << "fertilizer with id = " << id << " was not found..\n";
 		}
 	}
 
 	virtual void DeleteFertilizer(uint32_t id) {
-		fertilizers_changed = true;
-		std::lock_guard<std::mutex> lk(data_manager->mut_fertilizers);
-		data_manager->fertilizers.remove_by_id(id);
+		std::string name;
+		bool deleted = false;
+		{
+			std::lock_guard<std::mutex> lk(data_manager->mut_fertilizers);
+			if (auto item = get_fertilizer(id); item) {
+				deleted = true;
+				data_manager->fertilizers.remove_by_id(id);
+			}
+		}
+		if (deleted) {
+			fertilizers_changed = true;
+			observers.alarm(npkcalc::AlarmType::Info, user_data().user_name + " has deleted fertilizer \"" + name + "\"");
+		}
 	}
 
 	virtual void SaveData() {
@@ -340,8 +370,8 @@ public:
 	}
 
 	virtual void GetData(
-		/*out*/::flat::Vector_Direct2<npkcalc::flat::Solution, npkcalc::flat::Solution_Direct> solutions,
-		/*out*/::flat::Vector_Direct2<npkcalc::flat::Fertilizer, npkcalc::flat::Fertilizer_Direct> fertilizers)
+		/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Solution, npkcalc::flat::Solution_Direct> solutions,
+		/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Fertilizer, npkcalc::flat::Fertilizer_Direct> fertilizers)
 	{
 		const auto& sols = data_manager->solutions.data();
 		npkcalc::helper::assign_from_cpp_GetData_solutions(solutions, sols);
@@ -351,7 +381,7 @@ public:
 	}
 
 	virtual void GetImages(
-		/*out*/::flat::Vector_Direct2<npkcalc::flat::Media, npkcalc::flat::Media_Direct> images)
+		/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Media, npkcalc::flat::Media_Direct> images)
 	{
 		npkcalc::helper::assign_from_cpp_GetImages_images(images, data_manager->icons);
 	}
@@ -367,12 +397,18 @@ public:
 	}
 
 	virtual void GetGuestCalculations(
-		/*out*/::flat::Vector_Direct2<npkcalc::flat::Calculation, npkcalc::flat::Calculation_Direct> calculations) {
+		/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Calculation, npkcalc::flat::Calculation_Direct> calculations) {
 		npkcalc::helper::assign_from_cpp_GetMyCalculations_calculations(calculations, data_manager->get_calculations("Guest").data());
 	}
 };
 
 class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
+	const std::string& data_root_dir_;
+	nprpc::Poa* user_poa;
+
+	std::mutex mut_;
+	std::vector<std::unique_ptr<User>> users_db_;
+	
 	struct Session {
 		std::string sid;
 		std::string email;
@@ -387,13 +423,20 @@ class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
 			return sid < other.sid;
 		}
 	};
-
-	const std::string& data_root_dir_;
-	nprpc::Poa* user_poa;
-	std::vector<std::unique_ptr<User>> users_db_;
+	
 	std::set<Session> sessions_;
 
-	std::string create_uuid() {
+	struct NewUser {
+		User user;
+		std::uint32_t code;
+	};
+
+	std::mutex new_users_mut_;
+	std::map<std::string, NewUser> new_users_db_;
+
+	std::random_device rd_;
+
+	static std::string create_uuid() {
 		boost::uuids::random_generator generator;
 		auto uid = generator();
 		std::stringstream ss;
@@ -403,13 +446,20 @@ class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
 		return std::move(ss.str());
 	}
 
-	std::string sha256(std::string_view str) {
+	static std::string sha256(std::string_view str) {
 		unsigned char hash[SHA256_DIGEST_LENGTH];
 		SHA256_CTX sha256;
 		SHA256_Init(&sha256);
 		SHA256_Update(&sha256, str.data(), str.size());
 		SHA256_Final(hash, &sha256);
 		return std::string((char*)hash, SHA256_DIGEST_LENGTH);
+	}
+
+	static std::string str_tolower(std::string str) {
+		std::transform(std::begin(str), std::end(str), std::begin(str), [](unsigned char c) {
+			return std::tolower(c);
+			});
+		return str;
 	}
 
 	npkcalc::UserData try_login(std::string_view user_email, std::string_view user_password) {
@@ -453,7 +503,6 @@ class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
 	}
 
 	void store_users() noexcept {
-		//users_db_.emplace_back(std::make_unique<User>("admin@npkcalc.com", sha256("1"), "Admin"));
 		try {
 			std::ofstream ofs(data_root_dir_ + "/users.txt");
 			boost::archive::text_oarchive ar(ofs, boost::archive::no_header | boost::archive::no_tracking);
@@ -462,8 +511,24 @@ class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
 			std::cerr << ex.what() << '\n';
 		}
 	}
+
+	bool check_username(::nprpc::flat::Span<char> username) {
+		const auto lowercase = str_tolower(username);
+		return std::find_if(std::begin(users_db_), std::end(users_db_), [&lowercase](const std::unique_ptr<User>& user) {
+			return lowercase == str_tolower(user->user_name);
+			}) == users_db_.end();
+	}
+
+	bool check_email(::nprpc::flat::Span<char> email) {
+		const auto lowercase = str_tolower(email);
+		return std::find_if(std::begin(users_db_), std::end(users_db_), [&lowercase](const std::unique_ptr<User>& user) {
+			return lowercase == str_tolower(user->email);
+			}) == users_db_.end();
+	}
 public:
-	virtual npkcalc::UserData LogIn(::flat::Span<char> login, ::flat::Span<char> password) {
+	virtual npkcalc::UserData LogIn(::nprpc::flat::Span<char> login, ::nprpc::flat::Span<char> password) {
+		std::lock_guard<std::mutex> lk(mut_);
+
 		auto user_email = (std::string_view)login;
 		auto user_password = (std::string_view)password;
 
@@ -475,10 +540,13 @@ public:
 		return try_login(user_email, user_password);
 	}
 
-	virtual npkcalc::UserData LogInWithSessionId(::flat::Span<char> session_id) {
+	virtual npkcalc::UserData LogInWithSessionId(::nprpc::flat::Span<char> session_id) {
+		std::lock_guard<std::mutex> lk(mut_);
+
 		auto sid = (std::string_view)session_id;
 		Session s;
 		s.sid.assign(sid.data(), sid.size());
+		
 		if (auto it = sessions_.find(s); it != sessions_.end()) {
 			auto const& user_email = it->email;
 			if (auto it = std::find_if(users_db_.begin(), users_db_.end(),
@@ -492,11 +560,70 @@ public:
 		throw npkcalc::AuthorizationFailed(npkcalc::AuthorizationFailed_Reason::session_does_not_exist);
 	}
 
-	virtual bool LogOut(::flat::Span<char> session_id) {
+	virtual bool LogOut(::nprpc::flat::Span<char> session_id) {
+		std::lock_guard<std::mutex> lk(mut_);
+
 		auto sid = (std::string_view)session_id;
 		Session s;
 		s.sid.assign(sid.data(), sid.size());
 		return static_cast<bool>(sessions_.erase(s));
+	}
+
+
+	virtual bool CheckUsername(::nprpc::flat::Span<char> username) {
+		std::lock_guard<std::mutex> lk(mut_);
+		return check_username(username);
+	}
+
+	virtual bool CheckEmail(::nprpc::flat::Span<char> email) {
+		std::lock_guard<std::mutex> lk(mut_);
+		return check_email(email);
+	}
+
+	virtual void RegisterStepOne(::nprpc::flat::Span<char> username, ::nprpc::flat::Span<char> email, ::nprpc::flat::Span<char> password) {
+		{
+			std::lock_guard<std::mutex> lk(mut_);
+			if (check_username(username) == false)
+				throw npkcalc::RegistrationFailed(npkcalc::RegistrationFailed_Reason::username_already_exist);
+			if (check_email(email) == false)
+				throw npkcalc::RegistrationFailed(npkcalc::RegistrationFailed_Reason::email_already_registered);
+		}
+		
+		NewUser user;
+		
+		user.user.email = email;
+		user.user.password_sha256 = sha256(password);
+		user.user.user_name = username;
+		std::uniform_int_distribution<std::uint32_t> dist(10000, 99999);
+		user.code = dist(rd_);
+
+		//std::cerr << "Code: " << user.code << '\n';
+
+		observers.alarm(npkcalc::AlarmType::Info, "Dear " + user.user.user_name + ", here is your confirmation code: " + std::to_string(user.code));
+
+		{
+			std::lock_guard<std::mutex> lk(new_users_mut_);
+			new_users_db_.emplace(user.user.user_name, std::move(user));
+		}
+	}
+
+	virtual void RegisterStepTwo(::nprpc::flat::Span<char> username, uint32_t code) {
+		std::lock_guard<std::mutex> lk(new_users_mut_);
+		if (auto it = new_users_db_.find((std::string)username); it != new_users_db_.end()) {
+			if (it->second.code != code)
+				throw npkcalc::RegistrationFailed(npkcalc::RegistrationFailed_Reason::incorrect_code);
+
+			observers.alarm(npkcalc::AlarmType::Info, "New user '" + it->first + "' has been registered");
+
+			{
+				std::lock_guard<std::mutex> lk(mut_);
+				users_db_.push_back(std::make_unique<User>(std::move(it->second.user)));
+				store_users();
+			}
+			new_users_db_.erase(it);
+		} else {
+			throw npkcalc::RegistrationFailed(npkcalc::RegistrationFailed_Reason::invalid_username);
+		}
 	}
 
 	AuthorizatorImpl(nprpc::Rpc& rpc, const std::string& data_root_dir)
@@ -518,9 +645,9 @@ struct HostJson {
 
 		template<typename Archive>
 		void serialize(Archive& ar) {
-			ar& NVP(calculator);
-			ar& NVP(authorizator);
-			ar& NVP(chat);
+			ar & NVP(calculator);
+			ar & NVP(authorizator);
+			ar & NVP(chat);
 		}
 	} objects;
 
@@ -594,8 +721,6 @@ int main(int argc, char* argv[]) {
 		// Capture SIGINT and SIGTERM to perform a clean shutdown
 		boost::asio::signal_set signals(thread_pool::get_instance().ctx(), SIGINT, SIGTERM);
 		signals.async_wait([&](boost::beast::error_code const&, int) {
-			observers.stop();
-			chat.stop();
 			thread_pool::get_instance().stop();
 		});
 
@@ -615,9 +740,9 @@ int main(int argc, char* argv[]) {
 			oa << host_json;
 		}
 	
-		rpc->start();
 		thread_pool::get_instance().ctx().run();
 		rpc->destroy();
+
 	} catch (std::exception& ex) {
 		std::cerr << ex.what();
 		return EXIT_FAILURE;
