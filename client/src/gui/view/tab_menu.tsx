@@ -219,7 +219,9 @@ class TabPane extends React.Component<{
 	}
 
 	protected handle_select_view(view: React.RefObject<View>) {
-		if (this.active_view) this.active_view.show_window(false);
+		if (this.active_view) 
+			this.active_view.show_window(false);
+		
 		view.current.show_window(true);
 		this.active_view = view.current;
 
@@ -227,10 +229,13 @@ class TabPane extends React.Component<{
 			this.props.notify_tab_selected(view.current.props.data);
 	}
 
-	public select_view(view_index: number) {
-		if (view_index >= this.views.length) return;
+	public select_view(view_index: number): boolean {
+		if (view_index >= this.views.length) return false;
+
 		this.handle_select_view(this.views[view_index]);
 		this.menu.current.set_selected(view_index);
+
+		return true;
 	}
 
 	render() {
@@ -263,6 +268,49 @@ class TabPane extends React.Component<{
 	}
 }
 
+abstract class RouterTabPane extends TabPane {
+	urls: string[];
+
+	protected abstract create();
+
+	private set_url(idx: number) {
+		window.history.pushState("", "", this.urls[idx]);
+	}
+
+	public select_view(view_index: number): boolean {
+		if (!super.select_view(view_index)) return false
+		this.set_url(view_index);
+		return true;
+	}
+	
+	protected handle_select_view(view: React.RefObject<View>) {
+		super.handle_select_view(view);
+		const idx = this.views.findIndex( x => x == view);
+		console.assert(idx != -1);
+		this.set_url(idx);
+	}
+
+	constructor(props:any) {
+		super(props);
+
+		this.create();
+
+		const size = this.state.view_builder.length;
+		this.urls = new Array<string>(size);
+
+		for (let i = 0; i < size; ++i) {
+			this.urls[i] = '/' + this.state.view_builder[i].tab_name.toLowerCase()
+		}
+
+		for (let i = 0; i < size; ++i) {
+			if (this.urls[i] == window.location.pathname) {
+				this.active_index_after_adding = i;
+				break;
+			}
+		}
+	}
+}
+
 export {
-	Menu, TabPane, MenuButton
+	Menu, MenuButton, TabPane, RouterTabPane
 }

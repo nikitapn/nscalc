@@ -189,9 +189,9 @@ class RegisteredUser : public npkcalc::IRegisteredUser_Servant {
 
 	const User& user_data_;
 
-	bool calculations_changed = false;
-	bool solutions_changed = false;
-	bool fertilizers_changed = false;
+	std::atomic_bool calculations_changed = false;
+	std::atomic_bool solutions_changed = false;
+	std::atomic_bool fertilizers_changed = false;
 
 	Calculations calculations;
 
@@ -569,7 +569,6 @@ public:
 		return static_cast<bool>(sessions_.erase(s));
 	}
 
-
 	virtual bool CheckUsername(::nprpc::flat::Span<char> username) {
 		std::lock_guard<std::mutex> lk(mut_);
 		return check_username(username);
@@ -699,7 +698,7 @@ int main(int argc, char* argv[]) {
 	try {
 		nprpc::Config rpc_cfg;
 		rpc_cfg.debug_level = nprpc::DebugLevel::DebugLevel_Critical;
-		rpc_cfg.port = 52244;
+		rpc_cfg.port = 0;
 		rpc_cfg.websocket_port = port;
 		rpc_cfg.http_root_dir = http_root;
 		rpc_cfg.use_ssl = use_ssl;
@@ -707,6 +706,7 @@ int main(int argc, char* argv[]) {
 		rpc_cfg.ssl_secret_key = private_key;
 		rpc_cfg.ssl_dh_params = dh_params;
 		rpc_cfg.hostname = hostname;
+		rpc_cfg.spa_links = { "/calculator", "/solutions", "/fertilizers", "/links", "/chat", "/about" };
 
 		auto rpc = nprpc::init(thread_pool::get_instance().ctx(), std::move(rpc_cfg));
 

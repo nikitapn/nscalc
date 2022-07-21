@@ -5,7 +5,14 @@
 </svelte:head>
 
 <script lang="ts">
+  import Banner from 'gui/misc/Banner.svelte'
+  import Footer from 'gui/misc/Footer.svelte'
+  import { fade } from 'svelte/transition';
+
   export let content: HTMLDivElement;
+
+  let user_made_a_bad_decision = false;
+
 </script>
 
 <style>
@@ -55,9 +62,12 @@
   * :global(.rows > *:last-child) {
     margin-bottom: 0;
   }
-
 </style>
 
 <div>
-  <div bind:this={content} />
+  {#if !user_made_a_bad_decision}
+  <div bind:this={content} transition:fade="{{duration: 5000}}"/>
+  <Footer />
+  {/if}
+  <Banner bind:user_made_a_bad_decision={user_made_a_bad_decision}/>
 </div>

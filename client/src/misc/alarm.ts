@@ -1,3 +1,6 @@
+// Copyright (c) 2022 nikitapnn1@gmail.com
+// This file is a part of Nikita's NPK calculator and covered by LICENSING file in the topmost directory
+
 import * as nscalc from 'rpc/npkcalc'
 import { observable, computed } from 'mobx'
 

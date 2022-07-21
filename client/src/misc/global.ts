@@ -22,7 +22,13 @@ export class UserData {
 }
 
 export class MyIcons {
-
+	add = 'img/add.svg';
+	bell = 'img/bell.svg';
+	gear = 'img/gear.svg';
+	redo = 'img/redo.svg';
+	undo = 'img/undo.svg';
+	save = 'img/save.svg';
+/*
 	static get_image_jpg(abuf: ArrayBuffer) : string {
 		return this.get_image('application/octet-binary', abuf);
 	}
@@ -101,6 +107,7 @@ export class MyIcons {
 			}
 		}
 	}
+	*/
 }
 
 class Global {
@@ -110,6 +117,10 @@ class Global {
 	constructor() {
 		this.user_data = new UserData();
 		this.icons = new MyIcons();
+
+
+
+
 	}
 }
 

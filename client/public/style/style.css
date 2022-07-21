@@ -40,19 +40,6 @@ body {
 	/* Footer height */
 }
 
-
-
-#footer {
-	position: absolute;
-	bottom: 0;
-	width: 100%;
-	height: 15.5rem;
-	/* Footer height */
-	background-color: #294f73;
-	color: white;
-	text-align: center;
-}
-
 .tab {
 	width: 100%;
 	background-color: #294f73;
@@ -723,4 +710,8 @@ a:hover {
 .alarm_bell {
 	margin-left: 3%;
 	height: inherit;
+}
+
+.curtain {
+	background-image: url("../img/curtain2.jpg");
 }

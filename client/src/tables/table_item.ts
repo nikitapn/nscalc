@@ -70,8 +70,8 @@ export abstract class TableItemWithOwnership extends TableItem {
 type Constructor<T> = new(...args: any[]) => T;
 
 export interface ITable {
-	push(items: TableItem[]) : void;
-	add(item: TableItem) : void;
+	push_some(items: TableItem[]) : void;
+	push_one(item: TableItem) : void;
 	get_by_id(item_id: number) : TableItem;
 	erase_by_id(item_id: number) : void;
 	set_name(item_id: number, name: string) : void;
@@ -90,11 +90,11 @@ export function TableModel<T extends Constructor<{}>, U extends TableItem>(TBase
 			this.items = observable.array<U>();
 		}
 
-		push(items: Array<U>) {
+		push_some(items: U[]) {
 			this.items.push(...items.sort((a, b) => a.get_name().localeCompare(b.get_name())));
 		}
 	
-		add(item: U) {
+		push_one(item: U) {
 			this.items.push(item);
 		}
 

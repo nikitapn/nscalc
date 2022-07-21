@@ -8,7 +8,7 @@ export class View_Links extends View {
 
 	paint() : JSX.Element {
 		return (<div className="links_content">
-			<a target="_blank" rel="noopener noreferrer" href="/charts">Cool charts</a>
+			<a target="_blank" rel="noopener noreferrer" href="https://charts.hydrosoft.uk">Cool charts</a>
 			<br/>
 			<a target="_blank" rel="noopener noreferrer" href="https://www.nouryon.com/globalassets/inriver/resources/article-micronutrients-nutrient-solutions-for-greenhouse-crops-global-en.pdf">The booklet</a>
 		</div>);

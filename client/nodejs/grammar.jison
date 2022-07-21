@@ -31,6 +31,7 @@
 ("Co")				  return 'Co';
 ("Ag")				  return 'Ag';
 ("Al")				  return 'Al';
+("Na")				  return 'Na';
 ("N-NO3")			  return 'N_NO3';
 ("N-NH4")			  return 'N_NH4';
 ("O")			      return 'O';
@@ -144,15 +145,16 @@ count: 		/*%empty*/ 										{ $$ = 1; }
 			;
 			
 formula_stmt1:	
-			'H' count 										{ $$ = [1, $2]; }
+				'H' count 										{ $$ = [1, $2]; }
 	| 		'B' count 										{ $$ = [5, $2]; }
-	|		'C' count 										{ $$ = [6, $2]; }
-	|		'N' count 										{ $$ = [7, $2]; }
-	|		'O' count 										{ $$ = [8, $2]; }
+	|			'C' count 										{ $$ = [6, $2]; }
+	|			'N' count 										{ $$ = [7, $2]; }
+	|			'O' count 										{ $$ = [8, $2]; }
+	| 		'Na' count 										{ $$ = [11, $2]; }
 	| 		'Mg' count 										{ $$ = [12, $2]; }
 	| 		'Al' count 										{ $$ = [13, $2]; }
 	| 		'Si' count 										{ $$ = [14, $2]; }
-	|		'P' count 										{ $$ = [15, $2]; }
+	|			'P' count 										{ $$ = [15, $2]; }
 	| 		'S' count 										{ $$ = [16, $2]; }
 	| 		'Cl' count 										{ $$ = [17, $2]; }
 	| 		'K' count 										{ $$ = [19, $2]; }

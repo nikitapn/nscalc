@@ -84,17 +84,17 @@
   bind:open
   scrimClickAction=""
   escapeKeyAction=""
-  aaria-labelledby=""
-  aria-describedby=""
+  aria-labelledby="simple-title"
+  aria-describedby="simple-content"
 >
   <Header style="display: flex;">
-    <Title id="fullscreen-title">
+    <Title id="simple-title">
       {#if step_one}Create your Hydrosoft Account{:else}
       To verify your account please enter the code<br>that you should see in the alarm bar
       {/if}</Title>
     <IconButton style="margin-left: auto; order: 2;" action="close" class="material-icons">close</IconButton>
   </Header>
-  <Content id="fullscreen-content">
+  <Content id="simple-content">
     <FormField style="display: flex; flex-direction: column-reverse;">
       <div class="rows">
         {#if step_one}

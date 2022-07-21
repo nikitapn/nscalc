@@ -4,7 +4,7 @@
 		"calculator": {
 			"object_id": 0,
 			"ip4": 2130706433,
-			"port": 52244,
+			"port": 0,
 			"websocket_port": 8080,
 			"poa_idx": 0,
 			"flags": 1,
@@ -14,7 +14,7 @@
 		"authorizator": {
 			"object_id": 1,
 			"ip4": 2130706433,
-			"port": 52244,
+			"port": 0,
 			"websocket_port": 8080,
 			"poa_idx": 0,
 			"flags": 1,
@@ -24,7 +24,7 @@
 		"chat": {
 			"object_id": 2,
 			"ip4": 2130706433,
-			"port": 52244,
+			"port": 0,
 			"websocket_port": 8080,
 			"poa_idx": 0,
 			"flags": 1,
