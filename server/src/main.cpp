@@ -8,6 +8,9 @@
 #include <filesystem>
 #include <set>
 #include <algorithm>
+#include <tuple>
+#include <array>
+#include <unordered_map>
 #include <boost/asio/signal_set.hpp>
 #include <boost/beast/core/error.hpp>
 #include <boost/uuid/random_generator.hpp>
@@ -15,6 +18,8 @@
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/program_options.hpp>
+#include <boost/mp11/tuple.hpp>
+#include <boost/mp11/algorithm.hpp>
 #include <openssl/sha.h>
 #include "npkcalc.hpp"
 #include "data.hpp"
@@ -123,53 +128,6 @@ public:
 	}
 };
 
-class DataManager {
-	const std::string& data_root_dir_;
-public:
-	std::mutex mut_solutions;
-	Solutions solutions;
-
-	std::mutex mut_fertilizers;
-	Fertilizers fertilizers;
-
-	std::vector<npkcalc::Media> icons;
-
-	Calculations get_calculations(std::string owner) const noexcept {
-		Calculations calcs{data_root_dir_ + "/calculations/" + owner + ".bin"};
-		calcs.load();
-		return calcs;
-	}
-
-	void save_calculations(const Calculations& calculations, const std::string& owner) const noexcept {
-		calculations.store(data_root_dir_ + "/calculations/" + owner + ".bin");
-	}
-
-	DataManager(const std::string& data_root_dir)
-		: data_root_dir_{data_root_dir}
-		, solutions{data_root_dir + "/sols.bin"}
-		, fertilizers{data_root_dir + "/ferts.bin"}
-	{
-		solutions.load();
-		solutions.sort();
-
-		fertilizers.load();
-		fertilizers.sort();
-
-		constexpr std::string_view icon_list[] = {"add", "save", "redo", "undo", "gear", "bell"};
-		const auto root = std::string(data_root_dir + "/icons/");
-		const auto svg = std::string(".svg");
-
-		for (auto ic : icon_list) {
-			const auto s = std::string(ic);
-			std::ifstream is(root + s + svg, std::ios_base::binary);
-			if (!is) throw s + " not found...";
-			icons.emplace_back();
-			icons.back().name = s;
-			icons.back().data = {std::istreambuf_iterator<char>(is), std::istreambuf_iterator<char>()};
-		}
-	}
-};
-
 struct User {
 	std::string email;
 	std::string password_sha256;
@@ -181,22 +139,76 @@ struct User {
 		ar& password_sha256;
 		ar& user_name;
 	}
+
+};
+class DataManager {
+	const std::string& data_root_dir_;
+	std::tuple<Solutions, Fertilizers> data_;
+
+	std::mutex users_mut_;
+	std::unordered_map<std::string, std::weak_ptr<Calculations>> users_;
+
+	template<typename T> requires (
+		std::is_same_v<T, Solutions> || 
+		std::is_same_v<T, Fertilizers>
+		)
+	static constexpr size_t to_index() {
+		if constexpr (std::is_same_v<T, Solutions>) return 0;
+		if constexpr (std::is_same_v<T, Fertilizers>) return 1;
+	}
+public:
+	std::shared_ptr<Calculations> guest_calcs;
+	// std::vector<npkcalc::Media> icons;
+	
+	std::string get_calculation_path(std::string_view owner) const noexcept {
+		return data_root_dir_ + "/calculations/" + std::string(owner) + ".bin";
+	}
+
+	std::shared_ptr<Calculations> get_calculation(const User&) noexcept;
+
+	template<typename T>
+	T& get() {
+		return std::get<to_index<T>()>(data_);
+	}
+
+	DataManager(const std::string& data_root_dir)
+		: data_root_dir_{data_root_dir}
+		, data_{std::tuple<Solutions, Fertilizers>(
+			std::string_view(data_root_dir + "/sols.bin"), 
+			std::string_view(data_root_dir + "/ferts.bin"))}
+		, guest_calcs{std::make_shared<Calculations>(get_calculation_path("Guest"))}
+	{
+		boost::mp11::tuple_for_each(data_, [](auto& x) {
+			x.load();
+			x.sort();
+		});
+
+		// constexpr std::string_view icon_list[] = {"add", "save", "redo", "undo", "gear", "bell"};
+		// const auto root = std::string(data_root_dir + "/icons/");
+		// const auto svg = std::string(".svg");
+		// 
+		// for (auto ic : icon_list) {
+		// 	const auto s = std::string(ic);
+		// 	std::ifstream is(root + s + svg, std::ios_base::binary);
+		// 	if (!is) throw s + " not found...";
+		// 	icons.emplace_back();
+		// 	icons.back().name = s;
+		// 	icons.back().data = {std::istreambuf_iterator<char>(is), std::istreambuf_iterator<char>()};
+		// }
+	}
 };
 
-class RegisteredUser : public npkcalc::IRegisteredUser_Servant {
+std::unique_ptr<DataManager> data_manager;
+
+class RegisteredUser 
+	: public npkcalc::IRegisteredUser_Servant {
 	friend class CalculatorImpl;
-	inline static DataManager* data_manager;
 
 	const User& user_data_;
-
-	std::atomic_bool calculations_changed = false;
-	std::atomic_bool solutions_changed = false;
-	std::atomic_bool fertilizers_changed = false;
-
-	Calculations calculations;
+	std::shared_ptr<Calculations> calculations;
 
 	npkcalc::Solution* get_solution(std::uint32_t id) {
-		auto item = data_manager->solutions.get_by_id(id);
+		auto item = data_manager->get<Solutions>().get_by_id(id);
 		if (item && item->owner != user_data_.user_name) {
 			observers.alarm(npkcalc::AlarmType::Critical, user_data_.user_name + " is fiddeling with \"" + item->name + 
 				"\": please report this incident to the authority");
@@ -206,7 +218,7 @@ class RegisteredUser : public npkcalc::IRegisteredUser_Servant {
 	}
 
 	npkcalc::Fertilizer* get_fertilizer(std::uint32_t id) {
-		auto item = data_manager->fertilizers.get_by_id(id);
+		auto item = data_manager->get<Fertilizers>().get_by_id(id);
 		if (item && item->owner != user_data_.user_name) {
 			observers.alarm(npkcalc::AlarmType::Critical, user_data_.user_name + " is fiddeling with \"" + item->name +
 				"\": please report this incident to the authority");
@@ -221,38 +233,41 @@ public:
 
 	virtual void GetMyCalculations(
 		/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Calculation, npkcalc::flat::Calculation_Direct> calculations) {
-		npkcalc::helper::assign_from_cpp_GetMyCalculations_calculations(calculations, this->calculations.data());
+		std::lock_guard<Calculations> lk(*this->calculations);
+		npkcalc::helper::assign_from_cpp_GetMyCalculations_calculations(calculations, this->calculations->data());
 	}
 
+	// Solutions
+
 	virtual uint32_t AddSolution(::nprpc::flat::Span<char> name, ::nprpc::flat::Span<double> elements) {
-		std::lock_guard<std::mutex> lk(data_manager->mut_solutions);
-		auto s = data_manager->solutions.create();
+		std::lock_guard<Solutions> lk(data_manager->get<Solutions>());
+		
+		auto s = data_manager->get<Solutions>().create();
 		s->name = name;
 		s->owner = user_data_.user_name;
 		std::transform(elements.begin(), elements.end(), s->elements.begin(), [](auto x) { return x; });
 
 		observers.alarm(npkcalc::AlarmType::Info, user_data().user_name + " added solution \"" + s->name + "\"");
-		solutions_changed = true;
 
 		return s->id;
 	}
 
 	virtual void SetSolutionName(uint32_t id, ::nprpc::flat::Span<char> name) {
-		std::lock_guard<std::mutex> lk(data_manager->mut_solutions);
+		std::lock_guard<Solutions> lk(data_manager->get<Solutions>());
+		
 		if (auto item = get_solution(id); item) {
 			item->name = (std::string_view)name;
-			solutions_changed = true;
 		}
 	}
 
 	virtual void SetSolutionElements(uint32_t id, ::nprpc::flat::Span_ref<npkcalc::flat::SolutionElement, npkcalc::flat::SolutionElement_Direct> name) {
-		std::lock_guard<std::mutex> lk(data_manager->mut_solutions);
+		std::lock_guard<Solutions> lk(data_manager->get<Solutions>());
+		
 		if (auto s = get_solution(id); s) {
 			for (auto e : name) {
 				if (e.index() >= 14) continue;
 				s->elements[e.index()] = e.value();
 			}
-			solutions_changed = true;
 		}
 	}
 
@@ -260,23 +275,25 @@ public:
 		std::string name;
 		bool deleted = false;
 		{
-			std::lock_guard<std::mutex> lk(data_manager->mut_solutions);
+			std::lock_guard<Solutions> lk(data_manager->get<Solutions>());
+
 			if (auto s = get_solution(id); s) {
 				name = std::move(s->name);
-				data_manager->solutions.remove_by_id(id);
+				data_manager->get<Solutions>().remove_by_id(id);
 				deleted = true;
 			}
 		}
 		if (deleted) {
-			solutions_changed = true;
 			observers.alarm(npkcalc::AlarmType::Info, user_data().user_name + " has deleted solution \"" + name + "\"");
 		}
 	}
 
+	// Fertilizers
+
 	virtual uint32_t AddFertilizer(::nprpc::flat::Span<char> name, ::nprpc::flat::Span<char> formula) {
-		fertilizers_changed = true;
-		std::lock_guard<std::mutex> lk(data_manager->mut_fertilizers);
-		auto f = data_manager->fertilizers.create();
+		std::lock_guard<Fertilizers> lk(data_manager->get<Fertilizers>());
+		
+		auto f = data_manager->get<Fertilizers>().create();
 		f->name = name;
 		f->owner = user_data_.user_name;
 		f->formula = formula;
@@ -284,20 +301,20 @@ public:
 	}
 
 	virtual void SetFertilizerName(uint32_t id, ::nprpc::flat::Span<char> name) {
-		std::lock_guard<std::mutex> lk(data_manager->mut_fertilizers);
+		std::lock_guard<Fertilizers> lk(data_manager->get<Fertilizers>());
+
 		if (auto item = get_fertilizer(id); item) {
 			item->name = (std::string_view)name;
-			fertilizers_changed = true;
 		} else {
 			std::cerr << "fertilizer with id = " << id << " was not found..\n";
 		}
 	}
 
 	virtual void SetFertilizerFormula(uint32_t id, ::nprpc::flat::Span<char> name) {
-		std::lock_guard<std::mutex> lk(data_manager->mut_fertilizers);
+		std::lock_guard<Fertilizers> lk(data_manager->get<Fertilizers>());
+
 		if (auto item = get_fertilizer(id); item) {
 			item->formula = name;
-			fertilizers_changed = true;
 		} else {
 			std::cerr << "fertilizer with id = " << id << " was not found..\n";
 		}
@@ -307,83 +324,83 @@ public:
 		std::string name;
 		bool deleted = false;
 		{
-			std::lock_guard<std::mutex> lk(data_manager->mut_fertilizers);
+			std::lock_guard<Fertilizers> lk(data_manager->get<Fertilizers>());
+
 			if (auto item = get_fertilizer(id); item) {
 				deleted = true;
-				data_manager->fertilizers.remove_by_id(id);
+				data_manager->get<Fertilizers>().remove_by_id(id);
 			}
 		}
 		if (deleted) {
-			fertilizers_changed = true;
 			observers.alarm(npkcalc::AlarmType::Info, user_data().user_name + " has deleted fertilizer \"" + name + "\"");
 		}
 	}
 
-	virtual void SaveData() {
-		if (solutions_changed) {
-			std::lock_guard<std::mutex> lk(data_manager->mut_solutions);
-			data_manager->solutions.store();
-			solutions_changed = false;
-		}
-
-		if (fertilizers_changed) {
-			std::lock_guard<std::mutex> lk(data_manager->mut_fertilizers);
-			data_manager->fertilizers.store();
-			fertilizers_changed = false;
-		}
-	}
+	// Solutions
 
 	virtual uint32_t UpdateCalculation(npkcalc::flat::Calculation_Direct calculation) {
 		uint32_t id = calculation.id();
-		npkcalc::Calculation* calc = calculations.get_by_id(id);
+		{
+			std::lock_guard<Calculations> lk(*calculations);
+			
+			npkcalc::Calculation* calc = calculations->get_by_id(id);
 
-		if (!calc) {
-			calc = calculations.create();
-			id = calculation.id() = calc->id;
+			if (!calc) {
+				calc = calculations->create();
+				id = calculation.id() = calc->id;
+			}
+
+			npkcalc::helper::assign_from_flat_UpdateCalculation_calculation(calculation, *calc);
 		}
-
-		npkcalc::helper::assign_from_flat_UpdateCalculation_calculation(calculation, *calc);
-		data_manager->save_calculations(calculations, user_data().user_name);
+		
+		calculations->store();
 		
 		return id;
 	}
 
 	virtual void DeleteCalculation(uint32_t id) {
-		calculations.remove_by_id(id);
-		data_manager->save_calculations(calculations, user_data().user_name);
+		{
+			std::lock_guard<Calculations> lk(*calculations);
+			calculations->remove_by_id(id);
+		}
+		calculations->store();
 	}
 
-	RegisteredUser(const User& _user_data)
-		: user_data_(_user_data)
-		, calculations(data_manager->get_calculations(_user_data.user_name))
+	virtual void SaveData() {
+		data_manager->get<Solutions>().store();
+		data_manager->get<Fertilizers>().store();
+	}
+
+	RegisteredUser(const User& _user_data, std::shared_ptr<Calculations> calcs)
+		: user_data_{_user_data}
+		, calculations{std::move(calcs)}
 	{
 	}
+	
+	//~RegisteredUser() {
+	//	std::cerr << "~RegisteredUser()\n";
+	//}
 };
 
-class CalculatorImpl : public npkcalc::ICalculator_Servant {
-	std::unique_ptr<DataManager> data_manager;
+class CalculatorImpl 
+	: public npkcalc::ICalculator_Servant {
 public:
-	CalculatorImpl(const std::string& data_root_dir)
-		: data_manager{std::make_unique<DataManager>(data_root_dir)}
-	{
-		RegisteredUser::data_manager = data_manager.get();
-	}
-
 	virtual void GetData(
 		/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Solution, npkcalc::flat::Solution_Direct> solutions,
 		/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Fertilizer, npkcalc::flat::Fertilizer_Direct> fertilizers)
 	{
-		const auto& sols = data_manager->solutions.data();
+		const auto& sols = data_manager->get<Solutions>().data();
 		npkcalc::helper::assign_from_cpp_GetData_solutions(solutions, sols);
 
-		const auto& ferts = data_manager->fertilizers.data();
+		const auto& ferts = data_manager->get<Fertilizers>().data();
 		npkcalc::helper::assign_from_cpp_GetData_fertilizers(fertilizers, ferts);
 	}
 
 	virtual void GetImages(
 		/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Media, npkcalc::flat::Media_Direct> images)
 	{
-		npkcalc::helper::assign_from_cpp_GetImages_images(images, data_manager->icons);
+		std::vector<npkcalc::Media> icons;
+		npkcalc::helper::assign_from_cpp_GetImages_images(images, icons);
 	}
 
 	virtual void Subscribe(nprpc::Object* obj) {
@@ -398,9 +415,28 @@ public:
 
 	virtual void GetGuestCalculations(
 		/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Calculation, npkcalc::flat::Calculation_Direct> calculations) {
-		npkcalc::helper::assign_from_cpp_GetMyCalculations_calculations(calculations, data_manager->get_calculations("Guest").data());
+		npkcalc::helper::assign_from_cpp_GetMyCalculations_calculations(calculations, data_manager->guest_calcs->data());
 	}
 };
+
+std::shared_ptr<Calculations> DataManager::get_calculation(const User& user) noexcept {
+	if (user.user_name == "Guest") 
+		return data_manager->guest_calcs;
+	
+	std::lock_guard<std::mutex> lk(users_mut_);
+
+	if (auto it = users_.find(user.user_name); it != users_.end()) {
+		if (auto ptr = it->second.lock(); ptr) {
+			return ptr;
+		}
+	}
+
+	auto ptr = std::make_shared<Calculations>(get_calculation_path(user.user_name));
+	users_.emplace(user.user_name, ptr);
+	ptr->load();
+	
+	return ptr;
+}
 
 class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
 	const std::string& data_root_dir_;
@@ -472,8 +508,9 @@ class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
 				throw npkcalc::AuthorizationFailed(npkcalc::AuthorizationFailed_Reason::incorrect_password);
 			}
 
-			auto new_user = new RegisteredUser(*(*it).get());
-			auto oid = user_poa->activate_object(new_user, &nprpc::get_context());
+			auto& ud = *(*it).get();
+			auto new_user = new RegisteredUser(ud, data_manager->get_calculation(ud));
+			auto oid = user_poa->activate_object(new_user, &nprpc::get_context(), true);
 
 			Session s;
 			do { s.sid = create_uuid(); } while (sessions_.find(s) != sessions_.end());
@@ -714,7 +751,8 @@ int main(int argc, char* argv[]) {
 		auto policy = std::make_unique<nprpc::Policy_Lifespan>(nprpc::Policy_Lifespan::Persistent);
 		auto poa = rpc->create_poa(3, {policy.get()});
 
-		CalculatorImpl calc{data_root};
+		data_manager = std::make_unique<DataManager>(data_root);
+		CalculatorImpl calc;
 		AuthorizatorImpl autorizator(*rpc, data_root);
 		ChatImpl chat;
 
@@ -747,6 +785,8 @@ int main(int argc, char* argv[]) {
 		std::cerr << ex.what();
 		return EXIT_FAILURE;
 	}
+
+	data_manager = {};
 
 	std::cout << "calculator is shutting down..." << std::endl;
 

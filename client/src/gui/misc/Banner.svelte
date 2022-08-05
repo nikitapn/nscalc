@@ -110,7 +110,7 @@
     <Button style="margin: 5px" variant="raised" on:click={happy_user}>
       <Label>I understand</Label>
     </Button>
-    <Button style="margin: 5px" variant="raised" on:click={sad_user}>
+    <Button style="margin: 5px" variant="outlined" color="secondary" on:click={sad_user}>
       <Label>I don't want it</Label>
     </Button>
   </div>

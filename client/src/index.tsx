@@ -17,16 +17,15 @@ import { DataObserverImpl } from 'misc/data_observer'
 import App from 'gui/App.svelte';
 import { AppReact } from 'gui/AppReact'
 
-let root = document.getElementById('root') as HTMLDivElement;
-
-const app = new App({
-	target: root
+const the_app = new App({
+	target: document.getElementById('root')
 });
 
 ReactDOM.render(
 	<AppReact menu_className="tab" dynamic={false} />,
-	app.content
+	the_app.content
 );
+
 let body = document.getElementById("id_body") as HTMLBodyElement
 body.style.display = 'block';
 

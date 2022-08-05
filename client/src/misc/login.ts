@@ -22,10 +22,8 @@ export function set_user_data(ud: npkcalc.UserData | null, component_mounted: bo
 	}
 	
 	global.user_data.user = ud.name;
+	global.user_data.reg_user = narrow(new ObjectProxy(ud.db), npkcalc.RegisteredUser);
 	
-	let obj = new ObjectProxy(ud.db); 
-	obj.add_ref();
-	global.user_data.reg_user = narrow(obj, npkcalc.RegisteredUser);
 	if (global.user_data.reg_user === null) {
 		console.log("narrowing failed");
 	}

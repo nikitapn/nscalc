@@ -39,8 +39,6 @@ li {
     <p>Rethink your fertilizers participating in the calculation. The calculator solves the problem using a straightforward analytical method that does allow negative values as a result of a computation. Typically, this happens if your fertilizer set is redefined, if you know what I mean.</p>
     <li>What are those sliders next to each element on the 'CALCULATOR' page?</li>
     <p>The sliders represent the significants of each element. It makes sense to play with them if you are missing some fertilizers to make a complete solution; otherwise, there is no reason to touch them.</p>
-    <li>What sources should I read to understand more about this calculator?</li>
-    <p>Read 'Nutrient Solutions for Greenhouse Crops'; It contains adequate information about the subject. Some calculation formulas were borrowed from that article.</p>
   </ul>
     
   <h1 class="chapter">___</h1>

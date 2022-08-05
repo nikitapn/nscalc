@@ -66,8 +66,10 @@
 
 <div>
   {#if !user_made_a_bad_decision}
-  <div bind:this={content} transition:fade="{{duration: 5000}}"/>
-  <Footer />
+  <div transition:fade="{{duration: 5000}}">
+    <div bind:this={content} />
+    <Footer />
+  </div>
   {/if}
   <Banner bind:user_made_a_bad_decision={user_made_a_bad_decision}/>
 </div>

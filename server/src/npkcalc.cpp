@@ -1629,7 +1629,7 @@ void npkcalc::IChat_Servant::dispatch(nprpc::Buffers& bufs, nprpc::EndPoint remo
     case 0: {
       npkcalc_M14_Direct ia(bufs(), 32);
       if ( !check_1O(bufs(), ia) ) break;
-      Connect(nprpc::impl::g_orb->create_object_from_flat(ia._1(), remote_endpoint));
+      Connect(nprpc::impl::create_object_from_flat(ia._1(), remote_endpoint));
       nprpc::impl::make_simple_answer(bufs(), nprpc::impl::MessageId::Success);
       break;
     }
@@ -1888,7 +1888,7 @@ void npkcalc::ICalculator_Servant::dispatch(nprpc::Buffers& bufs, nprpc::EndPoin
     case 2: {
       npkcalc_M14_Direct ia(bufs(), 32);
       if ( !check_1O(bufs(), ia) ) break;
-      Subscribe(nprpc::impl::g_orb->create_object_from_flat(ia._1(), remote_endpoint));
+      Subscribe(nprpc::impl::create_object_from_flat(ia._1(), remote_endpoint));
       nprpc::impl::make_simple_answer(bufs(), nprpc::impl::MessageId::Success);
       break;
     }
