@@ -7,9 +7,11 @@ export class Footstep {
   world: mat4;
   ttl: number;
   color: vec3;
+  idx: number;
 
-  constructor(color: vec3, pos: vec2, dir: vec2) {
+  constructor(color: vec3, idx: number, pos: vec2, dir: vec2) {
     this.color = color;
+    this.idx = idx;
     this.ttl = 128;
     
     let angle = Math.atan(dir[1] / dir[0]);

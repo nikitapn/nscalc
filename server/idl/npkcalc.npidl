@@ -133,6 +133,7 @@ Vector2: flat {
 
 Footstep: flat {
 	color: Vector3;
+	idx: u32;
 	pos: Vector2;
 	dir: Vector2;
 }

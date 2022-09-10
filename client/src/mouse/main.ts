@@ -73,13 +73,14 @@ const tick = (): void => {
 
 let cnt = 0;
 let prev_pos: vec2 = [0, 0];
+let footstep_cnt = 0;
 const on_mouse_move = (ev: MouseEvent) => {
 	if (cnt++ === 0) {
 		prev_pos = camera.screen_to_xy_plane(ev.clientX, ev.clientY);
 		return;
 	}
 
-	if (cnt % 16 !== 0) return;
+	if (cnt % 64 !== 0) return;
 
 	let pos = camera.screen_to_xy_plane(ev.clientX, ev.clientY);
 	let dir = vec2.fromValues(pos[0] - prev_pos[0], pos[1] - prev_pos[1]);
@@ -92,17 +93,19 @@ const on_mouse_move = (ev: MouseEvent) => {
 		while (distance - 64 > 0) {
 			distance -= 64;
 			vec2.add(prev_pos, prev_pos, dir);
-			//footsteps.push(new Footstep(prev_pos, dir));
+			//footsteps.push(new Footstep([1, 0, 0], footstep_cnt++, prev_pos, dir));
 			calculator.SendFootstep({ 
-				color: footstep_color, 
+				color: footstep_color,
+				idx: footstep_cnt++,
 				pos: {x: prev_pos[0], y: prev_pos[1]}, 
 				dir: {x: dir[0], y: dir[1]}
 			});
 		}
 	} else{
-		//footsteps.push(new Footstep(pos, dir));
+		//footsteps.push(new Footstep([1, 0, 0], footstep_cnt++, pos, dir));
 		calculator.SendFootstep({ 
 			color: footstep_color, 
+			idx: footstep_cnt++,
 			pos: {x: pos[0], y: pos[1]}, 
 			dir: {x: dir[0], y: dir[1]}
 		});

@@ -409,6 +409,7 @@ export class Vector2_Direct extends NPRPC.Flat.Flat {
 } // namespace Flat 
 export interface Footstep {
   color: Vector3;
+  idx: number/*u32*/;
   pos: Vector2;
   dir: Vector2;
 }
@@ -416,8 +417,10 @@ export interface Footstep {
 export namespace Flat_npkcalc {
 export class Footstep_Direct extends NPRPC.Flat.Flat {
   public get color() { return new Vector3_Direct(this.buffer, this.offset + 0); }
-  public get pos() { return new Vector2_Direct(this.buffer, this.offset + 12); }
-  public get dir() { return new Vector2_Direct(this.buffer, this.offset + 20); }
+  public get idx() { return this.buffer.dv.getUint32(this.offset+12,true); }
+  public set idx(value: number) { this.buffer.dv.setUint32(this.offset+12,value,true); }
+  public get pos() { return new Vector2_Direct(this.buffer, this.offset + 16); }
+  public get dir() { return new Vector2_Direct(this.buffer, this.offset + 24); }
 }
 } // namespace Flat 
 export class Authorizator extends NPRPC.ObjectProxy {
@@ -1474,8 +1477,8 @@ export class DataObserver extends NPRPC.ObjectProxy {
   public async OnFootstep(footstep: /*in*/Footstep): Promise<void> {
     let interface_idx = (arguments.length == 1 ? 0 : arguments[arguments.length - 1]);
     let buf = NPRPC.FlatBuffer.create();
-    buf.prepare(60);
-    buf.commit(60);
+    buf.prepare(64);
+    buf.commit(64);
     buf.write_msg_id(NPRPC.impl.MessageId.FunctionCall);
     buf.write_msg_type(NPRPC.impl.MessageType.Request);
     let __ch = new NPRPC.impl.Flat_nprpc_base.CallHeader_Direct(buf, 16);
@@ -1487,6 +1490,7 @@ export class DataObserver extends NPRPC.ObjectProxy {
   _._1.color.x = footstep.color.x;
   _._1.color.y = footstep.color.y;
   _._1.color.z = footstep.color.z;
+  _._1.idx = footstep.idx;
   _._1.pos.x = footstep.pos.x;
   _._1.pos.y = footstep.pos.y;
   _._1.dir.x = footstep.dir.x;
@@ -1857,8 +1861,8 @@ export class Calculator extends NPRPC.ObjectProxy {
   public async SendFootstep(footstep: /*in*/Footstep): Promise<void> {
     let interface_idx = (arguments.length == 1 ? 0 : arguments[arguments.length - 1]);
     let buf = NPRPC.FlatBuffer.create();
-    buf.prepare(60);
-    buf.commit(60);
+    buf.prepare(64);
+    buf.commit(64);
     buf.write_msg_id(NPRPC.impl.MessageId.FunctionCall);
     buf.write_msg_type(NPRPC.impl.MessageType.Request);
     let __ch = new NPRPC.impl.Flat_nprpc_base.CallHeader_Direct(buf, 16);
@@ -1870,6 +1874,7 @@ export class Calculator extends NPRPC.ObjectProxy {
   _._1.color.x = footstep.color.x;
   _._1.color.y = footstep.color.y;
   _._1.color.z = footstep.color.z;
+  _._1.idx = footstep.idx;
   _._1.pos.x = footstep.pos.x;
   _._1.pos.y = footstep.pos.y;
   _._1.dir.x = footstep.dir.x;

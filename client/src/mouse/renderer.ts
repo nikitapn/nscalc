@@ -6,7 +6,7 @@ import { GLResourses } from "./texture"
 import { quad_vertex_buffer, quad_normal_buffer, quad_index_buffer, quad_texture_coords_buffer } from './primitives';
 import { Camera } from './camera';
 import { Footstep } from 'mouse/footstep';
-import { footsteps_texture } from 'mouse/assets';
+import { footsteps_texture, footsteps_texture1 } from 'mouse/assets';
 
 import { shaders } from './shaders'
 
@@ -25,15 +25,16 @@ export class Renderer {
 		gl.uniformMatrix4fv(pinfo.uniform_loc.u_proj, false, camera.proj);
 		gl.uniformMatrix4fv(pinfo.uniform_loc.u_view, false, camera.view);
 
-		gl.activeTexture(gl.TEXTURE0);
-		gl.uniform1i(pinfo.uniform_loc.u_sampler, 0);
-
 		let ix_vertex = pinfo.attr_loc.in_position;
 		let ix_texture = pinfo.attr_loc.in_texture_coord;
 		let ix_footstep_age = pinfo.uniform_loc.foot_age;
 		let ix_footstep_color = pinfo.uniform_loc.foot_color;
 
-		GLResourses.bindTexture(footsteps_texture);
+		gl.activeTexture(gl.TEXTURE0);
+		gl.bindTexture(gl.TEXTURE_2D, footsteps_texture.texture)
+
+		gl.activeTexture(gl.TEXTURE1);
+		gl.bindTexture(gl.TEXTURE_2D, footsteps_texture1.texture)
 
 		gl.bindBuffer(gl.ARRAY_BUFFER, quad_vertex_buffer);
 		gl.vertexAttribPointer(ix_vertex, 3, gl.FLOAT, false, 0, 0);
@@ -47,6 +48,13 @@ export class Renderer {
 
 		let ix_world = pinfo.uniform_loc.u_world;
 		this.footsteps.forEach((footstep: Footstep) => {
+			if ((footstep.idx & 1) === 0) {
+				gl.activeTexture(gl.TEXTURE0);
+				gl.uniform1i(pinfo.uniform_loc.u_sampler, 0);
+			} else {
+				gl.activeTexture(gl.TEXTURE1);
+				gl.uniform1i(pinfo.uniform_loc.u_sampler, 1);
+			}
 			gl.uniformMatrix4fv(ix_world, false, footstep.world);
 			gl.uniform1f(ix_footstep_age, footstep.ttl);
 			gl.uniform3fv(ix_footstep_color, footstep.color);

@@ -98,7 +98,7 @@ public:
 		nplib::async<false>(executor(), &DataObservers::alarm_impl, this, type, std::move(msg));
 	}
 	void footstep(npkcalc::Footstep&& footstep, const nprpc::EndPoint& endpoint) {
-		nplib::async<false>(executor(), [this, footstep = std::move(footstep), &endpoint] {
+		nplib::async<false>(executor(), [this, footstep = std::move(footstep), endpoint] {
 			broadcast(&npkcalc::DataObserver::OnFootstep, not_equal_to_endpoint_t{ endpoint }, footstep);
 			});
 	}

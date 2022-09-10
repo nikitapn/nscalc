@@ -26,6 +26,6 @@ export class DataObserverImpl extends npkcalc._IDataObserver_Servant implements 
 		let color = footstep.color;
 		let pos = footstep.pos;
 		let dir = footstep.dir;
-		footsteps.push(new Footstep([color.x, color.y, color.z], [pos.x, pos.y], [dir.x, dir.y]));
+		footsteps.push(new Footstep([color.x, color.y, color.z], footstep.idx, [pos.x, pos.y], [dir.x, dir.y]));
 	}
 }

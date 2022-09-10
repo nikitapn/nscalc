@@ -664,6 +664,7 @@ public:
 
 struct Footstep {
   Vector3 color;
+  uint32_t idx;
   Vector2 pos;
   Vector2 dir;
 };
@@ -671,6 +672,7 @@ struct Footstep {
 namespace flat {
 struct Footstep {
   npkcalc::flat::Vector3 color;
+  uint32_t idx;
   npkcalc::flat::Vector2 pos;
   npkcalc::flat::Vector2 dir;
 };
@@ -690,6 +692,8 @@ public:
   {
   }
   auto color() noexcept { return npkcalc::flat::Vector3_Direct(buffer_, offset_ + offsetof(Footstep, color)); }
+  const uint32_t& idx() const noexcept { return base().idx;}
+  uint32_t& idx() noexcept { return base().idx;}
   auto pos() noexcept { return npkcalc::flat::Vector2_Direct(buffer_, offset_ + offsetof(Footstep, pos)); }
   auto dir() noexcept { return npkcalc::flat::Vector2_Direct(buffer_, offset_ + offsetof(Footstep, dir)); }
 };
@@ -912,7 +916,7 @@ inline void assign_from_flat_OnAlarm_alarm(npkcalc::flat::Alarm_Direct& src, npk
   dest.msg = (std::string_view)src.msg();
 }
 inline void assign_from_flat_OnFootstep_footstep(npkcalc::flat::Footstep_Direct& src, npkcalc::Footstep& dest) {
-  memcpy(&dest, src.__data(), 28);
+  memcpy(&dest, src.__data(), 32);
 }
 inline void assign_from_flat_Send_msg(npkcalc::flat::ChatMessage_Direct& src, npkcalc::ChatMessage& dest) {
   dest.timestamp = src.timestamp();

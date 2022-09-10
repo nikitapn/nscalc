@@ -581,7 +581,7 @@ check_failed:
   return false;
 }
 bool check_1Footstep_1(nprpc::flat_buffer& buf, npkcalc_M14_Direct& ia) {
-  if (static_cast<std::uint32_t>(buf.size()) < ia.offset() + 28) goto check_failed;
+  if (static_cast<std::uint32_t>(buf.size()) < ia.offset() + 32) goto check_failed;
   return true;
 check_failed:
   nprpc::impl::make_simple_answer(buf, nprpc::impl::MessageId::Error_BadInput);
@@ -1570,8 +1570,8 @@ void npkcalc::DataObserver::OnAlarm(/*in*/const npkcalc::Alarm& alarm) {
 void npkcalc::DataObserver::OnFootstep(/*in*/const npkcalc::Footstep& footstep) {
   ::nprpc::flat_buffer buf;
   {
-    auto mb = buf.prepare(60);
-    buf.commit(60);
+    auto mb = buf.prepare(64);
+    buf.commit(64);
     static_cast<::nprpc::impl::Header*>(mb.data())->msg_id = ::nprpc::impl::MessageId::FunctionCall;
     static_cast<::nprpc::impl::Header*>(mb.data())->msg_type = ::nprpc::impl::MessageType::Request;
   }
@@ -1581,7 +1581,7 @@ void npkcalc::DataObserver::OnFootstep(/*in*/const npkcalc::Footstep& footstep) 
   __ch.interface_idx() = interface_idx_;
   __ch.function_idx() = 2;
   npkcalc_M14_Direct _(buf,32);
-  memcpy(_._1().__data(), &footstep, 28);
+  memcpy(_._1().__data(), &footstep, 32);
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
   ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
@@ -1918,8 +1918,8 @@ void npkcalc::Calculator::GetGuestCalculations(/*out*/std::vector<npkcalc::Calcu
 void npkcalc::Calculator::SendFootstep(/*in*/const npkcalc::Footstep& footstep) {
   ::nprpc::flat_buffer buf;
   {
-    auto mb = buf.prepare(60);
-    buf.commit(60);
+    auto mb = buf.prepare(64);
+    buf.commit(64);
     static_cast<::nprpc::impl::Header*>(mb.data())->msg_id = ::nprpc::impl::MessageId::FunctionCall;
     static_cast<::nprpc::impl::Header*>(mb.data())->msg_type = ::nprpc::impl::MessageType::Request;
   }
@@ -1929,7 +1929,7 @@ void npkcalc::Calculator::SendFootstep(/*in*/const npkcalc::Footstep& footstep) 
   __ch.interface_idx() = interface_idx_;
   __ch.function_idx() = 4;
   npkcalc_M14_Direct _(buf,32);
-  memcpy(_._1().__data(), &footstep, 28);
+  memcpy(_._1().__data(), &footstep, 32);
   static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
   ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
   auto std_reply = nprpc::impl::handle_standart_reply(buf);
