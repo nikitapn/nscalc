@@ -7,12 +7,23 @@
 <script lang="ts">
   import Banner from 'gui/misc/Banner.svelte'
   import Footer from 'gui/misc/Footer.svelte'
-  import { fade } from 'svelte/transition';
+  import { fade } from 'svelte/transition'
+  import { onMount } from 'svelte'
+  import { init as init_mouse } from 'mouse/main'
 
   export let content: HTMLDivElement;
 
   let user_made_a_bad_decision = false;
 
+  let canvas: HTMLCanvasElement;
+
+  onMount(() => {
+    canvas.width = document.body.clientWidth;
+    canvas.height = document.body.clientHeight;
+    init_mouse(canvas);
+  });
+
+  
 </script>
 
 <style>
@@ -62,9 +73,18 @@
   * :global(.rows > *:last-child) {
     margin-bottom: 0;
   }
+
+  .overflow {
+    position: fixed;
+    top: 0;
+    left: 0;
+    pointer-events:none;
+    z-index: 100;
+  }
 </style>
 
 <div>
+  <canvas class="overflow" bind:this={canvas} width="800" height="600"></canvas>
   {#if !user_made_a_bad_decision}
   <div transition:fade="{{duration: 5000}}">
     <div bind:this={content} />

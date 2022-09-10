@@ -7,7 +7,7 @@ import global from 'misc/global'
 import { setCookie } from 'misc/utils'
 import { get_calculations } from 'tables/store_calculations'
 
-export function set_user_data(ud: npkcalc.UserData | null, component_mounted: boolean): void {
+export function set_user_data(ud: npkcalc.UserData | null): void {
 	if (ud === null) {
 		global.user_data.is_logged_in = false;
 		global.user_data.user = "Guest";
@@ -28,10 +28,7 @@ export function set_user_data(ud: npkcalc.UserData | null, component_mounted: bo
 		console.log("narrowing failed");
 	}
 
-	if (component_mounted) {
-		get_calculations().then(	() => document.dispatchEvent(new CustomEvent("calc_data_received")) );
-	}
-	
+	get_calculations();
 	setCookie("sid", ud.session_id, 31, false);
 
 	global.user_data.is_logged_in = true;

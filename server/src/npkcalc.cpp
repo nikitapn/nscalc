@@ -337,7 +337,7 @@ public:
 };
 
 struct npkcalc_M14 {
-  nprpc::detail::flat::ObjectId _1;
+  npkcalc::flat::Footstep _1;
 };
 
 class npkcalc_M14_Direct {
@@ -354,11 +354,11 @@ public:
     , offset_(offset)
   {
   }
-  auto _1() noexcept { return nprpc::detail::flat::ObjectId_Direct(buffer_, offset_ + offsetof(npkcalc_M14, _1)); }
+  auto _1() noexcept { return npkcalc::flat::Footstep_Direct(buffer_, offset_ + offsetof(npkcalc_M14, _1)); }
 };
 
 struct npkcalc_M15 {
-  npkcalc::flat::ChatMessage _1;
+  nprpc::detail::flat::ObjectId _1;
 };
 
 class npkcalc_M15_Direct {
@@ -375,12 +375,11 @@ public:
     , offset_(offset)
   {
   }
-  auto _1() noexcept { return npkcalc::flat::ChatMessage_Direct(buffer_, offset_ + offsetof(npkcalc_M15, _1)); }
+  auto _1() noexcept { return nprpc::detail::flat::ObjectId_Direct(buffer_, offset_ + offsetof(npkcalc_M15, _1)); }
 };
 
 struct npkcalc_M16 {
-  ::nprpc::flat::Vector<npkcalc::flat::Solution> _1;
-  ::nprpc::flat::Vector<npkcalc::flat::Fertilizer> _2;
+  npkcalc::flat::ChatMessage _1;
 };
 
 class npkcalc_M16_Direct {
@@ -397,16 +396,12 @@ public:
     , offset_(offset)
   {
   }
-  void _1(std::uint32_t elements_size) { new (&base()._1) ::nprpc::flat::Vector<npkcalc::flat::Solution>(buffer_, elements_size); }
-  auto _1_d() noexcept { return ::nprpc::flat::Vector_Direct2<npkcalc::flat::Solution,npkcalc::flat::Solution_Direct>(buffer_, offset_ + offsetof(npkcalc_M16, _1)); }
-  auto _1() noexcept { return ::nprpc::flat::Span_ref<npkcalc::flat::Solution, npkcalc::flat::Solution_Direct>(buffer_, base()._1.range(buffer_.data().data())); }
-  void _2(std::uint32_t elements_size) { new (&base()._2) ::nprpc::flat::Vector<npkcalc::flat::Fertilizer>(buffer_, elements_size); }
-  auto _2_d() noexcept { return ::nprpc::flat::Vector_Direct2<npkcalc::flat::Fertilizer,npkcalc::flat::Fertilizer_Direct>(buffer_, offset_ + offsetof(npkcalc_M16, _2)); }
-  auto _2() noexcept { return ::nprpc::flat::Span_ref<npkcalc::flat::Fertilizer, npkcalc::flat::Fertilizer_Direct>(buffer_, base()._2.range(buffer_.data().data())); }
+  auto _1() noexcept { return npkcalc::flat::ChatMessage_Direct(buffer_, offset_ + offsetof(npkcalc_M16, _1)); }
 };
 
 struct npkcalc_M17 {
-  ::nprpc::flat::Vector<npkcalc::flat::Media> _1;
+  ::nprpc::flat::Vector<npkcalc::flat::Solution> _1;
+  ::nprpc::flat::Vector<npkcalc::flat::Fertilizer> _2;
 };
 
 class npkcalc_M17_Direct {
@@ -423,20 +418,46 @@ public:
     , offset_(offset)
   {
   }
+  void _1(std::uint32_t elements_size) { new (&base()._1) ::nprpc::flat::Vector<npkcalc::flat::Solution>(buffer_, elements_size); }
+  auto _1_d() noexcept { return ::nprpc::flat::Vector_Direct2<npkcalc::flat::Solution,npkcalc::flat::Solution_Direct>(buffer_, offset_ + offsetof(npkcalc_M17, _1)); }
+  auto _1() noexcept { return ::nprpc::flat::Span_ref<npkcalc::flat::Solution, npkcalc::flat::Solution_Direct>(buffer_, base()._1.range(buffer_.data().data())); }
+  void _2(std::uint32_t elements_size) { new (&base()._2) ::nprpc::flat::Vector<npkcalc::flat::Fertilizer>(buffer_, elements_size); }
+  auto _2_d() noexcept { return ::nprpc::flat::Vector_Direct2<npkcalc::flat::Fertilizer,npkcalc::flat::Fertilizer_Direct>(buffer_, offset_ + offsetof(npkcalc_M17, _2)); }
+  auto _2() noexcept { return ::nprpc::flat::Span_ref<npkcalc::flat::Fertilizer, npkcalc::flat::Fertilizer_Direct>(buffer_, base()._2.range(buffer_.data().data())); }
+};
+
+struct npkcalc_M18 {
+  ::nprpc::flat::Vector<npkcalc::flat::Media> _1;
+};
+
+class npkcalc_M18_Direct {
+  ::nprpc::flat_buffer& buffer_;
+  const std::uint32_t offset_;
+
+  auto& base() noexcept { return *reinterpret_cast<npkcalc_M18*>(reinterpret_cast<std::byte*>(buffer_.data().data()) + offset_); }
+  auto const& base() const noexcept { return *reinterpret_cast<const npkcalc_M18*>(reinterpret_cast<const std::byte*>(buffer_.data().data()) + offset_); }
+public:
+  uint32_t offset() const noexcept { return offset_; }
+  void* __data() noexcept { return (void*)&base(); }
+  npkcalc_M18_Direct(::nprpc::flat_buffer& buffer, std::uint32_t offset)
+    : buffer_(buffer)
+    , offset_(offset)
+  {
+  }
   void _1(std::uint32_t elements_size) { new (&base()._1) ::nprpc::flat::Vector<npkcalc::flat::Media>(buffer_, elements_size); }
-  auto _1_d() noexcept { return ::nprpc::flat::Vector_Direct2<npkcalc::flat::Media,npkcalc::flat::Media_Direct>(buffer_, offset_ + offsetof(npkcalc_M17, _1)); }
+  auto _1_d() noexcept { return ::nprpc::flat::Vector_Direct2<npkcalc::flat::Media,npkcalc::flat::Media_Direct>(buffer_, offset_ + offsetof(npkcalc_M18, _1)); }
   auto _1() noexcept { return ::nprpc::flat::Span_ref<npkcalc::flat::Media, npkcalc::flat::Media_Direct>(buffer_, base()._1.range(buffer_.data().data())); }
 };
 
 
 bool check_1S2S(nprpc::flat_buffer& buf, npkcalc_M1_Direct& ia) {
   if (static_cast<std::uint32_t>(buf.size()) < ia.offset() + 16) goto check_failed;
-    {
-      if(!ia._1_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
-    }
-    {
-      if(!ia._2_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
-    }
+  {
+    if(!ia._1_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
+  }
+  {
+    if(!ia._2_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
+  }
   return true;
 check_failed:
   nprpc::impl::make_simple_answer(buf, nprpc::impl::MessageId::Error_BadInput);
@@ -444,9 +465,9 @@ check_failed:
 }
 bool check_1S(nprpc::flat_buffer& buf, npkcalc_M3_Direct& ia) {
   if (static_cast<std::uint32_t>(buf.size()) < ia.offset() + 8) goto check_failed;
-    {
-      if(!ia._1_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
-    }
+  {
+    if(!ia._1_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
+  }
   return true;
 check_failed:
   nprpc::impl::make_simple_answer(buf, nprpc::impl::MessageId::Error_BadInput);
@@ -454,15 +475,15 @@ check_failed:
 }
 bool check_1S2S3S(nprpc::flat_buffer& buf, npkcalc_M5_Direct& ia) {
   if (static_cast<std::uint32_t>(buf.size()) < ia.offset() + 24) goto check_failed;
-    {
-      if(!ia._1_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
-    }
-    {
-      if(!ia._2_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
-    }
-    {
-      if(!ia._3_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
-    }
+  {
+    if(!ia._1_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
+  }
+  {
+    if(!ia._2_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
+  }
+  {
+    if(!ia._3_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
+  }
   return true;
 check_failed:
   nprpc::impl::make_simple_answer(buf, nprpc::impl::MessageId::Error_BadInput);
@@ -470,9 +491,9 @@ check_failed:
 }
 bool check_1S2Fu32(nprpc::flat_buffer& buf, npkcalc_M6_Direct& ia) {
   if (static_cast<std::uint32_t>(buf.size()) < ia.offset() + 12) goto check_failed;
-    {
-      if(!ia._1_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
-    }
+  {
+    if(!ia._1_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
+  }
   return true;
 check_failed:
   nprpc::impl::make_simple_answer(buf, nprpc::impl::MessageId::Error_BadInput);
@@ -480,9 +501,9 @@ check_failed:
 }
 bool check_1S2AFf64(nprpc::flat_buffer& buf, npkcalc_M8_Direct& ia) {
   if (static_cast<std::uint32_t>(buf.size()) < ia.offset() + 120) goto check_failed;
-    {
-      if(!ia._1_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
-    }
+  {
+    if(!ia._1_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
+  }
   return true;
 check_failed:
   nprpc::impl::make_simple_answer(buf, nprpc::impl::MessageId::Error_BadInput);
@@ -490,9 +511,9 @@ check_failed:
 }
 bool check_1Fu322S(nprpc::flat_buffer& buf, npkcalc_M10_Direct& ia) {
   if (static_cast<std::uint32_t>(buf.size()) < ia.offset() + 12) goto check_failed;
-    {
-      if(!ia._2_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
-    }
+  {
+    if(!ia._2_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
+  }
   return true;
 check_failed:
   nprpc::impl::make_simple_answer(buf, nprpc::impl::MessageId::Error_BadInput);
@@ -500,9 +521,9 @@ check_failed:
 }
 bool check_1Fu322VSolutionElement(nprpc::flat_buffer& buf, npkcalc_M11_Direct& ia) {
   if (static_cast<std::uint32_t>(buf.size()) < ia.offset() + 12) goto check_failed;
-    {
-      if(!ia._2_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
-    }
+  {
+    if(!ia._2_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
+  }
   return true;
 check_failed:
   nprpc::impl::make_simple_answer(buf, nprpc::impl::MessageId::Error_BadInput);
@@ -517,43 +538,50 @@ check_failed:
 }
 bool check_1Calculation_1(nprpc::flat_buffer& buf, npkcalc_M12_Direct& ia) {
   if (static_cast<std::uint32_t>(buf.size()) < ia.offset() + 376) goto check_failed;
+  {
     {
-      {
-        if(!ia._1().name_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
-      }
+      if(!ia._1().name_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
     }
+  }
   return true;
 check_failed:
   nprpc::impl::make_simple_answer(buf, nprpc::impl::MessageId::Error_BadInput);
   return false;
 }
-bool check_1O(nprpc::flat_buffer& buf, npkcalc_M14_Direct& ia) {
+bool check_1O(nprpc::flat_buffer& buf, npkcalc_M15_Direct& ia) {
   if (static_cast<std::uint32_t>(buf.size()) < ia.offset() + 40) goto check_failed;
   return true;
 check_failed:
   nprpc::impl::make_simple_answer(buf, nprpc::impl::MessageId::Error_BadInput);
   return false;
 }
-bool check_1ChatMessage_1(nprpc::flat_buffer& buf, npkcalc_M15_Direct& ia) {
+bool check_1ChatMessage_1(nprpc::flat_buffer& buf, npkcalc_M16_Direct& ia) {
   if (static_cast<std::uint32_t>(buf.size()) < ia.offset() + 16) goto check_failed;
+  {
     {
+      if(!ia._1().str_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
+    }
+    {
+      if(!ia._1().attachment()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
+      if ( ia._1().attachment().has_value() ) {
+        auto value = ia._1().attachment().value();
+  if (static_cast<std::uint32_t>(buf.size()) < value.offset() + 20) goto check_failed;
       {
-        if(!ia._1().str_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
+        if(!value.name_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
       }
       {
-        if(!ia._1().attachment()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
-        if ( ia._1().attachment().has_value() ) {
-          auto value = ia._1().attachment().value();
-  if (static_cast<std::uint32_t>(buf.size()) < value.offset() + 20) goto check_failed;
-        {
-          if(!value.name_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
-        }
-        {
-          if(!value.data_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
-        }
-        }
+        if(!value.data_d()._check_size_align(static_cast<std::uint32_t>(buf.size()))) goto check_failed;
+      }
       }
     }
+  }
+  return true;
+check_failed:
+  nprpc::impl::make_simple_answer(buf, nprpc::impl::MessageId::Error_BadInput);
+  return false;
+}
+bool check_1Footstep_1(nprpc::flat_buffer& buf, npkcalc_M14_Direct& ia) {
+  if (static_cast<std::uint32_t>(buf.size()) < ia.offset() + 28) goto check_failed;
   return true;
 check_failed:
   nprpc::impl::make_simple_answer(buf, nprpc::impl::MessageId::Error_BadInput);
@@ -1539,6 +1567,29 @@ void npkcalc::DataObserver::OnAlarm(/*in*/const npkcalc::Alarm& alarm) {
   }
 }
 
+void npkcalc::DataObserver::OnFootstep(/*in*/const npkcalc::Footstep& footstep) {
+  ::nprpc::flat_buffer buf;
+  {
+    auto mb = buf.prepare(60);
+    buf.commit(60);
+    static_cast<::nprpc::impl::Header*>(mb.data())->msg_id = ::nprpc::impl::MessageId::FunctionCall;
+    static_cast<::nprpc::impl::Header*>(mb.data())->msg_type = ::nprpc::impl::MessageType::Request;
+  }
+  ::nprpc::impl::flat::CallHeader_Direct __ch(buf, sizeof(::nprpc::impl::Header));
+  __ch.object_id() = this->_data().object_id;
+  __ch.poa_idx() = this->_data().poa_idx;
+  __ch.interface_idx() = interface_idx_;
+  __ch.function_idx() = 2;
+  npkcalc_M14_Direct _(buf,32);
+  memcpy(_._1().__data(), &footstep, 28);
+  static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
+  auto std_reply = nprpc::impl::handle_standart_reply(buf);
+  if (std_reply != 0) {
+    std::cerr << "received an unusual reply for function with no output arguments\n";
+  }
+}
+
 void npkcalc::IDataObserver_Servant::dispatch(nprpc::Buffers& bufs, nprpc::EndPoint remote_endpoint, bool from_parent, nprpc::ReferenceList& ref_list) {
   nprpc::impl::flat::CallHeader_Direct __ch(bufs(), sizeof(::nprpc::impl::Header));
   switch(__ch.function_idx()) {
@@ -1551,6 +1602,12 @@ void npkcalc::IDataObserver_Servant::dispatch(nprpc::Buffers& bufs, nprpc::EndPo
     case 1: {
       npkcalc_M13_Direct ia(bufs(), 32);
       OnAlarm(ia._1());
+      nprpc::impl::make_simple_answer(bufs(), nprpc::impl::MessageId::Success);
+      break;
+    }
+    case 2: {
+      npkcalc_M14_Direct ia(bufs(), 32);
+      OnFootstep(ia._1());
       nprpc::impl::make_simple_answer(bufs(), nprpc::impl::MessageId::Success);
       break;
     }
@@ -1572,7 +1629,7 @@ void npkcalc::Chat::Connect(/*in*/const ObjectId& obj) {
   __ch.poa_idx() = this->_data().poa_idx;
   __ch.interface_idx() = interface_idx_;
   __ch.function_idx() = 0;
-  npkcalc_M14_Direct _(buf,32);
+  npkcalc_M15_Direct _(buf,32);
   memcpy(_._1().__data(), &obj._data(), 24);
   _._1().class_id(obj._data().class_id);
   _._1().hostname(obj._data().hostname);
@@ -1597,7 +1654,7 @@ bool npkcalc::Chat::Send(/*in*/const npkcalc::ChatMessage& msg) {
   __ch.poa_idx() = this->_data().poa_idx;
   __ch.interface_idx() = interface_idx_;
   __ch.function_idx() = 1;
-  npkcalc_M15_Direct _(buf,32);
+  npkcalc_M16_Direct _(buf,32);
   _._1().timestamp() = msg.timestamp;
   _._1().str(msg.str);
   if (msg.attachment) {
@@ -1627,14 +1684,14 @@ void npkcalc::IChat_Servant::dispatch(nprpc::Buffers& bufs, nprpc::EndPoint remo
   nprpc::impl::flat::CallHeader_Direct __ch(bufs(), sizeof(::nprpc::impl::Header));
   switch(__ch.function_idx()) {
     case 0: {
-      npkcalc_M14_Direct ia(bufs(), 32);
+      npkcalc_M15_Direct ia(bufs(), 32);
       if ( !check_1O(bufs(), ia) ) break;
       Connect(nprpc::impl::create_object_from_flat(ia._1(), remote_endpoint));
       nprpc::impl::make_simple_answer(bufs(), nprpc::impl::MessageId::Success);
       break;
     }
     case 1: {
-      npkcalc_M15_Direct ia(bufs(), 32);
+      npkcalc_M16_Direct ia(bufs(), 32);
       if ( !check_1ChatMessage_1(bufs(), ia) ) break;
       bool __ret_val;
       __ret_val = Send(ia._1());
@@ -1667,7 +1724,7 @@ void npkcalc::ChatParticipant::OnMessage(/*in*/const npkcalc::ChatMessage& msg) 
   __ch.poa_idx() = this->_data().poa_idx;
   __ch.interface_idx() = interface_idx_;
   __ch.function_idx() = 0;
-  npkcalc_M15_Direct _(buf,32);
+  npkcalc_M16_Direct _(buf,32);
   _._1().timestamp() = msg.timestamp;
   _._1().str(msg.str);
   if (msg.attachment) {
@@ -1692,7 +1749,7 @@ void npkcalc::IChatParticipant_Servant::dispatch(nprpc::Buffers& bufs, nprpc::En
   nprpc::impl::flat::CallHeader_Direct __ch(bufs(), sizeof(::nprpc::impl::Header));
   switch(__ch.function_idx()) {
     case 0: {
-      npkcalc_M15_Direct ia(bufs(), 32);
+      npkcalc_M16_Direct ia(bufs(), 32);
       OnMessage(ia._1());
       nprpc::impl::make_simple_answer(bufs(), nprpc::impl::MessageId::Success);
       break;
@@ -1722,7 +1779,7 @@ void npkcalc::Calculator::GetData(/*out*/std::vector<npkcalc::Solution>& solutio
     std::cerr << "received an unusual reply for function with output arguments\n";
     throw nprpc::Exception("Unknown Error");
   }
-  npkcalc_M16_Direct out(buf, sizeof(::nprpc::impl::Header));
+  npkcalc_M17_Direct out(buf, sizeof(::nprpc::impl::Header));
     {
       auto span = out._1();
       solutions.resize(span.size());
@@ -1772,7 +1829,7 @@ void npkcalc::Calculator::GetImages(/*out*/std::vector<npkcalc::Media>& images) 
     std::cerr << "received an unusual reply for function with output arguments\n";
     throw nprpc::Exception("Unknown Error");
   }
-  npkcalc_M17_Direct out(buf, sizeof(::nprpc::impl::Header));
+  npkcalc_M18_Direct out(buf, sizeof(::nprpc::impl::Header));
     {
       auto span = out._1();
       images.resize(span.size());
@@ -1802,7 +1859,7 @@ void npkcalc::Calculator::Subscribe(/*in*/const ObjectId& obj) {
   __ch.poa_idx() = this->_data().poa_idx;
   __ch.interface_idx() = interface_idx_;
   __ch.function_idx() = 2;
-  npkcalc_M14_Direct _(buf,32);
+  npkcalc_M15_Direct _(buf,32);
   memcpy(_._1().__data(), &obj._data(), 24);
   _._1().class_id(obj._data().class_id);
   _._1().hostname(obj._data().hostname);
@@ -1858,6 +1915,29 @@ void npkcalc::Calculator::GetGuestCalculations(/*out*/std::vector<npkcalc::Calcu
     }
 }
 
+void npkcalc::Calculator::SendFootstep(/*in*/const npkcalc::Footstep& footstep) {
+  ::nprpc::flat_buffer buf;
+  {
+    auto mb = buf.prepare(60);
+    buf.commit(60);
+    static_cast<::nprpc::impl::Header*>(mb.data())->msg_id = ::nprpc::impl::MessageId::FunctionCall;
+    static_cast<::nprpc::impl::Header*>(mb.data())->msg_type = ::nprpc::impl::MessageType::Request;
+  }
+  ::nprpc::impl::flat::CallHeader_Direct __ch(buf, sizeof(::nprpc::impl::Header));
+  __ch.object_id() = this->_data().object_id;
+  __ch.poa_idx() = this->_data().poa_idx;
+  __ch.interface_idx() = interface_idx_;
+  __ch.function_idx() = 4;
+  npkcalc_M14_Direct _(buf,32);
+  memcpy(_._1().__data(), &footstep, 28);
+  static_cast<::nprpc::impl::Header*>(buf.data().data())->size = static_cast<uint32_t>(buf.size() - 4);
+  ::nprpc::impl::g_orb->call(this->get_endpoint(), buf, this->get_timeout());
+  auto std_reply = nprpc::impl::handle_standart_reply(buf);
+  if (std_reply != 0) {
+    std::cerr << "received an unusual reply for function with no output arguments\n";
+  }
+}
+
 void npkcalc::ICalculator_Servant::dispatch(nprpc::Buffers& bufs, nprpc::EndPoint remote_endpoint, bool from_parent, nprpc::ReferenceList& ref_list) {
   nprpc::impl::flat::CallHeader_Direct __ch(bufs(), sizeof(::nprpc::impl::Header));
   switch(__ch.function_idx()) {
@@ -1866,7 +1946,7 @@ void npkcalc::ICalculator_Servant::dispatch(nprpc::Buffers& bufs, nprpc::EndPoin
       obuf.consume(obuf.size());
       obuf.prepare(160);
       obuf.commit(32);
-      npkcalc_M16_Direct oa(obuf,16);
+      npkcalc_M17_Direct oa(obuf,16);
       GetData(oa._1_d(), oa._2_d());
       static_cast<::nprpc::impl::Header*>(obuf.data().data())->size = static_cast<uint32_t>(obuf.size() - 4);
       static_cast<::nprpc::impl::Header*>(obuf.data().data())->msg_id = ::nprpc::impl::MessageId::BlockResponse;
@@ -1878,7 +1958,7 @@ void npkcalc::ICalculator_Servant::dispatch(nprpc::Buffers& bufs, nprpc::EndPoin
       obuf.consume(obuf.size());
       obuf.prepare(152);
       obuf.commit(24);
-      npkcalc_M17_Direct oa(obuf,16);
+      npkcalc_M18_Direct oa(obuf,16);
       GetImages(oa._1_d());
       static_cast<::nprpc::impl::Header*>(obuf.data().data())->size = static_cast<uint32_t>(obuf.size() - 4);
       static_cast<::nprpc::impl::Header*>(obuf.data().data())->msg_id = ::nprpc::impl::MessageId::BlockResponse;
@@ -1886,7 +1966,7 @@ void npkcalc::ICalculator_Servant::dispatch(nprpc::Buffers& bufs, nprpc::EndPoin
       break;
     }
     case 2: {
-      npkcalc_M14_Direct ia(bufs(), 32);
+      npkcalc_M15_Direct ia(bufs(), 32);
       if ( !check_1O(bufs(), ia) ) break;
       Subscribe(nprpc::impl::create_object_from_flat(ia._1(), remote_endpoint));
       nprpc::impl::make_simple_answer(bufs(), nprpc::impl::MessageId::Success);
@@ -1904,6 +1984,13 @@ void npkcalc::ICalculator_Servant::dispatch(nprpc::Buffers& bufs, nprpc::EndPoin
       static_cast<::nprpc::impl::Header*>(obuf.data().data())->msg_type = ::nprpc::impl::MessageType::Answer;
       break;
     }
+    case 4: {
+      npkcalc_M14_Direct ia(bufs(), 32);
+      if ( !check_1Footstep_1(bufs(), ia) ) break;
+      SendFootstep(ia._1());
+      nprpc::impl::make_simple_answer(bufs(), nprpc::impl::MessageId::Success);
+      break;
+    }
     default:
       nprpc::impl::make_simple_answer(bufs(), nprpc::impl::MessageId::Error_UnknownFunctionIdx);
   }
@@ -1918,21 +2005,21 @@ void npkcalc_throw_exception(::nprpc::flat_buffer& buf) {
   {
     npkcalc::flat::AuthorizationFailed_Direct ex_flat(buf, sizeof(::nprpc::impl::Header));
     npkcalc::AuthorizationFailed ex;
-    ex.reason = ex_flat.reason();
+  ex.reason = ex_flat.reason();
     throw ex;
   }
   case 1:
   {
     npkcalc::flat::RegistrationFailed_Direct ex_flat(buf, sizeof(::nprpc::impl::Header));
     npkcalc::RegistrationFailed ex;
-    ex.reason = ex_flat.reason();
+  ex.reason = ex_flat.reason();
     throw ex;
   }
   case 2:
   {
     npkcalc::flat::PermissionViolation_Direct ex_flat(buf, sizeof(::nprpc::impl::Header));
     npkcalc::PermissionViolation ex;
-    ex.msg = (std::string_view)ex_flat.msg();
+  ex.msg = (std::string_view)ex_flat.msg();
     throw ex;
   }
   default:

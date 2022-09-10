@@ -55,7 +55,8 @@ module.exports = env => {
 				{ test: /\.tsx?$/, loader: "ts-loader" },
 				{ enforce: "pre", test: /\.js$/, loader: "source-map-loader" },
 				{ test: /\.css$/, use: ['style-loader', 'css-loader'] },
-				{ test: /\.exec\/calc.js/, use: ['script-loader'] }
+				{ test: /\.exec\/calc.js/, use: ['script-loader'] },
+				{ test: /\.glsl$/, loader: 'webpack-glsl-loader' },
 			]
 		},
 		resolve: {

@@ -594,6 +594,107 @@ public:
 };
 } // namespace flat
 
+struct Vector3 {
+  float x;
+  float y;
+  float z;
+};
+
+namespace flat {
+struct Vector3 {
+  float x;
+  float y;
+  float z;
+};
+
+class Vector3_Direct {
+  ::nprpc::flat_buffer& buffer_;
+  const std::uint32_t offset_;
+
+  auto& base() noexcept { return *reinterpret_cast<Vector3*>(reinterpret_cast<std::byte*>(buffer_.data().data()) + offset_); }
+  auto const& base() const noexcept { return *reinterpret_cast<const Vector3*>(reinterpret_cast<const std::byte*>(buffer_.data().data()) + offset_); }
+public:
+  uint32_t offset() const noexcept { return offset_; }
+  void* __data() noexcept { return (void*)&base(); }
+  Vector3_Direct(::nprpc::flat_buffer& buffer, std::uint32_t offset)
+    : buffer_(buffer)
+    , offset_(offset)
+  {
+  }
+  const float& x() const noexcept { return base().x;}
+  float& x() noexcept { return base().x;}
+  const float& y() const noexcept { return base().y;}
+  float& y() noexcept { return base().y;}
+  const float& z() const noexcept { return base().z;}
+  float& z() noexcept { return base().z;}
+};
+} // namespace flat
+
+struct Vector2 {
+  float x;
+  float y;
+};
+
+namespace flat {
+struct Vector2 {
+  float x;
+  float y;
+};
+
+class Vector2_Direct {
+  ::nprpc::flat_buffer& buffer_;
+  const std::uint32_t offset_;
+
+  auto& base() noexcept { return *reinterpret_cast<Vector2*>(reinterpret_cast<std::byte*>(buffer_.data().data()) + offset_); }
+  auto const& base() const noexcept { return *reinterpret_cast<const Vector2*>(reinterpret_cast<const std::byte*>(buffer_.data().data()) + offset_); }
+public:
+  uint32_t offset() const noexcept { return offset_; }
+  void* __data() noexcept { return (void*)&base(); }
+  Vector2_Direct(::nprpc::flat_buffer& buffer, std::uint32_t offset)
+    : buffer_(buffer)
+    , offset_(offset)
+  {
+  }
+  const float& x() const noexcept { return base().x;}
+  float& x() noexcept { return base().x;}
+  const float& y() const noexcept { return base().y;}
+  float& y() noexcept { return base().y;}
+};
+} // namespace flat
+
+struct Footstep {
+  Vector3 color;
+  Vector2 pos;
+  Vector2 dir;
+};
+
+namespace flat {
+struct Footstep {
+  npkcalc::flat::Vector3 color;
+  npkcalc::flat::Vector2 pos;
+  npkcalc::flat::Vector2 dir;
+};
+
+class Footstep_Direct {
+  ::nprpc::flat_buffer& buffer_;
+  const std::uint32_t offset_;
+
+  auto& base() noexcept { return *reinterpret_cast<Footstep*>(reinterpret_cast<std::byte*>(buffer_.data().data()) + offset_); }
+  auto const& base() const noexcept { return *reinterpret_cast<const Footstep*>(reinterpret_cast<const std::byte*>(buffer_.data().data()) + offset_); }
+public:
+  uint32_t offset() const noexcept { return offset_; }
+  void* __data() noexcept { return (void*)&base(); }
+  Footstep_Direct(::nprpc::flat_buffer& buffer, std::uint32_t offset)
+    : buffer_(buffer)
+    , offset_(offset)
+  {
+  }
+  auto color() noexcept { return npkcalc::flat::Vector3_Direct(buffer_, offset_ + offsetof(Footstep, color)); }
+  auto pos() noexcept { return npkcalc::flat::Vector2_Direct(buffer_, offset_ + offsetof(Footstep, pos)); }
+  auto dir() noexcept { return npkcalc::flat::Vector2_Direct(buffer_, offset_ + offsetof(Footstep, dir)); }
+};
+} // namespace flat
+
 class IAuthorizator_Servant
   : public virtual nprpc::ObjectServant
 {
@@ -679,6 +780,7 @@ public:
   void dispatch(nprpc::Buffers& bufs, nprpc::EndPoint remote_endpoint, bool from_parent, nprpc::ReferenceList& ref_list) override;
   virtual void DataChanged (uint32_t idx) = 0;
   virtual void OnAlarm (npkcalc::flat::Alarm_Direct alarm) = 0;
+  virtual void OnFootstep (npkcalc::flat::Footstep_Direct footstep) = 0;
 };
 
 class DataObserver
@@ -691,6 +793,7 @@ public:
   DataObserver(uint8_t interface_idx) : interface_idx_(interface_idx) {}
   void DataChanged (/*in*/uint32_t idx);
   void OnAlarm (/*in*/const npkcalc::Alarm& alarm);
+  void OnFootstep (/*in*/const npkcalc::Footstep& footstep);
 };
 
 class IChat_Servant
@@ -748,6 +851,7 @@ public:
   virtual void GetImages (/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Media, npkcalc::flat::Media_Direct> images) = 0;
   virtual void Subscribe (nprpc::Object* obj) = 0;
   virtual void GetGuestCalculations (/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Calculation, npkcalc::flat::Calculation_Direct> calculations) = 0;
+  virtual void SendFootstep (npkcalc::flat::Footstep_Direct footstep) = 0;
 };
 
 class Calculator
@@ -762,6 +866,7 @@ public:
   void GetImages (/*out*/std::vector<npkcalc::Media>& images);
   void Subscribe (/*in*/const ObjectId& obj);
   void GetGuestCalculations (/*out*/std::vector<npkcalc::Calculation>& calculations);
+  void SendFootstep (/*in*/const npkcalc::Footstep& footstep);
 };
 
 } // namespace npkcalc
@@ -769,110 +874,113 @@ public:
 namespace npkcalc::helper {
 template<::nprpc::IterableCollection T>
 void assign_from_cpp_GetMyCalculations_calculations(/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Calculation, npkcalc::flat::Calculation_Direct>& dest, const T & src) {
-    dest.length(static_cast<uint32_t>(src.size()));
-    {
-      auto span = dest();
-      auto it = src.begin();
-      for (auto e : span) {
-        auto __ptr = ::nprpc::make_wrapper1(*it);
-          e.id() = __ptr->id;
-          e.name(__ptr->name);
-        memcpy(  e.elements().data(), __ptr->elements.data(), __ptr->elements.size() * 24);
-          e.fertilizers_ids(static_cast<uint32_t>(__ptr->fertilizers_ids.size()));
-        memcpy(  e.fertilizers_ids().data(), __ptr->fertilizers_ids.data(), __ptr->fertilizers_ids.size() * 4);
-          e.volume() = __ptr->volume;
-          e.mode() = __ptr->mode;
-        ++it;
-      }
+  dest.length(static_cast<uint32_t>(src.size()));
+  {
+    auto span = dest();
+    auto it = src.begin();
+    for (auto e : span) {
+      auto __ptr = ::nprpc::make_wrapper1(*it);
+        e.id() = __ptr->id;
+        e.name(__ptr->name);
+      memcpy(  e.elements().data(), __ptr->elements.data(), __ptr->elements.size() * 24);
+        e.fertilizers_ids(static_cast<uint32_t>(__ptr->fertilizers_ids.size()));
+      memcpy(  e.fertilizers_ids().data(), __ptr->fertilizers_ids.data(), __ptr->fertilizers_ids.size() * 4);
+        e.volume() = __ptr->volume;
+        e.mode() = __ptr->mode;
+      ++it;
     }
+  }
 }
 inline void assign_from_flat_UpdateCalculation_calculation(npkcalc::flat::Calculation_Direct& src, npkcalc::Calculation& dest) {
-    dest.id = src.id();
-    dest.name = (std::string_view)src.name();
-    {
-      auto span = src.elements();
-      memcpy(dest.elements.data(), span.data(), 24 * span.size());
-    }
-    {
-      auto span = src.fertilizers_ids();
-      dest.fertilizers_ids.resize(span.size());
-      memcpy(dest.fertilizers_ids.data(), span.data(), 4 * span.size());
-    }
-    dest.volume = src.volume();
-    dest.mode = (bool)src.mode();
+  dest.id = src.id();
+  dest.name = (std::string_view)src.name();
+  {
+    auto span = src.elements();
+    memcpy(dest.elements.data(), span.data(), 24 * span.size());
+  }
+  {
+    auto span = src.fertilizers_ids();
+    dest.fertilizers_ids.resize(span.size());
+    memcpy(dest.fertilizers_ids.data(), span.data(), 4 * span.size());
+  }
+  dest.volume = src.volume();
+  dest.mode = (bool)src.mode();
 }
 inline void assign_from_flat_OnAlarm_alarm(npkcalc::flat::Alarm_Direct& src, npkcalc::Alarm& dest) {
-    dest.id = src.id();
-    dest.type = src.type();
-    dest.msg = (std::string_view)src.msg();
+  dest.id = src.id();
+  dest.type = src.type();
+  dest.msg = (std::string_view)src.msg();
+}
+inline void assign_from_flat_OnFootstep_footstep(npkcalc::flat::Footstep_Direct& src, npkcalc::Footstep& dest) {
+  memcpy(&dest, src.__data(), 28);
 }
 inline void assign_from_flat_Send_msg(npkcalc::flat::ChatMessage_Direct& src, npkcalc::ChatMessage& dest) {
-    dest.timestamp = src.timestamp();
-    dest.str = (std::string_view)src.str();
-    {
-      auto opt = src.attachment();
-      if (opt.has_value()) {
-        dest.attachment = std::decay<decltype(dest.attachment)>::type::value_type{};
-        auto& value_to = dest.attachment.value();
-        auto value_from = opt.value();
-        value_to.type = value_from.type();
-        value_to.name = (std::string_view)value_from.name();
-        {
-          auto span = value_from.data();
-          value_to.data.resize(span.size());
-          memcpy(value_to.data.data(), span.data(), 1 * span.size());
-        }
-      } else { 
-        dest.attachment = std::nullopt;
+  dest.timestamp = src.timestamp();
+  dest.str = (std::string_view)src.str();
+  {
+    auto opt = src.attachment();
+    if (opt.has_value()) {
+      dest.attachment = std::decay<decltype(dest.attachment)>::type::value_type{};
+      auto& value_to = dest.attachment.value();
+      auto value_from = opt.value();
+      value_to.type = value_from.type();
+      value_to.name = (std::string_view)value_from.name();
+      {
+        auto span = value_from.data();
+        value_to.data.resize(span.size());
+        memcpy(value_to.data.data(), span.data(), 1 * span.size());
       }
+    } else { 
+      dest.attachment = std::nullopt;
     }
+  }
 }
 template<::nprpc::IterableCollection T>
 void assign_from_cpp_GetData_solutions(/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Solution, npkcalc::flat::Solution_Direct>& dest, const T & src) {
-    dest.length(static_cast<uint32_t>(src.size()));
-    {
-      auto span = dest();
-      auto it = src.begin();
-      for (auto e : span) {
-        auto __ptr = ::nprpc::make_wrapper1(*it);
-          e.id() = __ptr->id;
-          e.name(__ptr->name);
-          e.owner(__ptr->owner);
-        memcpy(  e.elements().data(), __ptr->elements.data(), __ptr->elements.size() * 8);
-        ++it;
-      }
+  dest.length(static_cast<uint32_t>(src.size()));
+  {
+    auto span = dest();
+    auto it = src.begin();
+    for (auto e : span) {
+      auto __ptr = ::nprpc::make_wrapper1(*it);
+        e.id() = __ptr->id;
+        e.name(__ptr->name);
+        e.owner(__ptr->owner);
+      memcpy(  e.elements().data(), __ptr->elements.data(), __ptr->elements.size() * 8);
+      ++it;
     }
+  }
 }
 template<::nprpc::IterableCollection T>
 void assign_from_cpp_GetData_fertilizers(/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Fertilizer, npkcalc::flat::Fertilizer_Direct>& dest, const T & src) {
-    dest.length(static_cast<uint32_t>(src.size()));
-    {
-      auto span = dest();
-      auto it = src.begin();
-      for (auto e : span) {
-        auto __ptr = ::nprpc::make_wrapper1(*it);
-          e.id() = __ptr->id;
-          e.name(__ptr->name);
-          e.owner(__ptr->owner);
-          e.formula(__ptr->formula);
-        ++it;
-      }
+  dest.length(static_cast<uint32_t>(src.size()));
+  {
+    auto span = dest();
+    auto it = src.begin();
+    for (auto e : span) {
+      auto __ptr = ::nprpc::make_wrapper1(*it);
+        e.id() = __ptr->id;
+        e.name(__ptr->name);
+        e.owner(__ptr->owner);
+        e.formula(__ptr->formula);
+      ++it;
     }
+  }
 }
 template<::nprpc::IterableCollection T>
 void assign_from_cpp_GetImages_images(/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Media, npkcalc::flat::Media_Direct>& dest, const T & src) {
-    dest.length(static_cast<uint32_t>(src.size()));
-    {
-      auto span = dest();
-      auto it = src.begin();
-      for (auto e : span) {
-        auto __ptr = ::nprpc::make_wrapper1(*it);
-          e.name(__ptr->name);
-          e.data(static_cast<uint32_t>(__ptr->data.size()));
-        memcpy(  e.data().data(), __ptr->data.data(), __ptr->data.size() * 1);
-        ++it;
-      }
+  dest.length(static_cast<uint32_t>(src.size()));
+  {
+    auto span = dest();
+    auto it = src.begin();
+    for (auto e : span) {
+      auto __ptr = ::nprpc::make_wrapper1(*it);
+        e.name(__ptr->name);
+        e.data(static_cast<uint32_t>(__ptr->data.size()));
+      memcpy(  e.data().data(), __ptr->data.data(), __ptr->data.size() * 1);
+      ++it;
     }
+  }
 }
 } // namespace npkcalc::helper
 

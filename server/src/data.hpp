@@ -6,15 +6,11 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <array>
 #include <algorithm>
 #include <fstream>
-#include <numeric>
 #include <cassert>
 #include <atomic>
 #include <mutex>
-
-#include <boost/asio/io_context.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/serialization/vector.hpp>
@@ -24,25 +20,23 @@
 
 template<class T>
 class SerializibleIdVector  {
-	friend boost::serialization::access;
-	template<class Archive>
-	void serialize(Archive& ar, const int /*file_version*/) {
-		ar& last_id_;
-		ar& data_;
-	}
-
 	using container = std::vector<std::unique_ptr<T>>;
 	using iterator = typename container::iterator;
 
 	const std::string table_name_;
 	
-	// serializable
 	int last_id_ = 0;
 	container data_;
+
+	friend boost::serialization::access;
+	template<class Archive>
+	void serialize(Archive& ar, const int /*file_version*/) {
+		ar & last_id_;
+		ar & data_;
+	}
 	
 	mutable std::mutex mutex_;
 	std::atomic_bool changed_ = false;
-
 public:
 	T* create() {
 		data_.push_back(std::make_unique<T>());
@@ -94,7 +88,7 @@ public:
 			ar >> *this;
 			ok = true;
 		} catch (std::exception& ex) {
-			std::cerr << ex.what();
+			std::cerr << ex.what() << '\n';
 			clear();
 		}
 
@@ -104,8 +98,10 @@ public:
 	}
 
 	void store() noexcept {
+		assert(table_name_.length() > 0);
+
 		bool expected = true;
-		if (changed_.compare_exchange_weak(expected, false)) {
+		if (changed_.compare_exchange_strong(expected, false)) {
 			assert(table_name_.length() > 0);
 			std::lock_guard<std::mutex> lk(mutex_);
 			try {
@@ -113,7 +109,7 @@ public:
 				boost::archive::binary_oarchive ar(os, boost::archive::no_header | boost::archive::no_tracking);
 				ar << *this;
 			} catch (std::exception& ex) {
-				std::cout << ex.what() << std::endl;
+				std::cerr << ex.what() << '\n';
 			}
 		}
 	}
@@ -127,24 +123,8 @@ public:
 
 #include "npkcalc.hpp"
 
-struct ElementTmp {
-	npkcalc::ELEMENT element;
-	double mass_part;
-};
 
 namespace boost::serialization {
-template<typename Archive>
-void serialize(Archive& ar, ElementTmp& el, const unsigned int) {
-	ar& el.element;
-	ar& el.mass_part;
-}
-
-template<class Archive>
-void serialize(Archive& ar, npkcalc::TargetElement& el, const unsigned int) {
-	ar& el.value;
-	ar& el.value_base;
-	ar& el.ratio;
-}
 
 template<class Archive>
 void serialize(Archive& ar, npkcalc::Solution& x, const unsigned int) {
@@ -161,6 +141,14 @@ void serialize(Archive& ar, npkcalc::Fertilizer& x, const unsigned int file_vers
 	ar& x.owner;
 	ar& x.formula;
 }
+
+template<class Archive>
+void serialize(Archive& ar, npkcalc::TargetElement& x, const unsigned int) {
+	ar& x.value;
+	ar& x.value_base;
+	ar& x.ratio;
+}
+
 template<class Archive>
 void serialize(Archive& ar, npkcalc::Calculation& x, const unsigned int) {
 	ar& x.id;

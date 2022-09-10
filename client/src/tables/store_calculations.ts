@@ -68,5 +68,6 @@ export const get_calculations = async () => {
 	for (let calc_data of calculations_data.value) {
 		calculations.push_one(Calculation.Calculation.create_from_data(calc_data));
 	}
-	document.dispatchEvent(new CustomEvent("calc_clear"));
+
+	document.dispatchEvent(new CustomEvent("update_my_calculations"));
 }

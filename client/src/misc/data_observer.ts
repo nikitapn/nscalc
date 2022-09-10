@@ -5,6 +5,7 @@ import * as NPRPC from 'nprpc';
 import * as npkcalc from 'rpc/npkcalc'
 
 import { alarms, Alarm } from 'misc/alarm'
+import { Footstep, footsteps } from 'mouse/footstep';
 
 export class DataObserverImpl extends npkcalc._IDataObserver_Servant implements npkcalc.IDataObserver_Servant {
 	DataChanged(idx: number): void {
@@ -19,5 +20,12 @@ export class DataObserverImpl extends npkcalc._IDataObserver_Servant implements 
 			}
 		}
 		alarms.push(new Alarm(alarm.id, alarm.type, alarm.msg));
+	}
+
+	OnFootstep(footstep: npkcalc.Flat_npkcalc.Footstep_Direct): void {
+		let color = footstep.color;
+		let pos = footstep.pos;
+		let dir = footstep.dir;
+		footsteps.push(new Footstep([color.x, color.y, color.z], [pos.x, pos.y], [dir.x, dir.y]));
 	}
 }

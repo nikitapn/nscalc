@@ -75,7 +75,7 @@ async function auth() {
 	await init_rpc();
 	let session_id = utils.getCookie("sid");
 	if (session_id != null) {
-		try { set_user_data(await authorizator.LogInWithSessionId(session_id), false); } catch(e) {}
+		try { set_user_data(await authorizator.LogInWithSessionId(session_id)); } catch(e) {}
 	}
 	fetch_data();
 };

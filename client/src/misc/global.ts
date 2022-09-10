@@ -117,10 +117,6 @@ class Global {
 	constructor() {
 		this.user_data = new UserData();
 		this.icons = new MyIcons();
-
-
-
-
 	}
 }
 

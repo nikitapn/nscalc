@@ -71,7 +71,7 @@
     .then(() => { 
       open = false; 
       authorizator.LogIn(email, password)
-      .then((user_data: npkcalc.UserData) => set_user_data(user_data, true));
+      .then((user_data: npkcalc.UserData) => set_user_data(user_data));
     })
     .catch( ( ex: npkcalc.RegistrationFailed ) => {
       console.log(ex);

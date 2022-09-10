@@ -2,15 +2,16 @@
 // This file is a part of Nikita's NPK calculator and covered by LICENSING file in the topmost directory
 
 #include <iostream>
-#include <string>
-#include <concepts>
 #include <cassert>
-#include <filesystem>
-#include <set>
-#include <algorithm>
+#include <concepts>
+#include <string>
 #include <tuple>
 #include <array>
+#include <set>
 #include <unordered_map>
+#include <algorithm>
+#include <filesystem>
+#include <random>
 #include <boost/asio/signal_set.hpp>
 #include <boost/beast/core/error.hpp>
 #include <boost/uuid/random_generator.hpp>
@@ -20,14 +21,11 @@
 #include <boost/program_options.hpp>
 #include <boost/mp11/tuple.hpp>
 #include <boost/mp11/algorithm.hpp>
+#include <nprpc/serialization/oarchive.h>
 #include <openssl/sha.h>
 #include "npkcalc.hpp"
-#include "data.hpp"
 #include "thread_pool.hpp"
-#include <nprpc/serialization/oarchive.h>
-#include <boost/asio/strand.hpp>
-#include <nprpc/session_context.h>
-#include <random>
+#include "data.hpp"
 
 using thread_pool = nplib::thread_pool_4;
 
@@ -53,7 +51,7 @@ protected:
 	};
 
 	struct not_equal_to_endpoint_t {
-		nprpc::EndPoint& endpoint;
+		const nprpc::EndPoint& endpoint;
 		bool operator()(std::unique_ptr<T>& obj) const noexcept { 
 			return obj->_data().ip4 == endpoint.ip4 &&
 				obj->_data().port == endpoint.port; 
@@ -88,16 +86,21 @@ public:
 class DataObservers : public ObserversT<npkcalc::DataObserver> {
 	uint32_t alarm_id_ = 0;
 
-	npkcalc::Alarm make_alarm(npkcalc::AlarmType type, const std::string& msg) {
+	npkcalc::Alarm make_alarm(npkcalc::AlarmType type, std::string&& msg) {
 		return { alarm_id_++, type, msg };
 	}
 
 	void alarm_impl(npkcalc::AlarmType type, std::string msg) {
-		broadcast(&npkcalc::DataObserver::OnAlarm, no_condition, make_alarm(type, msg));
+		broadcast(&npkcalc::DataObserver::OnAlarm, no_condition, make_alarm(type, std::move(msg)));
 	}
 public:
 	void alarm(npkcalc::AlarmType type, std::string&& msg) {
-		nplib::async<false>(executor(), &DataObservers::alarm_impl, this, type, msg);
+		nplib::async<false>(executor(), &DataObservers::alarm_impl, this, type, std::move(msg));
+	}
+	void footstep(npkcalc::Footstep&& footstep, const nprpc::EndPoint& endpoint) {
+		nplib::async<false>(executor(), [this, footstep = std::move(footstep), &endpoint] {
+			broadcast(&npkcalc::DataObserver::OnFootstep, not_equal_to_endpoint_t{ endpoint }, footstep);
+			});
 	}
 } observers;
 
@@ -182,6 +185,8 @@ public:
 			x.load();
 			x.sort();
 		});
+
+		guest_calcs->load();
 
 		// constexpr std::string_view icon_list[] = {"add", "save", "redo", "undo", "gear", "bell"};
 		// const auto root = std::string(data_root_dir + "/icons/");
@@ -389,11 +394,16 @@ public:
 		/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Solution, npkcalc::flat::Solution_Direct> solutions,
 		/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Fertilizer, npkcalc::flat::Fertilizer_Direct> fertilizers)
 	{
-		const auto& sols = data_manager->get<Solutions>().data();
-		npkcalc::helper::assign_from_cpp_GetData_solutions(solutions, sols);
-
-		const auto& ferts = data_manager->get<Fertilizers>().data();
-		npkcalc::helper::assign_from_cpp_GetData_fertilizers(fertilizers, ferts);
+		{
+			auto& sols = data_manager->get<Solutions>();
+			std::lock_guard<Solutions> lk(sols);
+			npkcalc::helper::assign_from_cpp_GetData_solutions(solutions, sols.data());
+		}
+		{
+			auto& ferts = data_manager->get<Fertilizers>();
+			std::lock_guard<Fertilizers> lk(ferts);
+			npkcalc::helper::assign_from_cpp_GetData_fertilizers(fertilizers, ferts.data());
+		}
 	}
 
 	virtual void GetImages(
@@ -404,7 +414,7 @@ public:
 	}
 
 	virtual void Subscribe(nprpc::Object* obj) {
-		static int i = 0;
+		static std::atomic_int i {0};
 		observers.alarm(npkcalc::AlarmType::Info, "User #" + std::to_string(++i) + " connected");
 		if (auto user = nprpc::narrow<npkcalc::DataObserver>(obj); user) {
 			user->add_ref();
@@ -416,6 +426,12 @@ public:
 	virtual void GetGuestCalculations(
 		/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Calculation, npkcalc::flat::Calculation_Direct> calculations) {
 		npkcalc::helper::assign_from_cpp_GetMyCalculations_calculations(calculations, data_manager->guest_calcs->data());
+	}
+
+	virtual void SendFootstep(npkcalc::flat::Footstep_Direct footstep) {
+		npkcalc::Footstep step;
+		npkcalc::helper::assign_from_flat_OnFootstep_footstep(footstep, step);
+		observers.footstep(std::move(step), nprpc::get_context().remote_endpoint);
 	}
 };
 

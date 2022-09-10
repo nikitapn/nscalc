@@ -120,6 +120,24 @@ ChatMessage: flat {
 	attachment?: ChatAttachment;
 }
 
+Vector3: flat {
+	x: float32;
+	y: float32;
+	z: float32;
+}
+
+Vector2: flat {
+	x: float32;
+	y: float32;
+}
+
+Footstep: flat {
+	color: Vector3;
+	pos: Vector2;
+	dir: Vector2;
+}
+
+
 [trusted=false]
 interface Authorizator {
 	UserData LogIn(login: in string, password: in string) raises(AuthorizationFailed);
@@ -154,6 +172,7 @@ interface RegisteredUser {
 interface DataObserver {
 	void DataChanged(idx: in u32);
 	void OnAlarm(alarm: in Alarm);
+	void OnFootstep(footstep: in Footstep);
 }
 
 [trusted=false]
@@ -172,6 +191,7 @@ interface Calculator {
 	void GetImages(images: out direct vector<Media>);
 	void Subscribe(obj: in object);
 	void GetGuestCalculations(calculations: out direct vector<Calculation>);
+	void SendFootstep(footstep: in Footstep);
 }
 
 }

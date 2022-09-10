@@ -41,7 +41,7 @@ export class LoginPanel extends React.Component<{
 		event.preventDefault();
 		let this_ = this;
 		authorizator.LogIn(this.state.email, this.state.pwd).then((ud: npkcalc.UserData) => {
-			set_user_data(ud, true);
+			set_user_data(ud);
 		}).catch((e: any) => {
 			if (e instanceof npkcalc.AuthorizationFailed) {
 				console.log("Authorization failed: " + e.reason);
@@ -58,7 +58,7 @@ export class LoginPanel extends React.Component<{
 	handleLogOut(event: any) {
 		let this_ = this;
 		authorizator.LogOut(utils.getCookie("sid")).then( () => {
-			set_user_data(null, true);
+			set_user_data(null);
 		 });
 	}
 
