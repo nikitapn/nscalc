@@ -171,9 +171,9 @@ interface RegisteredUser {
 }
 
 interface DataObserver {
-	void DataChanged(idx: in u32);
-	void OnAlarm(alarm: in Alarm);
-	void OnFootstep(footstep: in Footstep);
+	async DataChanged(idx: in u32);
+	async OnAlarm(alarm: in Alarm);
+	async OnFootstep(footstep: in Footstep);
 }
 
 [trusted=false]
@@ -183,7 +183,7 @@ interface Chat {
 }
 
 interface ChatParticipant {
-	void OnMessage(msg: in ChatMessage);
+	async OnMessage(msg: in ChatMessage);
 }
 
 [trusted=false]

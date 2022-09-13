@@ -723,13 +723,13 @@ public:
   using servant_t = IAuthorizator_Servant;
 
   Authorizator(uint8_t interface_idx) : interface_idx_(interface_idx) {}
-  UserData LogIn (/*in*/const std::string& login, /*in*/const std::string& password);
-  UserData LogInWithSessionId (/*in*/const std::string& session_id);
-  bool LogOut (/*in*/const std::string& session_id);
-  bool CheckUsername (/*in*/const std::string& username);
-  bool CheckEmail (/*in*/const std::string& email);
-  void RegisterStepOne (/*in*/const std::string& username, /*in*/const std::string& email, /*in*/const std::string& password);
-  void RegisterStepTwo (/*in*/const std::string& username, /*in*/uint32_t code);
+  UserData LogIn (const std::string& login, const std::string& password);
+  UserData LogInWithSessionId (const std::string& session_id);
+  bool LogOut (const std::string& session_id);
+  bool CheckUsername (const std::string& username);
+  bool CheckEmail (const std::string& email);
+  void RegisterStepOne (const std::string& username, const std::string& email, const std::string& password);
+  void RegisterStepTwo (const std::string& username, uint32_t code);
 };
 
 class IRegisteredUser_Servant
@@ -761,18 +761,18 @@ public:
   using servant_t = IRegisteredUser_Servant;
 
   RegisteredUser(uint8_t interface_idx) : interface_idx_(interface_idx) {}
-  void GetMyCalculations (/*out*/std::vector<npkcalc::Calculation>& calculations);
-  uint32_t AddSolution (/*in*/const std::string& name, /*in*/const std::array<double,14>& elements);
-  void SetSolutionName (/*in*/uint32_t id, /*in*/const std::string& name);
-  void SetSolutionElements (/*in*/uint32_t id, /*in*/::nprpc::flat::Span<const npkcalc::SolutionElement> name);
-  void DeleteSolution (/*in*/uint32_t id);
-  uint32_t AddFertilizer (/*in*/const std::string& name, /*in*/const std::string& formula);
-  void SetFertilizerName (/*in*/uint32_t id, /*in*/const std::string& name);
-  void SetFertilizerFormula (/*in*/uint32_t id, /*in*/const std::string& name);
-  void DeleteFertilizer (/*in*/uint32_t id);
+  void GetMyCalculations (std::vector<npkcalc::Calculation>& calculations);
+  uint32_t AddSolution (const std::string& name, const std::array<double,14>& elements);
+  void SetSolutionName (uint32_t id, const std::string& name);
+  void SetSolutionElements (uint32_t id, ::nprpc::flat::Span<const npkcalc::SolutionElement> name);
+  void DeleteSolution (uint32_t id);
+  uint32_t AddFertilizer (const std::string& name, const std::string& formula);
+  void SetFertilizerName (uint32_t id, const std::string& name);
+  void SetFertilizerFormula (uint32_t id, const std::string& name);
+  void DeleteFertilizer (uint32_t id);
   void SaveData ();
-  uint32_t UpdateCalculation (/*in*/const npkcalc::Calculation& calculation);
-  void DeleteCalculation (/*in*/uint32_t id);
+  uint32_t UpdateCalculation (const npkcalc::Calculation& calculation);
+  void DeleteCalculation (uint32_t id);
 };
 
 class IDataObserver_Servant
@@ -795,9 +795,9 @@ public:
   using servant_t = IDataObserver_Servant;
 
   DataObserver(uint8_t interface_idx) : interface_idx_(interface_idx) {}
-  void DataChanged (/*in*/uint32_t idx);
-  void OnAlarm (/*in*/const npkcalc::Alarm& alarm);
-  void OnFootstep (/*in*/const npkcalc::Footstep& footstep);
+  void DataChanged (std::optional<std::function<void()>> handler, uint32_t idx);
+  void OnAlarm (std::optional<std::function<void()>> handler, const npkcalc::Alarm& alarm);
+  void OnFootstep (std::optional<std::function<void()>> handler, const npkcalc::Footstep& footstep);
 };
 
 class IChat_Servant
@@ -819,8 +819,8 @@ public:
   using servant_t = IChat_Servant;
 
   Chat(uint8_t interface_idx) : interface_idx_(interface_idx) {}
-  void Connect (/*in*/const ObjectId& obj);
-  bool Send (/*in*/const npkcalc::ChatMessage& msg);
+  void Connect (const ObjectId& obj);
+  bool Send (const npkcalc::ChatMessage& msg);
 };
 
 class IChatParticipant_Servant
@@ -841,7 +841,7 @@ public:
   using servant_t = IChatParticipant_Servant;
 
   ChatParticipant(uint8_t interface_idx) : interface_idx_(interface_idx) {}
-  void OnMessage (/*in*/const npkcalc::ChatMessage& msg);
+  void OnMessage (std::optional<std::function<void()>> handler, const npkcalc::ChatMessage& msg);
 };
 
 class ICalculator_Servant
@@ -866,11 +866,11 @@ public:
   using servant_t = ICalculator_Servant;
 
   Calculator(uint8_t interface_idx) : interface_idx_(interface_idx) {}
-  void GetData (/*out*/std::vector<npkcalc::Solution>& solutions, /*out*/std::vector<npkcalc::Fertilizer>& fertilizers);
-  void GetImages (/*out*/std::vector<npkcalc::Media>& images);
-  void Subscribe (/*in*/const ObjectId& obj);
-  void GetGuestCalculations (/*out*/std::vector<npkcalc::Calculation>& calculations);
-  void SendFootstep (/*in*/const npkcalc::Footstep& footstep);
+  void GetData (std::vector<npkcalc::Solution>& solutions, std::vector<npkcalc::Fertilizer>& fertilizers);
+  void GetImages (std::vector<npkcalc::Media>& images);
+  void Subscribe (const ObjectId& obj);
+  void GetGuestCalculations (std::vector<npkcalc::Calculation>& calculations);
+  void SendFootstep (const npkcalc::Footstep& footstep);
 };
 
 } // namespace npkcalc

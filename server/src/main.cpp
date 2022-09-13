@@ -68,10 +68,10 @@ protected:
 				continue;
 			}
 			try {
-				std::mem_fn(fn)(*it, args...);
+				std::mem_fn(fn)(*it, std::nullopt, args...);
 				it = std::next(it);
 			} catch (nprpc::Exception&) {
-				it = observers.erase(it);
+				it = observers.erase(it); // session was closed
 			}
 		}
 	}
