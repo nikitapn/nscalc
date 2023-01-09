@@ -1,26 +1,18 @@
-class Timer {
+// Copyright (c) 2023 nikitapnn1@gmail.com
+// This file is a part of Nikita's NPK calculator and covered by LICENSING file in the topmost directory
+
+export class Timer {
 	public time: number;
 	public dt: number;
 
-	start_time: number;
-	prev_time: number;
-
 	constructor() {
-		let t = new Date().getTime() / 1000.0;
-		this.start_time = t;
-		this.time = 0.0;
-		this.prev_time = 0.0;
+		this.time = Date.now();
 		this.dt = 0.0;
 	}
 
 	public update(): void {
-		let t = (new Date().getTime() / 1000.0) - this.start_time;
-		this.time = t;
-		this.dt = t - this.prev_time;
-		this.prev_time = t;
+		let old = this.time;
+		this.time = Date.now();
+		this.dt = (this.time - old) / 1000.0;
 	}
-} 
-
-
-
-export default new Timer();
+}

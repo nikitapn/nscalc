@@ -5,9 +5,11 @@ import { Texture, GLResourses } from 'mouse/texture'
 
 export let footsteps_texture: Texture = null;
 export let footsteps_texture1: Texture = null;
+export let dot_rad_grad: Texture = null;
 
 export const init = () => {
 	footsteps_texture = GLResourses.loadTexture('img/footsteps.png');
 	footsteps_texture1 = GLResourses.loadTexture('img/footsteps1.png');
+	dot_rad_grad = GLResourses.loadTexture('img/dot.png');
 }
 

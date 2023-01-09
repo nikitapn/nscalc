@@ -6,30 +6,28 @@ import { GLResourses } from "./texture"
 import { quad_vertex_buffer, quad_normal_buffer, quad_index_buffer, quad_texture_coords_buffer } from './primitives';
 import { Camera } from './camera';
 import { Footstep } from 'mouse/footstep';
-import { footsteps_texture, footsteps_texture1 } from 'mouse/assets';
+import { Particle } from 'mouse/particle';
+import { Firework } from 'mouse/fireworks';
+import { footsteps_texture, footsteps_texture1, dot_rad_grad } from 'mouse/assets';
 
 import { shaders } from './shaders'
 
 export class Renderer {
-	private width: number;
-	private height: number;
-
-	footsteps: Footstep[];
-
 	private render_footsteps(camera: Camera) {
 		let footsteps = this.footsteps;
 		if (footsteps.length === 0) return;
 
 		let pinfo = shaders.footstep.use();
 
+		const ix_vertex = pinfo.attr_loc.in_position;
+		const ix_texture = pinfo.attr_loc.in_texture_coord;
+		const ix_footstep_age = pinfo.uniform_loc.foot_age;
+		const ix_footstep_color = pinfo.uniform_loc.foot_color;
+		const ix_world = pinfo.uniform_loc.u_world;
+
 		gl.uniformMatrix4fv(pinfo.uniform_loc.u_proj, false, camera.proj);
 		gl.uniformMatrix4fv(pinfo.uniform_loc.u_view, false, camera.view);
-
-		let ix_vertex = pinfo.attr_loc.in_position;
-		let ix_texture = pinfo.attr_loc.in_texture_coord;
-		let ix_footstep_age = pinfo.uniform_loc.foot_age;
-		let ix_footstep_color = pinfo.uniform_loc.foot_color;
-
+		
 		gl.activeTexture(gl.TEXTURE0);
 		gl.bindTexture(gl.TEXTURE_2D, footsteps_texture.texture)
 
@@ -46,7 +44,6 @@ export class Renderer {
 
 		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, quad_index_buffer);
 
-		let ix_world = pinfo.uniform_loc.u_world;
 		this.footsteps.forEach((footstep: Footstep) => {
 			if ((footstep.idx & 1) === 0) {
 				gl.activeTexture(gl.TEXTURE0);
@@ -60,6 +57,43 @@ export class Renderer {
 			gl.uniform3fv(ix_footstep_color, footstep.color);
 			gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
 		});
+	}
+
+	private render_particles(camera: Camera) {
+		if (this.fireworks.length === 0) return;
+
+		let pinfo = shaders.particle.use();
+
+		const ix_vertex = pinfo.attr_loc.in_position;
+		const ix_texture = pinfo.attr_loc.in_texture_coord;
+		//const ix_ttl = pinfo.uniform_loc.u_ttl;
+		const ix_color = pinfo.uniform_loc.u_color;
+		const ix_world = pinfo.uniform_loc.u_world;
+
+		gl.activeTexture(gl.TEXTURE0);
+		gl.bindTexture(gl.TEXTURE_2D, dot_rad_grad.texture)
+		gl.uniform1i(pinfo.uniform_loc.u_sampler, 0);
+
+		gl.uniformMatrix4fv(pinfo.uniform_loc.u_proj, false, camera.proj);
+		gl.uniformMatrix4fv(pinfo.uniform_loc.u_view, false, camera.view);
+		
+		gl.bindBuffer(gl.ARRAY_BUFFER, quad_vertex_buffer);
+		gl.vertexAttribPointer(ix_vertex, 3, gl.FLOAT, false, 0, 0);
+		gl.enableVertexAttribArray(ix_vertex);
+
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, quad_index_buffer);
+
+		gl.bindBuffer(gl.ARRAY_BUFFER, quad_texture_coords_buffer);
+		gl.vertexAttribPointer(ix_texture, 2, gl.FLOAT, false, 0, 0);
+		gl.enableVertexAttribArray(ix_texture);
+
+		for (let firework of this.fireworks) {
+			for (let particle of firework.particles) {			
+			gl.uniformMatrix4fv(ix_world, false, particle.world);
+			gl.uniform4fv(ix_color, particle.color);
+			gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+			}
+		}
 	}
 
 	public render(camera: Camera) {
@@ -79,11 +113,14 @@ export class Renderer {
 		gl.depthFunc(gl.LEQUAL);
 		
 		this.render_footsteps(camera);
+		this.render_particles(camera);
 	}
 
-	constructor(width: number, height: number, footsteps: Array<Footstep>) {
-		this.width = width;
-		this.height = height;
-		this.footsteps = footsteps;
+	constructor(
+		private width: number, 
+		private height: number, 
+		public footsteps: Array<Footstep>,
+		public fireworks: Array<Firework>) {
+
 	}
 }

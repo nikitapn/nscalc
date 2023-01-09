@@ -726,7 +726,7 @@ int main(int argc, char* argv[]) {
 		("help", "produce help message")
 		("hostname", po::value<std::string>(&hostname)->default_value(""), "Hostname")
 		("root_dir", po::value<std::string>(&http_root)->
-			default_value("\\\\wsl$\\Debian\\home\\png\\projects\\npk-calculator\\client\\public"), "HTTP root directory")
+			default_value("\\\\wsl$\\Arch\\home\\nikita\\projects\\npk-calculator\\client\\public"), "HTTP root directory")
 		("data_dir", po::value<std::string>(&data_root)->default_value("./data"), "Data root directory")
 		("port", po::value<unsigned short>(&port)->default_value(8080), "Port to listen")
 		("use_ssl", po::value<bool>(&use_ssl)->default_value(false), "Use SSL")

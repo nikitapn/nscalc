@@ -5,10 +5,12 @@ import { vec2, vec3 } from 'gl-matrix'
 import { the_canvas, init as init_gl } from 'mouse/gl';
 import { Renderer } from 'mouse/renderer'
 import { Footstep, footsteps } from 'mouse/footstep';
+import { firework_system } from 'mouse/fireworks';
 import { init as init_primitives } from 'mouse/primitives'
 import { init as init_camera, camera } from 'mouse/camera';
 import { init as init_assets } from 'mouse/assets';
 import { init as init_shaders} from 'mouse/shaders';
+import { Timer } from 'mouse/timer'
 import { calculator } from 'rpc/rpc';
 
 
@@ -21,6 +23,7 @@ interface Color {
 }
 
 let footstep_color: Color = null;
+let timer: Timer;
 
 export const init = (canvas: HTMLCanvasElement) => {
 	init_gl(canvas);
@@ -28,25 +31,43 @@ export const init = (canvas: HTMLCanvasElement) => {
 	init_primitives();
 	init_camera();
 	init_assets();
-	
+
 	footstep_color = { x: Math.random(), y: Math.random(), z: Math.random() };
 
-	renderer = new Renderer(the_canvas.width, the_canvas.height, footsteps);
+	renderer = new Renderer(
+		the_canvas.width, 
+		the_canvas.height, 
+		footsteps, 
+		firework_system.fireworks
+	);
+
+	timer = new Timer();
+
 
 	document.addEventListener("mousemove", on_mouse_move);
-	setTimeout(tick, 30);
-	//the_loop();
+	//setTimeout(tick, 30);
+	the_loop();
 }
 
 let stop = true;
 
+
+let t = 0;
 const the_loop = (): void => {
+	timer.update();
+
+	if (t > 16) firework_system.stop = true;
+	firework_system.update(timer);
+	
 	renderer.render(camera);
-	if (!stop) requestAnimationFrame(the_loop);
+	requestAnimationFrame(the_loop);
+	//if (!stop) requestAnimationFrame(the_loop);
+	t += timer.dt;
 }
 
 const tick = (): void => {
 	setTimeout(tick, 30);
+
 	let k = footsteps.length;
 	
 	if (k === 0) {
@@ -80,7 +101,7 @@ const on_mouse_move = (ev: MouseEvent) => {
 		return;
 	}
 
-	if (cnt % 64 !== 0) return;
+	if (cnt % 32 !== 0) return;
 
 	let pos = camera.screen_to_xy_plane(ev.clientX, ev.clientY);
 	let dir = vec2.fromValues(pos[0] - prev_pos[0], pos[1] - prev_pos[1]);

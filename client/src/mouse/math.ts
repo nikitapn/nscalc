@@ -36,6 +36,31 @@ export namespace math {
 		out[1] = s * n[1];
 		out[2] = s * n[2];
 	}
+
+	export const rad_vec2 = (alpha: number): vec2 => {
+		return [Math.sin(alpha), Math.cos(alpha)];
+	}
+
+	export const add_clamp1 = (a: number, value: number, limit: number): number => {
+		let tmp = a + value;
+		return tmp > limit ? limit : tmp;
+	}
+
+	export const add_clamp2 = (out: vec2, a: vec2, value: number, limit: number): vec2 => {
+		let tmp = a[0] + value;
+		out[0] = tmp > limit ? limit : tmp;
+		tmp = a[1] + value;
+		out[1] = tmp > limit ? limit : tmp;
+		return out;
+	}
+
+	export const rand = (a: number, b: number): number => {
+		return a + (b - a) * Math.random();
+	}
+
+	export const randi = (a: number, b: number): number => {
+		return Math.round(rand(a, b));
+	}
 }
 
 export class Ray {

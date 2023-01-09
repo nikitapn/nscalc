@@ -103,7 +103,10 @@ export class MyShader<T, U> {
 export let shaders = {
 	footstep: new MyShader(require('mouse/shaders/footstep_vs.glsl'), require('mouse/shaders/footstep_ps.glsl'),
 		{ in_position: -1, in_texture_coord: -1 },
-		{ u_world: -1, u_view: -1, u_proj: -1, u_sampler: -1, foot_age: -1, foot_color: -1 })
+		{ u_world: -1, u_view: -1, u_proj: -1, u_sampler: -1, foot_age: -1, foot_color: -1 }),
+	particle: new MyShader(require('mouse/shaders/particle_vs.glsl'), require('mouse/shaders/particle_ps.glsl'),
+		{ in_position: -1, in_texture_coord: -1 },
+		{ u_world: -1, u_view: -1, u_proj: -1, u_color: -1, u_sampler: -1 })
 };
 
 export const init = () => {
