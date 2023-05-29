@@ -1,4 +1,3 @@
 # nscalc
 
-A Nutrient Solution Calculator done right.\
-Try it! https://hydrosoft.uk
+A Nutrient Solution Calculator done right.
