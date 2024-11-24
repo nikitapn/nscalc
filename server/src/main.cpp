@@ -1,17 +1,17 @@
 // Copyright (c) 2022 nikitapnn1@gmail.com
 // This file is a part of Nikita's NPK calculator and covered by LICENSING file in the topmost directory
 
+#include <exception>
 #include <iostream>
 #include <cassert>
-#include <concepts>
 #include <string>
 #include <tuple>
 #include <array>
 #include <set>
 #include <unordered_map>
 #include <algorithm>
-#include <filesystem>
 #include <random>
+#include <filesystem>
 #include <boost/asio/signal_set.hpp>
 #include <boost/beast/core/error.hpp>
 #include <boost/uuid/random_generator.hpp>
@@ -23,7 +23,7 @@
 #include <boost/mp11/algorithm.hpp>
 #include <nprpc/serialization/oarchive.h>
 #include <openssl/sha.h>
-#include "npkcalc.hpp"
+#include "idl/nscalc.hpp"
 #include "thread_pool.hpp"
 #include "data.hpp"
 
@@ -83,50 +83,50 @@ public:
 	ObserversT() : strand_{ thread_pool::get_instance().make_strand() } {}
 };
 
-class DataObservers : public ObserversT<npkcalc::DataObserver> {
+class DataObservers : public ObserversT<nscalc::DataObserver> {
 	uint32_t alarm_id_ = 0;
 
-	npkcalc::Alarm make_alarm(npkcalc::AlarmType type, std::string&& msg) {
+	nscalc::Alarm make_alarm(nscalc::AlarmType type, std::string&& msg) {
 		return { alarm_id_++, type, msg };
 	}
 
-	void alarm_impl(npkcalc::AlarmType type, std::string msg) {
-		broadcast(&npkcalc::DataObserver::OnAlarm, no_condition, make_alarm(type, std::move(msg)));
+	void alarm_impl(nscalc::AlarmType type, std::string msg) {
+		broadcast(&nscalc::DataObserver::OnAlarm, no_condition, make_alarm(type, std::move(msg)));
 	}
 public:
-	void alarm(npkcalc::AlarmType type, std::string&& msg) {
+	void alarm(nscalc::AlarmType type, std::string&& msg) {
 		nplib::async<false>(executor(), &DataObservers::alarm_impl, this, type, std::move(msg));
 	}
-	void footstep(npkcalc::Footstep&& footstep, const nprpc::EndPoint& endpoint) {
+	void footstep(nscalc::Footstep&& footstep, const nprpc::EndPoint& endpoint) {
 		nplib::async<false>(executor(), [this, footstep = std::move(footstep), endpoint] {
-			broadcast(&npkcalc::DataObserver::OnFootstep, not_equal_to_endpoint_t{ endpoint }, footstep);
+			broadcast(&nscalc::DataObserver::OnFootstep, not_equal_to_endpoint_t{ endpoint }, footstep);
 			});
 	}
 } observers;
 
 class ChatImpl
-	: public npkcalc::IChat_Servant
-	, public ObserversT<npkcalc::ChatParticipant>
+	: public nscalc::IChat_Servant
+	, public ObserversT<nscalc::ChatParticipant>
 {
-	void send_to_all_impl(npkcalc::ChatMessage msg, nprpc::EndPoint endpoint) {
-		broadcast(&npkcalc::ChatParticipant::OnMessage, not_equal_to_endpoint_t{ endpoint }, std::ref(msg));
+	void send_to_all_impl(nscalc::ChatMessage msg, nprpc::EndPoint endpoint) {
+		broadcast(&nscalc::ChatParticipant::OnMessage, not_equal_to_endpoint_t{ endpoint }, std::ref(msg));
 	}
-	void send_to_all(npkcalc::ChatMessage&& msg, nprpc::EndPoint endpoint) {
+	void send_to_all(nscalc::ChatMessage&& msg, nprpc::EndPoint endpoint) {
 		nplib::async<false>(executor(), &ChatImpl::send_to_all_impl, this, std::move(msg), std::move(endpoint));
 	}
 public:
 	virtual void Connect(nprpc::Object* obj) {
-		if (auto participant = nprpc::narrow<npkcalc::ChatParticipant>(obj); participant) {
+		if (auto participant = nprpc::narrow<nscalc::ChatParticipant>(obj); participant) {
 			participant->add_ref();
 			participant->set_timeout(250);
 			add(participant);
 		}
 	}
 
-	virtual bool Send(npkcalc::flat::ChatMessage_Direct msg) {
+	virtual bool Send(nscalc::flat::ChatMessage_Direct msg) {
 		auto timestamp = static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::minutes>(
 			std::chrono::system_clock::now().time_since_epoch()).count());
-		send_to_all(npkcalc::ChatMessage{ timestamp, (std::string)msg.str() }, nprpc::get_context().remote_endpoint);
+		send_to_all(nscalc::ChatMessage{ timestamp, (std::string)msg.str() }, nprpc::get_context().remote_endpoint);
 		return true;
 	}
 };
@@ -137,7 +137,7 @@ struct User {
 	std::string user_name;
 
 	template<class Archive>
-	void serialize(Archive& ar, const int file_version) {
+	void serialize(Archive& ar, const int /* file_version */) {
 		ar& email;
 		ar& password_sha256;
 		ar& user_name;
@@ -161,7 +161,7 @@ class DataManager {
 	}
 public:
 	std::shared_ptr<Calculations> guest_calcs;
-	// std::vector<npkcalc::Media> icons;
+	// std::vector<nscalc::Media> icons;
 	
 	std::string get_calculation_path(std::string_view owner) const noexcept {
 		return data_root_dir_ + "/calculations/" + std::string(owner) + ".bin";
@@ -206,28 +206,28 @@ public:
 std::unique_ptr<DataManager> data_manager;
 
 class RegisteredUser 
-	: public npkcalc::IRegisteredUser_Servant {
+	: public nscalc::IRegisteredUser_Servant {
 	friend class CalculatorImpl;
 
 	const User& user_data_;
 	std::shared_ptr<Calculations> calculations;
 
-	npkcalc::Solution* get_solution(std::uint32_t id) {
+	nscalc::Solution* get_solution(std::uint32_t id) {
 		auto item = data_manager->get<Solutions>().get_by_id(id);
 		if (item && item->owner != user_data_.user_name) {
-			observers.alarm(npkcalc::AlarmType::Critical, user_data_.user_name + " is fiddeling with \"" + item->name + 
+			observers.alarm(nscalc::AlarmType::Critical, user_data_.user_name + " is fiddeling with \"" + item->name + 
 				"\": please report this incident to the authority");
-			throw npkcalc::PermissionViolation{ "You don't have rights to fiddle with this solution." };
+			throw nscalc::PermissionViolation{ "You don't have rights to fiddle with this solution." };
 		}
 		return item;
 	}
 
-	npkcalc::Fertilizer* get_fertilizer(std::uint32_t id) {
+	nscalc::Fertilizer* get_fertilizer(std::uint32_t id) {
 		auto item = data_manager->get<Fertilizers>().get_by_id(id);
 		if (item && item->owner != user_data_.user_name) {
-			observers.alarm(npkcalc::AlarmType::Critical, user_data_.user_name + " is fiddeling with \"" + item->name +
+			observers.alarm(nscalc::AlarmType::Critical, user_data_.user_name + " is fiddeling with \"" + item->name +
 				"\": please report this incident to the authority");
-			throw npkcalc::PermissionViolation{ "You don't have rights to fiddle with this fertilizer." };
+			throw nscalc::PermissionViolation{ "You don't have rights to fiddle with this fertilizer." };
 		}
 		return item;
 	}
@@ -237,9 +237,9 @@ public:
 	}
 
 	virtual void GetMyCalculations(
-		/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Calculation, npkcalc::flat::Calculation_Direct> calculations) {
+		/*out*/::nprpc::flat::Vector_Direct2<nscalc::flat::Calculation, nscalc::flat::Calculation_Direct> calculations) {
 		std::lock_guard<Calculations> lk(*this->calculations);
-		npkcalc::helper::assign_from_cpp_GetMyCalculations_calculations(calculations, this->calculations->data());
+		nscalc::helper::assign_from_cpp_GetMyCalculations_calculations(calculations, this->calculations->data());
 	}
 
 	// Solutions
@@ -252,7 +252,7 @@ public:
 		s->owner = user_data_.user_name;
 		std::transform(elements.begin(), elements.end(), s->elements.begin(), [](auto x) { return x; });
 
-		observers.alarm(npkcalc::AlarmType::Info, user_data().user_name + " added solution \"" + s->name + "\"");
+		observers.alarm(nscalc::AlarmType::Info, user_data().user_name + " added solution \"" + s->name + "\"");
 
 		return s->id;
 	}
@@ -265,7 +265,7 @@ public:
 		}
 	}
 
-	virtual void SetSolutionElements(uint32_t id, ::nprpc::flat::Span_ref<npkcalc::flat::SolutionElement, npkcalc::flat::SolutionElement_Direct> name) {
+	virtual void SetSolutionElements(uint32_t id, ::nprpc::flat::Span_ref<nscalc::flat::SolutionElement, nscalc::flat::SolutionElement_Direct> name) {
 		std::lock_guard<Solutions> lk(data_manager->get<Solutions>());
 		
 		if (auto s = get_solution(id); s) {
@@ -289,7 +289,7 @@ public:
 			}
 		}
 		if (deleted) {
-			observers.alarm(npkcalc::AlarmType::Info, user_data().user_name + " has deleted solution \"" + name + "\"");
+			observers.alarm(nscalc::AlarmType::Info, user_data().user_name + " has deleted solution \"" + name + "\"");
 		}
 	}
 
@@ -337,25 +337,25 @@ public:
 			}
 		}
 		if (deleted) {
-			observers.alarm(npkcalc::AlarmType::Info, user_data().user_name + " has deleted fertilizer \"" + name + "\"");
+			observers.alarm(nscalc::AlarmType::Info, user_data().user_name + " has deleted fertilizer \"" + name + "\"");
 		}
 	}
 
 	// Solutions
 
-	virtual uint32_t UpdateCalculation(npkcalc::flat::Calculation_Direct calculation) {
+	virtual uint32_t UpdateCalculation(nscalc::flat::Calculation_Direct calculation) {
 		uint32_t id = calculation.id();
 		{
 			std::lock_guard<Calculations> lk(*calculations);
 			
-			npkcalc::Calculation* calc = calculations->get_by_id(id);
+			nscalc::Calculation* calc = calculations->get_by_id(id);
 
 			if (!calc) {
 				calc = calculations->create();
 				id = calculation.id() = calc->id;
 			}
 
-			npkcalc::helper::assign_from_flat_UpdateCalculation_calculation(calculation, *calc);
+			nscalc::helper::assign_from_flat_UpdateCalculation_calculation(calculation, *calc);
 		}
 		
 		calculations->store();
@@ -388,35 +388,35 @@ public:
 };
 
 class CalculatorImpl 
-	: public npkcalc::ICalculator_Servant {
+	: public nscalc::ICalculator_Servant {
 public:
 	virtual void GetData(
-		/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Solution, npkcalc::flat::Solution_Direct> solutions,
-		/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Fertilizer, npkcalc::flat::Fertilizer_Direct> fertilizers)
+		/*out*/::nprpc::flat::Vector_Direct2<nscalc::flat::Solution, nscalc::flat::Solution_Direct> solutions,
+		/*out*/::nprpc::flat::Vector_Direct2<nscalc::flat::Fertilizer, nscalc::flat::Fertilizer_Direct> fertilizers)
 	{
 		{
 			auto& sols = data_manager->get<Solutions>();
 			std::lock_guard<Solutions> lk(sols);
-			npkcalc::helper::assign_from_cpp_GetData_solutions(solutions, sols.data());
+			nscalc::helper::assign_from_cpp_GetData_solutions(solutions, sols.data());
 		}
 		{
 			auto& ferts = data_manager->get<Fertilizers>();
 			std::lock_guard<Fertilizers> lk(ferts);
-			npkcalc::helper::assign_from_cpp_GetData_fertilizers(fertilizers, ferts.data());
+			nscalc::helper::assign_from_cpp_GetData_fertilizers(fertilizers, ferts.data());
 		}
 	}
 
 	virtual void GetImages(
-		/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Media, npkcalc::flat::Media_Direct> images)
+		/*out*/::nprpc::flat::Vector_Direct2<nscalc::flat::Media, nscalc::flat::Media_Direct> images)
 	{
-		std::vector<npkcalc::Media> icons;
-		npkcalc::helper::assign_from_cpp_GetImages_images(images, icons);
+		std::vector<nscalc::Media> icons;
+		nscalc::helper::assign_from_cpp_GetImages_images(images, icons);
 	}
 
 	virtual void Subscribe(nprpc::Object* obj) {
 		static std::atomic_int i {0};
-		observers.alarm(npkcalc::AlarmType::Info, "User #" + std::to_string(++i) + " connected");
-		if (auto user = nprpc::narrow<npkcalc::DataObserver>(obj); user) {
+		observers.alarm(nscalc::AlarmType::Info, "User #" + std::to_string(++i) + " connected");
+		if (auto user = nprpc::narrow<nscalc::DataObserver>(obj); user) {
 			user->add_ref();
 			user->set_timeout(250);
 			observers.add(user);
@@ -424,13 +424,13 @@ public:
 	}
 
 	virtual void GetGuestCalculations(
-		/*out*/::nprpc::flat::Vector_Direct2<npkcalc::flat::Calculation, npkcalc::flat::Calculation_Direct> calculations) {
-		npkcalc::helper::assign_from_cpp_GetMyCalculations_calculations(calculations, data_manager->guest_calcs->data());
+		/*out*/::nprpc::flat::Vector_Direct2<nscalc::flat::Calculation, nscalc::flat::Calculation_Direct> calculations) {
+		nscalc::helper::assign_from_cpp_GetMyCalculations_calculations(calculations, data_manager->guest_calcs->data());
 	}
 
-	virtual void SendFootstep(npkcalc::flat::Footstep_Direct footstep) {
-		npkcalc::Footstep step;
-		npkcalc::helper::assign_from_flat_OnFootstep_footstep(footstep, step);
+	virtual void SendFootstep(nscalc::flat::Footstep_Direct footstep) {
+		nscalc::Footstep step;
+		nscalc::helper::assign_from_flat_OnFootstep_footstep(footstep, step);
 		observers.footstep(std::move(step), nprpc::get_context().remote_endpoint);
 	}
 };
@@ -454,7 +454,7 @@ std::shared_ptr<Calculations> DataManager::get_calculation(const User& user) noe
 	return ptr;
 }
 
-class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
+class AuthorizatorImpl : public nscalc::IAuthorizator_Servant {
 	const std::string& data_root_dir_;
 	nprpc::Poa* user_poa;
 
@@ -466,7 +466,7 @@ class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
 		std::string email;
 
 		template<class Archive>
-		void serialize(Archive& ar, const int file_version) {
+		void serialize(Archive& ar, const int /* file_version */) {
 			ar& sid;
 			ar& email;
 		}
@@ -514,14 +514,14 @@ class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
 		return str;
 	}
 
-	npkcalc::UserData try_login(std::string_view user_email, std::string_view user_password) {
+	nscalc::UserData try_login(std::string_view user_email, std::string_view user_password) {
 		if (auto it = std::find_if(users_db_.begin(), users_db_.end(),
 			[user_email](const std::unique_ptr<User>& u) { return u->email == user_email; });
 			it != users_db_.end())
 		{
 			if (!user_password.empty() && (*it)->password_sha256 != sha256(user_password)) {
-				observers.alarm(npkcalc::AlarmType::Warning, "User \"" + (*it)->user_name + "\" forgot his password");
-				throw npkcalc::AuthorizationFailed(npkcalc::AuthorizationFailed_Reason::incorrect_password);
+				observers.alarm(nscalc::AlarmType::Warning, "User \"" + (*it)->user_name + "\" forgot his password");
+				throw nscalc::AuthorizationFailed(nscalc::AuthorizationFailed_Reason::incorrect_password);
 			}
 
 			auto& ud = *(*it).get();
@@ -532,11 +532,11 @@ class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
 			do { s.sid = create_uuid(); } while (sessions_.find(s) != sessions_.end());
 			s.email = user_email;
 
-			observers.alarm(npkcalc::AlarmType::Info, "User \"" + (*it)->user_name + "\" has logged in");
+			observers.alarm(nscalc::AlarmType::Info, "User \"" + (*it)->user_name + "\" has logged in");
 
 			return {(*it)->user_name, sessions_.emplace(std::move(s)).first->sid, oid};
 		} else {
-			throw npkcalc::AuthorizationFailed(npkcalc::AuthorizationFailed_Reason::email_does_not_exist);
+			throw nscalc::AuthorizationFailed(nscalc::AuthorizationFailed_Reason::email_does_not_exist);
 		}
 	}
 
@@ -579,21 +579,21 @@ class AuthorizatorImpl : public npkcalc::IAuthorizator_Servant {
 			}) == users_db_.end();
 	}
 public:
-	virtual npkcalc::UserData LogIn(::nprpc::flat::Span<char> login, ::nprpc::flat::Span<char> password) {
+	virtual nscalc::UserData LogIn(::nprpc::flat::Span<char> login, ::nprpc::flat::Span<char> password) {
 		std::lock_guard<std::mutex> lk(mut_);
 
 		auto user_email = (std::string_view)login;
 		auto user_password = (std::string_view)password;
 
 		if (user_password.empty()) {
-			observers.alarm(npkcalc::AlarmType::Warning, "User is trying to log in with an empty password");
-			throw npkcalc::AuthorizationFailed(npkcalc::AuthorizationFailed_Reason::incorrect_password);
+			observers.alarm(nscalc::AlarmType::Warning, "User is trying to log in with an empty password");
+			throw nscalc::AuthorizationFailed(nscalc::AuthorizationFailed_Reason::incorrect_password);
 		}
 
 		return try_login(user_email, user_password);
 	}
 
-	virtual npkcalc::UserData LogInWithSessionId(::nprpc::flat::Span<char> session_id) {
+	virtual nscalc::UserData LogInWithSessionId(::nprpc::flat::Span<char> session_id) {
 		std::lock_guard<std::mutex> lk(mut_);
 
 		auto sid = (std::string_view)session_id;
@@ -608,9 +608,9 @@ public:
 			{
 				return try_login(user_email, {});
 			}
-			throw npkcalc::AuthorizationFailed(npkcalc::AuthorizationFailed_Reason::email_does_not_exist);
+			throw nscalc::AuthorizationFailed(nscalc::AuthorizationFailed_Reason::email_does_not_exist);
 		}
-		throw npkcalc::AuthorizationFailed(npkcalc::AuthorizationFailed_Reason::session_does_not_exist);
+		throw nscalc::AuthorizationFailed(nscalc::AuthorizationFailed_Reason::session_does_not_exist);
 	}
 
 	virtual bool LogOut(::nprpc::flat::Span<char> session_id) {
@@ -636,9 +636,9 @@ public:
 		{
 			std::lock_guard<std::mutex> lk(mut_);
 			if (check_username(username) == false)
-				throw npkcalc::RegistrationFailed(npkcalc::RegistrationFailed_Reason::username_already_exist);
+				throw nscalc::RegistrationFailed(nscalc::RegistrationFailed_Reason::username_already_exist);
 			if (check_email(email) == false)
-				throw npkcalc::RegistrationFailed(npkcalc::RegistrationFailed_Reason::email_already_registered);
+				throw nscalc::RegistrationFailed(nscalc::RegistrationFailed_Reason::email_already_registered);
 		}
 		
 		NewUser user;
@@ -651,7 +651,7 @@ public:
 
 		//std::cerr << "Code: " << user.code << '\n';
 
-		observers.alarm(npkcalc::AlarmType::Info, "Dear " + user.user.user_name + ", here is your confirmation code: " + std::to_string(user.code));
+		observers.alarm(nscalc::AlarmType::Info, "Dear " + user.user.user_name + ", here is your confirmation code: " + std::to_string(user.code));
 
 		{
 			std::lock_guard<std::mutex> lk(new_users_mut_);
@@ -663,9 +663,9 @@ public:
 		std::lock_guard<std::mutex> lk(new_users_mut_);
 		if (auto it = new_users_db_.find((std::string)username); it != new_users_db_.end()) {
 			if (it->second.code != code)
-				throw npkcalc::RegistrationFailed(npkcalc::RegistrationFailed_Reason::incorrect_code);
+				throw nscalc::RegistrationFailed(nscalc::RegistrationFailed_Reason::incorrect_code);
 
-			observers.alarm(npkcalc::AlarmType::Info, "New user '" + it->first + "' has been registered");
+			observers.alarm(nscalc::AlarmType::Info, "New user '" + it->first + "' has been registered");
 
 			{
 				std::lock_guard<std::mutex> lk(mut_);
@@ -674,7 +674,7 @@ public:
 			}
 			new_users_db_.erase(it);
 		} else {
-			throw npkcalc::RegistrationFailed(npkcalc::RegistrationFailed_Reason::invalid_username);
+			throw nscalc::RegistrationFailed(nscalc::RegistrationFailed_Reason::invalid_username);
 		}
 	}
 
@@ -716,7 +716,6 @@ int main(int argc, char* argv[]) {
 	namespace fs = std::filesystem;
 
 	HostJson host_json;
-
 	std::string hostname, http_root, data_root, public_key, private_key, dh_params;
 	unsigned short port;
 	bool use_ssl;
@@ -724,10 +723,9 @@ int main(int argc, char* argv[]) {
 	po::options_description desc("Allowed options");
 	desc.add_options()
 		("help", "produce help message")
+		("root-dir", po::value<std::string>(&http_root)->required(), "HTTP root directory")
+		("data-dir", po::value<std::string>(&data_root)->required(), "Data root directory")
 		("hostname", po::value<std::string>(&hostname)->default_value(""), "Hostname")
-		("root_dir", po::value<std::string>(&http_root)->
-			default_value("\\\\wsl$\\Arch\\home\\nikita\\projects\\npk-calculator\\client\\public"), "HTTP root directory")
-		("data_dir", po::value<std::string>(&data_root)->default_value("./data"), "Data root directory")
 		("port", po::value<unsigned short>(&port)->default_value(8080), "Port to listen")
 		("use_ssl", po::value<bool>(&use_ssl)->default_value(false), "Use SSL")
 		("public_key", po::value<std::string>(&public_key)->default_value(""), "Path to public key")
@@ -738,13 +736,13 @@ int main(int argc, char* argv[]) {
 	try {
 		po::variables_map vm;
 		po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
-		po::notify(vm);
 		if (vm.count("help")) {
 			std::cout << desc << "\n";
 			return 0;
 		}
-	} catch (po::unknown_option& e) {
-		std::cerr << e.what();
+		po::notify(vm);
+	} catch (std::exception& e) {
+		std::cerr << e.what() << '\n';
 		return -1;
 	}
 
@@ -789,7 +787,7 @@ int main(int argc, char* argv[]) {
 		std::cout.flush();
 
 		{
-			std::ofstream os(std::filesystem::path(http_root) / "host.json");
+			std::ofstream os(fs::path(http_root) / "host.json");
 			nprpc::serialization::json_oarchive oa(os);
 			oa << host_json;
 		}

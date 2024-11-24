@@ -4,7 +4,7 @@
 import { Updater, writable } from 'svelte/store'
 import { chat, poa } from 'rpc/rpc'
 import * as NPRPC from 'nprpc';
-import * as npkcalc from 'rpc/npkcalc'
+import * as nscalc from 'rpc/nscalc'
 
 export interface Message {
   date: Date;
@@ -14,8 +14,8 @@ export interface Message {
 
 export let chat_messages = writable(new Array<Message>()); 
 
-class ChatParticipantImpl extends npkcalc._IChatParticipant_Servant implements npkcalc.IChatParticipant_Servant {
-  OnMessage(msg: npkcalc.Flat_npkcalc.ChatMessage_Direct): void {
+class ChatParticipantImpl extends nscalc._IChatParticipant_Servant implements nscalc.IChatParticipant_Servant {
+  OnMessage(msg: nscalc.Flat_nscalc.ChatMessage_Direct): void {
     chat_messages.update(updater => {updater.push({date: new Date(msg.timestamp*60*1000), str: msg.str, sent_by_me: false}); return updater;} );
   }
 }

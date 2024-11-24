@@ -2,17 +2,17 @@
 // This file is a part of Nikita's NPK calculator and covered by LICENSING file in the topmost directory
 
 import * as NPRPC from 'nprpc';
-import * as npkcalc from 'rpc/npkcalc'
+import * as nscalc from 'rpc/nscalc'
 
 import { alarms, Alarm } from 'misc/alarm'
 import { Footstep, footsteps } from 'mouse/footstep';
 
-export class DataObserverImpl extends npkcalc._IDataObserver_Servant implements npkcalc.IDataObserver_Servant {
+export class DataObserverImpl extends nscalc._IDataObserver_Servant implements nscalc.IDataObserver_Servant {
 	DataChanged(idx: number): void {
 		// console.log("DataObserverImpl(): " + idx.toString());
 	}
 
-	OnAlarm(alarm: npkcalc.Flat_npkcalc.Alarm_Direct) {
+	OnAlarm(alarm: nscalc.Flat_nscalc.Alarm_Direct) {
 		for (let i = 0; i < alarms.length; ++i) {
 			if (alarms[i].confirmed) {
 				alarms.splice(i, 0, new Alarm(alarm.id, alarm.type, alarm.msg));
@@ -22,7 +22,7 @@ export class DataObserverImpl extends npkcalc._IDataObserver_Servant implements 
 		alarms.push(new Alarm(alarm.id, alarm.type, alarm.msg));
 	}
 
-	OnFootstep(footstep: npkcalc.Flat_npkcalc.Footstep_Direct): void {
+	OnFootstep(footstep: nscalc.Flat_nscalc.Footstep_Direct): void {
 		let color = footstep.color;
 		let pos = footstep.pos;
 		let dir = footstep.dir;

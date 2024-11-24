@@ -6,7 +6,7 @@
 	import { Message, chat_messages } from 'misc/chat'
 	import { chat } from 'rpc/rpc'
 	import ChatMessage from './ChatMessage.svelte';
-	import * as npkcalc from 'rpc/npkcalc'
+	import * as nscalc from 'rpc/nscalc'
 	import { onMount } from 'svelte';
 
 	let text;

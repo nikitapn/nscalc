@@ -2,7 +2,7 @@
 // This file is a part of Nikita's NPK calculator and covered by LICENSING file in the topmost directory
 
 import * as React from 'react'
-import * as npkcalc from 'rpc/npkcalc'
+import * as nscalc from 'rpc/nscalc'
 import { observer } from 'mobx-react'
 import { alarms, Alarm } from 'misc/alarm'
 import global from 'misc/global'
@@ -32,9 +32,9 @@ class AlarmEntry extends React.Component<{ alarm: Alarm }, {}> {
 	render() : JSX.Element {
 		let style;
 		switch(this.props.alarm.type) {
-				case npkcalc.AlarmType.Info: style = "alarm alarm_info"; break;
-				case npkcalc.AlarmType.Warning: style = "alarm alarm_warning"; break;
-				case npkcalc.AlarmType.Critical: style = "alarm alarm_critical"; break;
+				case nscalc.AlarmType.Info: style = "alarm alarm_info"; break;
+				case nscalc.AlarmType.Warning: style = "alarm alarm_warning"; break;
+				case nscalc.AlarmType.Critical: style = "alarm alarm_critical"; break;
 		}
 		if (this.props.alarm.confirmed) style += " alarm_confirmed";
 		return (

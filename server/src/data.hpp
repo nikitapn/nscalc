@@ -17,6 +17,7 @@
 #include <boost/serialization/array.hpp>
 #include <boost/serialization/unique_ptr.hpp>
 #include <boost/serialization/access.hpp>
+#include "idl/nscalc.hpp"
 
 template<class T>
 class SerializibleIdVector  {
@@ -121,13 +122,10 @@ public:
 		: table_name_{std::move(table_name)} {}
 };
 
-#include "npkcalc.hpp"
-
-
 namespace boost::serialization {
 
 template<class Archive>
-void serialize(Archive& ar, npkcalc::Solution& x, const unsigned int) {
+void serialize(Archive& ar, nscalc::Solution& x, const unsigned int) {
 	ar& x.id;
 	ar& x.name;
 	ar& x.owner;
@@ -135,7 +133,7 @@ void serialize(Archive& ar, npkcalc::Solution& x, const unsigned int) {
 }
 
 template<class Archive>
-void serialize(Archive& ar, npkcalc::Fertilizer& x, const unsigned int file_version) {
+void serialize(Archive& ar, nscalc::Fertilizer& x, const unsigned int) {
 	ar& x.id;
 	ar& x.name;
 	ar& x.owner;
@@ -143,14 +141,14 @@ void serialize(Archive& ar, npkcalc::Fertilizer& x, const unsigned int file_vers
 }
 
 template<class Archive>
-void serialize(Archive& ar, npkcalc::TargetElement& x, const unsigned int) {
+void serialize(Archive& ar, nscalc::TargetElement& x, const unsigned int) {
 	ar& x.value;
 	ar& x.value_base;
 	ar& x.ratio;
 }
 
 template<class Archive>
-void serialize(Archive& ar, npkcalc::Calculation& x, const unsigned int) {
+void serialize(Archive& ar, nscalc::Calculation& x, const unsigned int) {
 	ar& x.id;
 	ar& x.name;
 	ar& x.elements;
@@ -160,10 +158,10 @@ void serialize(Archive& ar, npkcalc::Calculation& x, const unsigned int) {
 }
 } // namespace boost::serialization
 
-BOOST_CLASS_VERSION(npkcalc::Solution, 1);
-BOOST_CLASS_VERSION(npkcalc::Fertilizer, 30);
-BOOST_CLASS_VERSION(npkcalc::Calculation, 1);
+BOOST_CLASS_VERSION(nscalc::Solution, 1);
+BOOST_CLASS_VERSION(nscalc::Fertilizer, 30);
+BOOST_CLASS_VERSION(nscalc::Calculation, 1);
 
-using Solutions = SerializibleIdVector<npkcalc::Solution>;
-using Fertilizers = SerializibleIdVector<npkcalc::Fertilizer>;
-using Calculations = SerializibleIdVector<npkcalc::Calculation>;
+using Solutions = SerializibleIdVector<nscalc::Solution>;
+using Fertilizers = SerializibleIdVector<nscalc::Fertilizer>;
+using Calculations = SerializibleIdVector<nscalc::Calculation>;

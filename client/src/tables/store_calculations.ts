@@ -4,7 +4,7 @@
 import * as Calculation from '../calculation/calculation'
 import global from 'misc/global'
 import * as NPRPC from 'nprpc';
-import * as npkcalc from 'rpc/npkcalc'
+import * as nscalc from 'rpc/nscalc'
 import { TableModel } from 'tables/table_item'
 import { calculator } from 'rpc/rpc'
 
@@ -57,7 +57,7 @@ class Table_Calculations extends TableModel(class {}, Calculation.Calculation) {
 export let calculations = new Table_Calculations();
 
 export const get_calculations = async () => {
-	let calculations_data = NPRPC.make_ref<NPRPC.Flat.Vector_Direct2<npkcalc.Flat_npkcalc.Calculation_Direct>>();
+	let calculations_data = NPRPC.make_ref<NPRPC.Flat.Vector_Direct2<nscalc.Flat_nscalc.Calculation_Direct>>();
 	if (global.user_data.reg_user) {
 		await global.user_data.reg_user.GetMyCalculations(calculations_data);
 	} else {

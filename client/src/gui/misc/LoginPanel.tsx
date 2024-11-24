@@ -3,7 +3,7 @@
 
 import * as React from 'react'
 import global from 'misc/global'
-import * as npkcalc from 'rpc/npkcalc'
+import * as nscalc from 'rpc/nscalc'
 import * as utils from 'misc/utils'
 import { authorizator } from 'rpc/rpc'
 import { observer } from 'mobx-react'
@@ -40,10 +40,10 @@ export class LoginPanel extends React.Component<{
 	handleSubmit(event: any) {
 		event.preventDefault();
 		let this_ = this;
-		authorizator.LogIn(this.state.email, this.state.pwd).then((ud: npkcalc.UserData) => {
+		authorizator.LogIn(this.state.email, this.state.pwd).then((ud: nscalc.UserData) => {
 			set_user_data(ud);
 		}).catch((e: any) => {
-			if (e instanceof npkcalc.AuthorizationFailed) {
+			if (e instanceof nscalc.AuthorizationFailed) {
 				console.log("Authorization failed: " + e.reason);
 			} else {
 				console.log(e);

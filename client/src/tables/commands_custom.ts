@@ -5,7 +5,7 @@ import { MobXValue } from 'tables/modified';
 import { IServerCommand, Command_ValueChanged, Command_ValueChangedUpdateDependValue } from './command'
 import global from 'misc/global'
 import * as che from 'calculation/datatypes'
-import * as npkcalc from 'rpc/npkcalc'
+import * as nscalc from 'rpc/nscalc'
 
 export class CommandComposer {
 	commands: Map<number, any>
@@ -14,13 +14,13 @@ export class CommandComposer {
 	}
 
 	server_execute(): void {
-		let elements = new Map<number, npkcalc.SolutionElement[]>();
+		let elements = new Map<number, nscalc.SolutionElement[]>();
 		this.commands.forEach((x, key) => {
 			if ((key & che.solution_id_bit) && (key & 0x00FF0000)) {
 				let solution_id = key & 0xFFFF;
 				let a = elements.get(solution_id);
 				if (!a) { 
-					a = new Array<npkcalc.SolutionElement>();
+					a = new Array<nscalc.SolutionElement>();
 					elements.set(solution_id, a);
 				}
 				a.push({index: ((key >> 16) & 0xFF) - 1, value: x});

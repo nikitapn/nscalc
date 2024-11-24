@@ -5,7 +5,7 @@ import { MobXValue } from 'tables/modified'
 import { TableItemWithOwnership } from 'tables/table_item'
 import { observable } from 'mobx'
 import  global from 'misc/global'
-import * as NPKCalc from 'rpc/npkcalc'
+import * as NSCalc from 'rpc/nscalc'
 
 export const solution_id_bit 		= 0x10000000;  
 export const fertilizer_id_bit 	= 0x20000000;  
@@ -137,7 +137,7 @@ export class Solution extends TableItemWithOwnership {
 		return s;
 	}
 
-	public static create_from_data(data: NPKCalc.Flat_npkcalc.Solution_Direct): Solution {
+	public static create_from_data(data: NSCalc.Flat_nscalc.Solution_Direct): Solution {
 		let s = new Solution(false, data.owner);
 		s.set_id(data.id);
 		s.set_name(data.name);
@@ -189,8 +189,8 @@ export class Solution extends TableItemWithOwnership {
 export class Fertilizer extends TableItemWithOwnership {
 	@observable public elements: Array<number>;
 	formula: MobXValue<string>;
-	type: NPKCalc.FertilizerType;
-	@observable bottle: NPKCalc.FertilizerBottle;
+	type: NSCalc.FertilizerType;
+	@observable bottle: NSCalc.FertilizerBottle;
 	@observable density: number;
 	@observable cost: number;
 
@@ -217,7 +217,7 @@ export class Fertilizer extends TableItemWithOwnership {
 		} catch (e) { console.log(e); }
 	}
 
-	public static create_from_data(data: NPKCalc.Flat_npkcalc.Fertilizer_Direct): Fertilizer {
+	public static create_from_data(data: NSCalc.Flat_nscalc.Fertilizer_Direct): Fertilizer {
 		let f = new Fertilizer(false, data.owner);
 		f.set_id(data.id);
 		f.mx_value = data.name;

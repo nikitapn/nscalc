@@ -1,7 +1,7 @@
 // Copyright (c) 2022 nikitapnn1@gmail.com
 // This file is a part of Nikita's NPK calculator and covered by LICENSING file in the topmost directory
 
-import * as npkcalc from 'rpc/npkcalc'
+import * as nscalc from 'rpc/nscalc'
 import * as NPRPC from 'nprpc';
 import { observable, computed } from 'mobx'
 
@@ -12,7 +12,7 @@ export class UserData {
 	
 	email: string;
 	
-	reg_user: npkcalc.RegisteredUser;
+	reg_user: nscalc.RegisteredUser;
 	
 	constructor() {
 		this.is_logged_in = false;
@@ -42,7 +42,7 @@ export class MyIcons {
 	}
 
 
-	public async fetch(obj: npkcalc.Calculator) {
+	public async fetch(obj: nscalc.Calculator) {
 		let db: IDBDatabase;
 		let request = window.indexedDB.open("Cache", 1);
 		let promise = new NPRPC.MyPromise<boolean>();
@@ -90,7 +90,7 @@ export class MyIcons {
 			console.log(e);
 		}
 		
-		let images = NPRPC.make_ref<NPRPC.Flat.Vector_Direct2<npkcalc.Flat_npkcalc.Media_Direct>>();
+		let images = NPRPC.make_ref<NPRPC.Flat.Vector_Direct2<nscalc.Flat_nscalc.Media_Direct>>();
 		await obj.GetImages(images);
 		for (let img of images.value) {
 			(this as any)[img.name] = MyIcons.get_image_svg(img.data_d().array_buffer);

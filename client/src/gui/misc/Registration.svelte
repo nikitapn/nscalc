@@ -10,7 +10,7 @@
   import FormField from '@smui/form-field';
   import Checkbox from '@smui/checkbox';
   import { authorizator } from 'rpc/rpc'
-	import * as npkcalc from 'rpc/npkcalc'
+	import * as nscalc from 'rpc/nscalc'
   import { onMount } from 'svelte';
   import { set_user_data } from 'misc/login'
 
@@ -58,7 +58,7 @@
   const do_register_step_one = () => {
     authorizator.RegisterStepOne(username, email, password)
     .then(() => { step_one = false; })
-    .catch( ( ex: npkcalc.RegistrationFailed ) => {
+    .catch( ( ex: nscalc.RegistrationFailed ) => {
       console.log(ex);
     }); 
   };
@@ -71,9 +71,9 @@
     .then(() => { 
       open = false; 
       authorizator.LogIn(email, password)
-      .then((user_data: npkcalc.UserData) => set_user_data(user_data));
+      .then((user_data: nscalc.UserData) => set_user_data(user_data));
     })
-    .catch( ( ex: npkcalc.RegistrationFailed ) => {
+    .catch( ( ex: nscalc.RegistrationFailed ) => {
       console.log(ex);
     });
   };

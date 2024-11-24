@@ -6,7 +6,7 @@ import * as ReactDOM from 'react-dom';
 
 import { set_user_data } from 'misc/login'
 import * as NPRPC from 'nprpc';
-import * as npkcalc from 'rpc/npkcalc'
+import * as nscalc from 'rpc/nscalc'
 import { store } from 'tables/store'
 import * as che from 'calculation/datatypes'
 import * as utils from 'misc/utils'
@@ -30,13 +30,12 @@ let body = document.getElementById("id_body") as HTMLBodyElement
 body.style.display = 'block';
 
 async function fetch_data() {
-	let solutions = NPRPC.make_ref<NPRPC.Flat.Vector_Direct2<npkcalc.Flat_npkcalc.Solution_Direct>>();
-	let fertilizers = NPRPC.make_ref<NPRPC.Flat.Vector_Direct2<npkcalc.Flat_npkcalc.Fertilizer_Direct>>();
+	let solutions = NPRPC.make_ref<NPRPC.Flat.Vector_Direct2<nscalc.Flat_nscalc.Solution_Direct>>();
+	let fertilizers = NPRPC.make_ref<NPRPC.Flat.Vector_Direct2<nscalc.Flat_nscalc.Fertilizer_Direct>>();
 	
 	//let t0 = performance.now()
 	try {
 		await calculator.GetData(solutions, fertilizers);
-		
 		{
 			const size = solutions.value.elements_size;
 			let a = new Array<che.Solution>(size);

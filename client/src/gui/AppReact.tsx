@@ -6,7 +6,6 @@ import { RouterTabPane, Menu, MenuButton } from 'gui/view/tab_menu'
 import { View_NutrientSolutions } from 'gui/view/view_solutions'
 import { View_Fertilizers } from 'gui/view/view_fertilizers'
 import { View_Calculator } from 'gui/view/view_calculator'
-import { View_Links } from 'gui/view/view_links'
 import { View_Chat } from 'gui/view/view_chat'
 import { View_About } from 'gui/view/view_about'
 import { LoginPanel } from 'gui/misc/LoginPanel'
@@ -21,7 +20,6 @@ export class AppReact extends RouterTabPane {
 		this.add_view(View_Calculator, "CALCULATOR", true);
 		this.add_view(View_NutrientSolutions, "SOLUTIONS", false);
 		this.add_view(View_Fertilizers, "FERTILIZERS", false);
-		this.add_view(View_Links, "LINKS", false);
 		this.add_view(View_Chat, "CHAT", false);
 		this.add_view(View_About, "ABOUT", false);
 	}
