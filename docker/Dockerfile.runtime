@@ -1,0 +1,29 @@
+# Dockerfile.runtime
+FROM debian:12
+
+# Install only runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libstdc++6 \
+    openssl \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Add Boost runtime libraries
+COPY boost_runtime_libs.tar.gz /tmp/
+RUN tar --absolute-names -xzf /tmp/boost_runtime_libs.tar.gz -C / && \
+    rm /tmp/boost_runtime_libs.tar.gz
+
+# Set working directory
+WORKDIR /app
+
+# Copy application binary
+COPY ./nscalc /app
+
+# Copy nprpc library
+COPY ./libnprpc.so /usr/local/lib
+COPY ./libnplib.so /usr/local/lib
+
+# Add path to the shared libraries
+RUN ldconfig /usr/local/lib
+
+# Default command to run the application
+CMD ["./nscalc"]
