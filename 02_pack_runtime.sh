@@ -19,6 +19,7 @@ set -ex
 cp $ROOT_DIR/${BUILD_DIR}/bin/nscalc runtime/out
 cp $ROOT_DIR/${BUILD_DIR}/external/npsystem/nplib/libnplib.so runtime/out
 cp $ROOT_DIR/${BUILD_DIR}/external/npsystem/nprpc/libnprpc.so runtime/out
+cp $ROOT_DIR/docker/Dockerfile.runtime runtime/out
 
 cd runtime
 tar -czf nscalc-runtime.tar.gz out/
