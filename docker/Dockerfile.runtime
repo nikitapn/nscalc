@@ -1,6 +1,9 @@
 # Dockerfile.runtime
 FROM debian:12
 
+# Add a non-root user
+RUN useradd -m -d /home/nscalc -s /bin/bash nscalc
+
 # Install only runtime dependencies
 RUN apt-get update && apt-get install -y \
     libstdc++6 \
@@ -16,7 +19,7 @@ RUN tar --absolute-names -xzf /tmp/boost_runtime_libs.tar.gz -C / && \
 WORKDIR /app
 
 # Copy application binary
-COPY ./nscalc /app
+COPY ./nscalc /usr/local/bin
 
 # Copy nprpc library
 COPY ./libnprpc.so /usr/local/lib
@@ -25,5 +28,9 @@ COPY ./libnplib.so /usr/local/lib
 # Add path to the shared libraries
 RUN ldconfig /usr/local/lib
 
+# Switch to non-root user
+RUN chown -R nscalc:nscalc /app
+USER nscalc
+
 # Default command to run the application
-CMD ["./nscalc"]
+CMD ["nscalc"]

@@ -5,6 +5,8 @@ set -e
 BUILD_DIR=.build
 ROOT_DIR=$(dirname $(readlink -e ${BASH_SOURCE[0]}))
 
+cd $ROOT_DIR
+
 docker run --rm \
   -v $ROOT_DIR:/app \
   -v $(readlink -f server/external/npsystem):/app/server/external/npsystem \

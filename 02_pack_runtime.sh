@@ -1,5 +1,7 @@
 #!/bin/env bash
 
+set -e
+
 BUILD_DIR=.build
 ROOT_DIR=$(dirname $(readlink -e ${BASH_SOURCE[0]}))
 
@@ -16,10 +18,16 @@ docker run --rm \
 
 set -ex
 
-cp $ROOT_DIR/${BUILD_DIR}/bin/nscalc runtime/out
-cp $ROOT_DIR/${BUILD_DIR}/external/npsystem/nplib/libnplib.so runtime/out
-cp $ROOT_DIR/${BUILD_DIR}/external/npsystem/nprpc/libnprpc.so runtime/out
-cp $ROOT_DIR/docker/Dockerfile.runtime runtime/out
+cp ${BUILD_DIR}/bin/nscalc runtime/out
+cp ${BUILD_DIR}/external/npsystem/nplib/libnplib.so runtime/out
+cp ${BUILD_DIR}/external/npsystem/nprpc/libnprpc.so runtime/out
+cp docker/Dockerfile.runtime runtime/out
 
 cd runtime
-tar -czf nscalc-runtime.tar.gz out/
+tar -czf nscalc-server.tar.gz out/
+
+[ ! -L "www" ] && ln -s ../client/public www
+tar -czhf nscalc-client.tar.gz www/
+
+[ ! -L "data" ] && ln -s ../sample_data data
+tar -czhf nscalc-data.tar.gz data/
