@@ -9,6 +9,6 @@ docker run -d \
   cpp-runtime-env \
   /app/nscalc \
     --hostname archvm \
-    --data-dir sample_data \
-    --root-dir client/public
-    --root-dir client/public
+    --http-dir client/public \
+    --data-dir database
+

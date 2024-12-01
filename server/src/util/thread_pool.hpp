@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "singleton.hpp"
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/post.hpp>
 #include <boost/asio/use_future.hpp>
@@ -14,15 +13,11 @@
 namespace nplib {
 
 template<size_t NUMBER_OF_THREADS, size_t NUMBER_OF_IOC_THREADS, size_t NUMBER_OF_IOC1_THREADS>
-class thread_pool : public singleton<thread_pool<NUMBER_OF_THREADS, NUMBER_OF_IOC_THREADS, NUMBER_OF_IOC1_THREADS>> {
-	friend nplib::singleton<thread_pool<NUMBER_OF_THREADS, NUMBER_OF_IOC_THREADS, NUMBER_OF_IOC1_THREADS>>;
-
+class thread_pool {
 	boost::asio::io_context ioc_;
 	boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard_;
-
 	boost::asio::io_context ioc1_;
 	boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard1_;
-
 	boost::asio::thread_pool pool_{ NUMBER_OF_THREADS + NUMBER_OF_IOC_THREADS + NUMBER_OF_IOC1_THREADS };
 
 	thread_pool() 
@@ -37,6 +32,11 @@ class thread_pool : public singleton<thread_pool<NUMBER_OF_THREADS, NUMBER_OF_IO
 		}
 	}
 public:
+	static thread_pool& get_instance() {
+		static thread_pool tp;
+		return tp;
+	}
+
 	boost::asio::io_context& ctx() noexcept {
 		return ioc_; 
 	}

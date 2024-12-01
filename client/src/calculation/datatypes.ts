@@ -138,7 +138,7 @@ export class Solution extends TableItemWithOwnership {
 	}
 
 	public static create_from_data(data: NSCalc.Flat_nscalc.Solution_Direct): Solution {
-		let s = new Solution(false, data.owner);
+		let s = new Solution(false, data.userName);
 		s.set_id(data.id);
 		s.set_name(data.name);
 		let vde = data.elements_d();
@@ -218,7 +218,7 @@ export class Fertilizer extends TableItemWithOwnership {
 	}
 
 	public static create_from_data(data: NSCalc.Flat_nscalc.Fertilizer_Direct): Fertilizer {
-		let f = new Fertilizer(false, data.owner);
+		let f = new Fertilizer(false, data.userName);
 		f.set_id(data.id);
 		f.mx_value = data.name;
 		f.formula.mx_value = data.formula;

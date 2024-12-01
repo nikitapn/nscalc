@@ -29,7 +29,7 @@ export function set_user_data(ud: nscalc.UserData | null): void {
 	}
 
 	get_calculations();
-	setCookie("sid", ud.session_id, 31, false);
+	setCookie("sid", ud.sessionId, 31, false);
 
 	global.user_data.is_logged_in = true;
 }

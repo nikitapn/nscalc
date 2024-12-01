@@ -3,6 +3,8 @@ import * as NPRPC from 'nprpc'
 const u8enc = new TextEncoder();
 const u8dec = new TextDecoder();
 
+export const GUEST_ID = 2;
+export const TARGET_ELEMENT_COUNT = 14;
 export const enum ELEMENT { //u32
   N_NO3,
   N_NH4,
@@ -37,8 +39,9 @@ export const enum ELEMENT { //u32
 }
 export interface Solution {
   id: number/*u32*/;
+  userId: number/*u32*/;
+  userName: string;
   name: string;
-  owner: string;
   elements: Array<number/*f64*/>;
 }
 
@@ -46,24 +49,26 @@ export namespace Flat_nscalc {
 export class Solution_Direct extends NPRPC.Flat.Flat {
   public get id() { return this.buffer.dv.getUint32(this.offset+0,true); }
   public set id(value: number) { this.buffer.dv.setUint32(this.offset+0,value,true); }
+  public get userId() { return this.buffer.dv.getUint32(this.offset+4,true); }
+  public set userId(value: number) { this.buffer.dv.setUint32(this.offset+4,value,true); }
+  public get userName() {
+    const offset = this.offset + 8;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
+  }
+  public set userName(str: string) {
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 8, bytes.length, 1, 1);
+    new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
+  }
   public get name() {
-    const offset = this.offset + 4;
+    const offset = this.offset + 16;
     const n = this.buffer.dv.getUint32(offset + 4, true);
     return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
   public set name(str: string) {
     const bytes = u8enc.encode(str);
-    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 4, bytes.length, 1, 1);
-    new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
-  }
-  public get owner() {
-    const offset = this.offset + 12;
-    const n = this.buffer.dv.getUint32(offset + 4, true);
-    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
-  }
-  public set owner(str: string) {
-    const bytes = u8enc.encode(str);
-    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 12, bytes.length, 1, 1);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 16, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
   public elements_d() { return new NPRPC.Flat.Array_Direct1_f64(this.buffer, this.offset + 24, 14); }
@@ -81,8 +86,9 @@ export const enum FertilizerType { //u8
 }
 export interface Fertilizer {
   id: number/*u32*/;
+  userId: number/*u32*/;
+  userName: string;
   name: string;
-  owner: string;
   formula: string;
 }
 
@@ -90,41 +96,43 @@ export namespace Flat_nscalc {
 export class Fertilizer_Direct extends NPRPC.Flat.Flat {
   public get id() { return this.buffer.dv.getUint32(this.offset+0,true); }
   public set id(value: number) { this.buffer.dv.setUint32(this.offset+0,value,true); }
+  public get userId() { return this.buffer.dv.getUint32(this.offset+4,true); }
+  public set userId(value: number) { this.buffer.dv.setUint32(this.offset+4,value,true); }
+  public get userName() {
+    const offset = this.offset + 8;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
+  }
+  public set userName(str: string) {
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 8, bytes.length, 1, 1);
+    new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
+  }
   public get name() {
-    const offset = this.offset + 4;
+    const offset = this.offset + 16;
     const n = this.buffer.dv.getUint32(offset + 4, true);
     return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
   public set name(str: string) {
     const bytes = u8enc.encode(str);
-    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 4, bytes.length, 1, 1);
-    new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
-  }
-  public get owner() {
-    const offset = this.offset + 12;
-    const n = this.buffer.dv.getUint32(offset + 4, true);
-    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
-  }
-  public set owner(str: string) {
-    const bytes = u8enc.encode(str);
-    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 12, bytes.length, 1, 1);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 16, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
   public get formula() {
-    const offset = this.offset + 20;
+    const offset = this.offset + 24;
     const n = this.buffer.dv.getUint32(offset + 4, true);
     return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
   public set formula(str: string) {
     const bytes = u8enc.encode(str);
-    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 20, bytes.length, 1, 1);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 24, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
 }
 } // namespace Flat 
 export interface TargetElement {
   value: number/*f64*/;
-  value_base: number/*f64*/;
+  valueBase: number/*f64*/;
   ratio: number/*f64*/;
 }
 
@@ -132,8 +140,8 @@ export namespace Flat_nscalc {
 export class TargetElement_Direct extends NPRPC.Flat.Flat {
   public get value() { return this.buffer.dv.getFloat64(this.offset+0,true); }
   public set value(value: number) { this.buffer.dv.setFloat64(this.offset+0,value,true); }
-  public get value_base() { return this.buffer.dv.getFloat64(this.offset+8,true); }
-  public set value_base(value: number) { this.buffer.dv.setFloat64(this.offset+8,value,true); }
+  public get valueBase() { return this.buffer.dv.getFloat64(this.offset+8,true); }
+  public set valueBase(value: number) { this.buffer.dv.setFloat64(this.offset+8,value,true); }
   public get ratio() { return this.buffer.dv.getFloat64(this.offset+16,true); }
   public set ratio(value: number) { this.buffer.dv.setFloat64(this.offset+16,value,true); }
 }
@@ -141,8 +149,8 @@ export class TargetElement_Direct extends NPRPC.Flat.Flat {
 export interface Calculation {
   id: number/*u32*/;
   name: string;
-  elements: Array<TargetElement>;
-  fertilizers_ids: Array<number/*u32*/>;
+  elements: string;
+  fertilizersIds: string;
   volume: number/*f64*/;
   mode: boolean/*boolean*/;
 }
@@ -161,15 +169,30 @@ export class Calculation_Direct extends NPRPC.Flat.Flat {
     const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 4, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
-  public elements_d() { return new NPRPC.Flat.Array_Direct2<Flat_nscalc.TargetElement_Direct>(this.buffer, this.offset + 16, 24, Flat_nscalc.TargetElement_Direct, 14); }
-  public fertilizers_ids(elements_size: number): void { 
-    NPRPC.Flat._alloc(this.buffer, this.offset + 352, elements_size, 4, 4);
+  public get elements() {
+    const offset = this.offset + 12;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
-  public fertilizers_ids_d() { return new NPRPC.Flat.Vector_Direct1_u32(this.buffer, this.offset + 352); }
-  public get volume() { return this.buffer.dv.getFloat64(this.offset+360,true); }
-  public set volume(value: number) { this.buffer.dv.setFloat64(this.offset+360,value,true); }
-  public get mode() { return (this.buffer.dv.getUint8(this.offset+368) === 0x01); }
-  public set mode(value: boolean) { this.buffer.dv.setUint8(this.offset+368, value === true ? 0x01 : 0x00); }
+  public set elements(str: string) {
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 12, bytes.length, 1, 1);
+    new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
+  }
+  public get fertilizersIds() {
+    const offset = this.offset + 20;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
+  }
+  public set fertilizersIds(str: string) {
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 20, bytes.length, 1, 1);
+    new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
+  }
+  public get volume() { return this.buffer.dv.getFloat64(this.offset+32,true); }
+  public set volume(value: number) { this.buffer.dv.setFloat64(this.offset+32,value,true); }
+  public get mode() { return (this.buffer.dv.getUint8(this.offset+40) === 0x01); }
+  public set mode(value: boolean) { this.buffer.dv.setUint8(this.offset+40, value === true ? 0x01 : 0x00); }
 }
 } // namespace Flat 
 export interface Media {
@@ -250,9 +273,29 @@ export class PermissionViolation_Direct extends NPRPC.Flat.Flat {
   }
 }
 } // namespace Flat 
+export class InvalidArgument extends NPRPC.Exception {
+  constructor(public msg?: string) { super("InvalidArgument"); }
+}
+
+export namespace Flat_nscalc {
+export class InvalidArgument_Direct extends NPRPC.Flat.Flat {
+  public get __ex_id() { return this.buffer.dv.getUint32(this.offset+0,true); }
+  public set __ex_id(value: number) { this.buffer.dv.setUint32(this.offset+0,value,true); }
+  public get msg() {
+    const offset = this.offset + 4;
+    const n = this.buffer.dv.getUint32(offset + 4, true);
+    return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
+  }
+  public set msg(str: string) {
+    const bytes = u8enc.encode(str);
+    const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 4, bytes.length, 1, 1);
+    new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
+  }
+}
+} // namespace Flat 
 export interface UserData {
   name: string;
-  session_id: string;
+  sessionId: string;
   db: NPRPC.detail.ObjectId;
 }
 
@@ -268,12 +311,12 @@ export class UserData_Direct extends NPRPC.Flat.Flat {
     const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 0, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
   }
-  public get session_id() {
+  public get sessionId() {
     const offset = this.offset + 8;
     const n = this.buffer.dv.getUint32(offset + 4, true);
     return n > 0 ? u8dec.decode(new DataView(this.buffer.array_buffer, offset + this.buffer.dv.getUint32(offset, true), n)) : ""
   }
-  public set session_id(str: string) {
+  public set sessionId(str: string) {
     const bytes = u8enc.encode(str);
     const offset = NPRPC.Flat._alloc(this.buffer, this.offset + 8, bytes.length, 1, 1);
     new Uint8Array(this.buffer.array_buffer, offset).set(bytes);
@@ -460,7 +503,7 @@ export class Authorizator extends NPRPC.ObjectProxy {
   let __ret_value: UserData;
   (__ret_value as any) = new Object();
   __ret_value.name = out._1.name;
-  __ret_value.session_id = out._1.session_id;
+  __ret_value.sessionId = out._1.sessionId;
   __ret_value.db = NPRPC.oid_create_from_flat(out._1.db);
   return __ret_value;
 }
@@ -495,7 +538,7 @@ export class Authorizator extends NPRPC.ObjectProxy {
   let __ret_value: UserData;
   (__ret_value as any) = new Object();
   __ret_value.name = out._1.name;
-  __ret_value.session_id = out._1.session_id;
+  __ret_value.sessionId = out._1.sessionId;
   __ret_value.db = NPRPC.oid_create_from_flat(out._1.db);
   return __ret_value;
 }
@@ -691,7 +734,7 @@ let __ret_val: UserData;
         return;
       }
   oa._1.name = __ret_val.name;
-  oa._1.session_id = __ret_val.session_id;
+  oa._1.sessionId = __ret_val.sessionId;
   oa._1.db.object_id = __ret_val.db.object_id;
   oa._1.db.ip4 = __ret_val.db.ip4;
   oa._1.db.port = __ret_val.db.port;
@@ -730,7 +773,7 @@ let __ret_val: UserData;
         return;
       }
   oa._1.name = __ret_val.name;
-  oa._1.session_id = __ret_val.session_id;
+  oa._1.sessionId = __ret_val.sessionId;
   oa._1.db.object_id = __ret_val.db.object_id;
   oa._1.db.ip4 = __ret_val.db.ip4;
   oa._1.db.port = __ret_val.db.port;
@@ -1127,8 +1170,8 @@ export class RegisteredUser extends NPRPC.ObjectProxy {
   public async UpdateCalculation(calculation: /*in*/Calculation): Promise<number/*u32*/> {
     let interface_idx = (arguments.length == 1 ? 0 : arguments[arguments.length - 1]);
     let buf = NPRPC.FlatBuffer.create();
-    buf.prepare(536);
-    buf.commit(408);
+    buf.prepare(208);
+    buf.commit(80);
     buf.write_msg_id(NPRPC.impl.MessageId.FunctionCall);
     buf.write_msg_type(NPRPC.impl.MessageType.Request);
     let __ch = new NPRPC.impl.Flat_nprpc_base.CallHeader_Direct(buf, 16);
@@ -1139,17 +1182,8 @@ export class RegisteredUser extends NPRPC.ObjectProxy {
   let _ = new Flat_nscalc.nscalc_M12_Direct(buf,32);
   _._1.id = calculation.id;
   _._1.name = calculation.name;
-  {
-  let vv = _._1.elements_d(), index = 0;
-  for (let e of vv) {
-          e.value = calculation.elements[index].value;
-      e.value_base = calculation.elements[index].value_base;
-      e.ratio = calculation.elements[index].ratio;
-    ++index;
-  }
-  }
-  _._1.fertilizers_ids(calculation.fertilizers_ids.length);
-  _._1.fertilizers_ids_d().copy_from_ts_array(calculation.fertilizers_ids); 
+  _._1.elements = calculation.elements;
+  _._1.fertilizersIds = calculation.fertilizersIds;
   _._1.volume = calculation.volume;
   _._1.mode = calculation.mode;
     buf.write_len(buf.size - 4);
@@ -1987,6 +2021,13 @@ function nscalc_throw_exception(buf: NPRPC.FlatBuffer): void {
   ex.msg = ex_flat.msg;
     throw ex;
   }
+  case 3:
+  {
+    let ex_flat = new Flat_nscalc.InvalidArgument_Direct(buf, 16);
+    let ex = new InvalidArgument();
+  ex.msg = ex_flat.msg;
+    throw ex;
+  }
   default:
     throw "unknown rpc exception";
   }
@@ -2125,9 +2166,9 @@ export interface nscalc_M7 {
 export namespace Flat_nscalc {
 export class nscalc_M7_Direct extends NPRPC.Flat.Flat {
   public _1(elements_size: number): void { 
-    NPRPC.Flat._alloc(this.buffer, this.offset + 0, elements_size, 376, 8);
+    NPRPC.Flat._alloc(this.buffer, this.offset + 0, elements_size, 48, 8);
   }
-  public _1_d() { return new NPRPC.Flat.Vector_Direct2<Flat_nscalc.Calculation_Direct>(this.buffer, this.offset + 0, 376, Flat_nscalc.Calculation_Direct); }
+  public _1_d() { return new NPRPC.Flat.Vector_Direct2<Flat_nscalc.Calculation_Direct>(this.buffer, this.offset + 0, 48, Flat_nscalc.Calculation_Direct); }
 }
 } // namespace Flat 
 export interface nscalc_M8 {
@@ -2253,9 +2294,9 @@ export class nscalc_M17_Direct extends NPRPC.Flat.Flat {
   }
   public _1_d() { return new NPRPC.Flat.Vector_Direct2<Flat_nscalc.Solution_Direct>(this.buffer, this.offset + 0, 136, Flat_nscalc.Solution_Direct); }
   public _2(elements_size: number): void { 
-    NPRPC.Flat._alloc(this.buffer, this.offset + 8, elements_size, 28, 4);
+    NPRPC.Flat._alloc(this.buffer, this.offset + 8, elements_size, 32, 4);
   }
-  public _2_d() { return new NPRPC.Flat.Vector_Direct2<Flat_nscalc.Fertilizer_Direct>(this.buffer, this.offset + 8, 28, Flat_nscalc.Fertilizer_Direct); }
+  public _2_d() { return new NPRPC.Flat.Vector_Direct2<Flat_nscalc.Fertilizer_Direct>(this.buffer, this.offset + 8, 32, Flat_nscalc.Fertilizer_Direct); }
 }
 } // namespace Flat 
 export interface nscalc_M18 {

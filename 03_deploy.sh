@@ -60,12 +60,12 @@ if [ "$DEPLOY_SERVER" ]; then
       cpp-runtime-env \
       nscalc \
         --hostname $HOSTNAME \
-        --root-dir www \
+        --http-dir www \
         --data-dir data \
-        --use_ssl 1 \
-        --public_key cert/fullchain.pem \
-        --private_key cert/privkey.pem \
-        --dh_params cert/ssl-dhparams.pem \
+        --use-ssl 1 \
+        --public-key cert/fullchain.pem \
+        --private-key cert/privkey.pem \
+        --dh-params cert/ssl-dhparams.pem \
   "
 fi;
 

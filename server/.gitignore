@@ -1,5 +1,5 @@
 #
 .cache
-build
+.build
 src/idl
 external

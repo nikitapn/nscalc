@@ -3,6 +3,9 @@
 
 namespace nscalc {
 
+const GUEST_ID = 2;
+const TARGET_ELEMENT_COUNT = 14;
+
 enum ELEMENT { 
 	N_NO3, N_NH4, P, K, Ca, Mg, S, Cl, Fe, Zn, B, Mn, Cu, Mo, 
 	CO3, _P1, _P2, _P3, _P4, _P5, _P6, _P7, _P8, 
@@ -11,9 +14,10 @@ enum ELEMENT {
 
 Solution: flat {
 	id: u32;
+	userId: u32;
+	userName: string;
 	name: string;
-	owner: string;
-	elements: float64[14];
+	elements: float64[TARGET_ELEMENT_COUNT];
 }
 
 enum FertilizerBottle: u8 {
@@ -30,22 +34,23 @@ enum FertilizerType: u8 {
 
 Fertilizer: flat {
 	id: u32;
+	userId: u32;
+	userName: string;
 	name: string;
-	owner: string;
 	formula: string;
 }
 
 TargetElement : flat {
 	value: float64;
-	value_base: float64;
+	valueBase: float64;
 	ratio: float64;
 }
 
 Calculation: flat {
 	id: u32;
 	name: string;
-	elements: TargetElement[14];
-	fertilizers_ids: vector<u32>;
+	elements: string; // TargetElement[TARGET_ELEMENT_COUNT]
+	fertilizersIds: string; // vector<u32>;
 	volume: float64;
 	mode: boolean;
 }
@@ -80,10 +85,14 @@ PermissionViolation: exception {
 	msg: string;
 }
 
+InvalidArgument: exception {
+	msg: string;
+}
+
 UserData: flat {
 	name: string;
-	session_id: string;
-	db: object; 
+	sessionId: string;
+	db: object; // RegisteredUser
 }
 
 SolutionElement: flat {
@@ -138,7 +147,6 @@ Footstep: flat {
 	dir: Vector2;
 }
 
-
 [trusted=false]
 interface Authorizator {
 	UserData LogIn(login: in string, password: in string) raises(AuthorizationFailed);
@@ -155,7 +163,7 @@ interface Authorizator {
 interface RegisteredUser {
 	void GetMyCalculations(calculations: out direct vector<Calculation>);
 	
-	u32 AddSolution(name: in string, elements: in float64[14]);
+	u32 AddSolution(name: in string, elements: in float64[TARGET_ELEMENT_COUNT]);
 	void SetSolutionName(id: in u32, name: in string) raises(PermissionViolation);
 	void SetSolutionElements(id: in u32, name: in vector<SolutionElement>) raises(PermissionViolation);
 	void DeleteSolution(id: in u32) raises(PermissionViolation);

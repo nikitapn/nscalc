@@ -29,20 +29,22 @@ class Table_Calculations extends TableModel(class {}, Calculation.Calculation) {
 	}
 
 	public save_calculation(calc: Calculation.Calculation) {
+		/*
 		global.user_data.reg_user.UpdateCalculation({	
 				id: calc.get_id(),
 				name: calc.get_name(),
 				elements: calc.elements.map(x => { return {
 						value: x.value,
-						value_base: x.value_base,
+						valueBase: x.value_base,
 						ratio: x.ratio
 					}}),
-				fertilizers_ids: calc.ferts.map( x => { return x.get_id() }),
+				fertilizersIds: calc.ferts.map( x => { return x.get_id() }),
 				volume: calc.volume.mx_value,
 				mode: calc.mode,
 			}
 		).then(id => calc.set_id(id))
 		.catch(e => { console.log("save_calculation failed: " + e) });
+		*/
 	}
 
 	public delete_calculation(calc: Calculation.Calculation) {

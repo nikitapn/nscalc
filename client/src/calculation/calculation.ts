@@ -252,15 +252,16 @@ export class Calculation extends TableItem {
 		s.cost_k = 0.0;
 		let ix = 0;
 
-		for (let e of data.elements_d()) {
+		let target_elements = JSON.parse(data.elements) as Array<[number, number, number]>
+		for (let ix = 0; ix < NSCalc.TARGET_ELEMENT_COUNT; ++ix) {
 			s.elements[ix] = new TargetElement();
-			s.elements[ix].set_value(e.value_base);
-			s.elements[ix].ratio = e.ratio;
-			++ix;
+			s.elements[ix].set_value(target_elements[ix][1]);
+			s.elements[ix].ratio = target_elements[ix][2];
 		}
 
-		for (let fert_id of data.fertilizers_ids_d()) {
-			let fert = store.fertilizers.get_by_id(fert_id);
+		let fertilizerIds = JSON.parse(data.fertilizersIds) as Array<number>
+		for (let ix = 0; ix < fertilizerIds.length; ++ix) {
+			let fert = store.fertilizers.get_by_id(fertilizerIds[ix]);
 			if (fert) s.ferts.push(fert);
 		}
 

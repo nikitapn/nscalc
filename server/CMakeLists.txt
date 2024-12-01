@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.25.1)
 
 project(nscalc)
 
+find_package(SQLite3 REQUIRED)
+
 set(BOOST_LIB_PREFIX "/usr/lib" CACHE STRING "Location of the boost libs")
 
 #set(OUTPUT_LIB_DIR ${CMAKE_BINARY_DIR}/lib)
@@ -14,7 +16,8 @@ endif()
 message("Building: ${CMAKE_BUILD_TYPE}")
 
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_FLAGS_RELEASE "-O2")
+SET(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O2 -g")
 
 if(WIN32)
   if ("${OPT_BOOST_INCLUDE_DIR}" STREQUAL "")
@@ -42,7 +45,7 @@ if(WIN32)
 
   add_compile_options(/W3 /bigobj)
 else()
-  add_compile_options(-Wall -Wextra -Wpedantic )
+  add_compile_options(-Wall -Wno-deprecated-declarations)
   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
   include_directories(
@@ -86,19 +89,34 @@ foreach(file ${IDL_FILES_LIST})
   )
 endforeach()
 
+
+include_directories(
+  src
+)
+
 add_executable(nscalc
   src/idl/nscalc.hpp
   src/idl/nscalc.cpp
+  src/util/thread_pool.hpp
+  src/services/db/Database.hpp
+  src/services/db/SolutionService.hpp
+  src/services/db/FertilizerService.hpp
+  src/services/db/CalculationService.hpp
+  src/services/objects/Authorizator.hpp
+  src/services/objects/Authorizator.cpp
+  src/services/objects/Calculator.hpp
+  src/services/objects/RegisteredUser.hpp
+  src/services/objects/Chat.hpp
+  src/services/client/Observer.hpp
+  src/services/client/DataObserver.hpp
   src/main.cpp
-  src/data.hpp
-  src/singleton.hpp
-  src/thread_pool.hpp
 )
 
-target_link_libraries(nscalc PUBLIC
+target_link_libraries(nscalc PRIVATE
   pthread
   crypto
   nprpc
   boost_program_options
   boost_serialization
+  SQLite::SQLite3
 )
