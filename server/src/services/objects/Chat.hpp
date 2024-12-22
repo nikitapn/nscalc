@@ -28,4 +28,8 @@ public:
     send_to_all(nscalc::ChatMessage{timestamp, (std::string)msg.str()}, nprpc::get_context().remote_endpoint);
     return true;
   }
+
+  ~ChatImpl() {
+    std::cout << "ChatImpl destroyed" << std::endl;
+  }
 };

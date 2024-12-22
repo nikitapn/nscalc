@@ -9,6 +9,9 @@
 #include <boost/asio/thread_pool.hpp>
 #include <boost/asio/strand.hpp>
 #include <future>
+#include <mutex>
+#include <thread>
+#include <iostream>
 
 namespace nplib {
 
@@ -20,15 +23,25 @@ class thread_pool {
 	boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard1_;
 	boost::asio::thread_pool pool_{ NUMBER_OF_THREADS + NUMBER_OF_IOC_THREADS + NUMBER_OF_IOC1_THREADS };
 
+	std::mutex mtx_;
+
 	thread_pool() 
 		: work_guard_(boost::asio::make_work_guard(ioc_))
 		, work_guard1_(boost::asio::make_work_guard(ioc1_)) 
 	{ 
 		for (size_t i = 0; i < NUMBER_OF_IOC_THREADS; ++i) {
-			boost::asio::post(pool_, [this] { ioc_.run(); });
+			boost::asio::post(pool_, [this] { 
+				ioc_.run();
+				std::lock_guard lk(mtx_);
+				std::cout << "ioc thread exited: " << std::this_thread::get_id() << std::endl;
+			});
 		}
 		for (size_t i = 0; i < NUMBER_OF_IOC1_THREADS; ++i) {
-			boost::asio::post(pool_, [this] { ioc1_.run(); });
+			boost::asio::post(pool_, [this] { 
+				ioc1_.run(); 
+				std::lock_guard lk(mtx_);
+				std::cout << "ioc1 thread exited: " << std::this_thread::get_id() << std::endl;
+			});
 		}
 	}
 public:
@@ -50,17 +63,15 @@ public:
 	}
 	
 	void stop() noexcept {
-		work_guard_.reset();
 		ioc_.stop();
-		
-		work_guard1_.reset();
+		work_guard_.reset();
+
 		ioc1_.stop();
-		
-		pool_.join();
+		work_guard1_.reset();
 	}
 
-	~thread_pool() {
-		stop();
+	void wait() noexcept {
+		pool_.wait();
 	}
 };
 

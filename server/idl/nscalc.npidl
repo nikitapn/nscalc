@@ -162,18 +162,17 @@ interface Authorizator {
 [trusted=false]
 interface RegisteredUser {
 	void GetMyCalculations(calculations: out direct vector<Calculation>);
-	
+
 	u32 AddSolution(name: in string, elements: in float64[TARGET_ELEMENT_COUNT]);
 	void SetSolutionName(id: in u32, name: in string) raises(PermissionViolation);
 	void SetSolutionElements(id: in u32, name: in vector<SolutionElement>) raises(PermissionViolation);
 	void DeleteSolution(id: in u32) raises(PermissionViolation);
-	
+
 	u32 AddFertilizer(name: in string, formula: in string);
 	void SetFertilizerName(id: in u32, name: in string) raises(PermissionViolation);
 	void SetFertilizerFormula(id: in u32, name: in string) raises(PermissionViolation);
 	void DeleteFertilizer(id: in u32) raises(PermissionViolation);
-	void SaveData();
-	
+
 	u32 UpdateCalculation(calculation: in Calculation);
 	void DeleteCalculation(id: in u32);
 }
@@ -197,8 +196,7 @@ interface ChatParticipant {
 [trusted=false]
 interface Calculator {
 	void GetData(solutions: out direct vector<Solution>, fertilizers: out direct vector<Fertilizer>);
-	void GetImages(images: out direct vector<Media>);
-	void Subscribe(obj: in object);
+	void Subscribe(obj: /*DataObserver*/ in object );
 	void GetGuestCalculations(calculations: out direct vector<Calculation>);
 	void SendFootstep(footstep: in Footstep);
 }

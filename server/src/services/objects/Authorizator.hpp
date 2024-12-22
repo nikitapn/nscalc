@@ -63,4 +63,8 @@ public:
     std::shared_ptr<CalculationService> calculationService,
     std::shared_ptr<DataObservers> dataObservers
   );
+
+  ~AuthorizatorImpl() {
+    std::cout << "AuthorizatorImpl destroyed" << std::endl;
+  }
 };

@@ -19,12 +19,6 @@ public:
       nscalc::helper::assign_from_cpp_GetData_fertilizers(fertilizers, fertilizerService_->getAll());
   }
 
-  virtual void GetImages(
-      /*out*/ ::nprpc::flat::Vector_Direct2<nscalc::flat::Media, nscalc::flat::Media_Direct> images) {
-    std::vector<nscalc::Media> icons;
-    nscalc::helper::assign_from_cpp_GetImages_images(images, icons);
-  }
-
   virtual void Subscribe(nprpc::Object* obj) {
     static std::atomic_int i{0};
     dataObservers_->alarm(nscalc::AlarmType::Info, "User #" + std::to_string(++i) + " connected");
@@ -57,6 +51,10 @@ public:
     , dataObservers_{dataObservers}
     {
     }
+
+  ~CalculatorImpl() {
+    std::cout << "CalculatorImpl destroyed" << std::endl;
+  }
 };
 
 

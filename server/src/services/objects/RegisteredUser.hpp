@@ -10,7 +10,6 @@
 #include "services/db/CalculationService.hpp"
 #include "services/client/DataObserver.hpp"
 
-
 class RegisteredUser
   : public nscalc::IRegisteredUser_Servant {
   const UserService::User& user_;
@@ -18,18 +17,6 @@ class RegisteredUser
   std::shared_ptr<FertilizerService> fertilizerService_;
   std::shared_ptr<CalculationService> calculationService_;
   std::shared_ptr<DataObservers> dataObservers_;
-
-  nscalc::Fertilizer* get_fertilizer(std::uint32_t id) {
-    //auto item = data_manager->get<Fertilizers>().get_by_id(id);
-    //if (item && item->owner != user_data_.user_name) {
-    //  observers.alarm(nscalc::AlarmType::Critical, user_data_.user_name + " is fiddeling with \"" + item->name +
-    //                                                   "\": please report this incident to the authority");
-    //  throw nscalc::PermissionViolation{"You don't have rights to fiddle with this fertilizer."};
-    //}
-    //return item;
-    return nullptr;
-  }
-
 public:
   virtual void GetMyCalculations(
       /*out*/ ::nprpc::flat::Vector_Direct2<nscalc::flat::Calculation, nscalc::flat::Calculation_Direct> calculations) {
@@ -76,87 +63,53 @@ public:
   // Fertilizers
 
   virtual uint32_t AddFertilizer(::nprpc::flat::Span<char> name, ::nprpc::flat::Span<char> formula) {
-    //std::lock_guard<Fertilizers> lk(data_manager->get<Fertilizers>());
-
-    //auto f = data_manager->get<Fertilizers>().create();
-    //f->name = name;
-    //f->owner = user_data_.user_name;
-    //f->formula = formula;
-    //return f->id;
-    return 0;
+    auto stName = (std::string)name;
+    auto id = fertilizerService_->addFertilizer(user_.id, stName, (std::string)formula);
+    dataObservers_->alarm(nscalc::AlarmType::Info, user_.user_name + " added fertilizer \"" + stName + "\"");
+    return id;
   }
 
   virtual void SetFertilizerName(uint32_t id, ::nprpc::flat::Span<char> name) {
-    //std::lock_guard<Fertilizers> lk(data_manager->get<Fertilizers>());
-
-    //if (auto item = get_fertilizer(id); item) {
-    //  item->name = (std::string_view)name;
-    //} else {
-    //  std::cerr << "fertilizer with id = " << id << " was not found..\n";
-    //}
+    fertilizerService_->updateFertilizerName(id, user_.id, (std::string)name);
   }
 
   virtual void SetFertilizerFormula(uint32_t id, ::nprpc::flat::Span<char> name) {
-    //std::lock_guard<Fertilizers> lk(data_manager->get<Fertilizers>());
-
-    //if (auto item = get_fertilizer(id); item) {
-    //  item->formula = name;
-    //} else {
-    //  std::cerr << "fertilizer with id = " << id << " was not found..\n";
-    //}
+    fertilizerService_->updateFertilizerFormula(id, user_.id, (std::string)name);
   }
 
   virtual void DeleteFertilizer(uint32_t id) {
-    //std::string name;
-    //bool deleted = false;
-    //{
-    //  std::lock_guard<Fertilizers> lk(data_manager->get<Fertilizers>());
+    auto fertilizer = fertilizerService_->getFertilizer(id);
+    if (!fertilizer)
+      return;
 
-    //  if (auto item = get_fertilizer(id); item) {
-    //    deleted = true;
-    //    data_manager->get<Fertilizers>().remove_by_id(id);
-    //  }
-    //}
-    //if (deleted) {
-    ///  observers.alarm(nscalc::AlarmType::Info, user_data().user_name + " has deleted fertilizer \"" + name + "\"");
-    //}
+    if (fertilizer->userId != user_.id) {
+      dataObservers_->alarm(nscalc::AlarmType::Critical, user_.user_name + " is fiddeling with \"" + fertilizer->name +
+        "\": please report this incident to the authority");
+      throw nscalc::PermissionViolation{"You don't have rights to fiddle with this fertilizer."};
+    }
+
+    if (fertilizerService_->deleteFertilizer(id, user_.id)) {
+      dataObservers_->alarm(nscalc::AlarmType::Info, user_.user_name + " has deleted fertilizer \"" + fertilizer->name + "\"");
+    }
   }
 
-  // Solutions
+  // Calculations
 
-  virtual uint32_t UpdateCalculation(nscalc::flat::Calculation_Direct calculation) {
+  virtual uint32_t UpdateCalculation(nscalc::flat::Calculation_Direct calculationFlat) {
+    nscalc::Calculation calculation;
+    nscalc::helper::assign_from_flat_UpdateCalculation_calculation(calculationFlat, calculation);
 
-    //uint32_t id = calculation.id();
-    //{
-    //  std::lock_guard<Calculations> lk(*calculations);
-
-    //  nscalc::Calculation* calc = calculations->get_by_id(id);
-
-    //  if (!calc) {
-    //    calc = calculations->create();
-     //   id = calculation.id() = calc->id;
-     // }
-
-     // nscalc::helper::assign_from_flat_UpdateCalculation_calculation(calculation, *calc);
-    //}
-
-    //calculations->store();
-
-    //return id;
-    return 0;
+    auto id = calculation.id;
+    if (!calculationService_->isExist(id)) {
+      id = calculationService_->insertCalculation(calculation, user_.id);
+    } else {
+      calculationService_->updateCalculation(calculation, user_.id);
+    }
+    return id;
   }
 
   virtual void DeleteCalculation(uint32_t id) {
-    //{
-    //  std::lock_guard<Calculations> lk(*calculations);
-    //  calculations->remove_by_id(id);
-    //}
-    //calculations->store();
-  }
-
-  virtual void SaveData() {
-    //data_manager->get<Solutions>().store();
-    //data_manager->get<Fertilizers>().store();
+    calculationService_->deleteCalculation(id, user_.id);
   }
 
   RegisteredUser(
@@ -174,6 +127,6 @@ public:
   }
 
   ~RegisteredUser() {
-    std::cerr << "~RegisteredUser()\n";
+    std::cout << "Registered user \"" << user_.user_name << "\" disconnected\n";
   }
 };

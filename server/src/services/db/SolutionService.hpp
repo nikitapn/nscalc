@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <sqlite3.h>
 #include <string>
 #include "Database.hpp"
@@ -55,16 +56,14 @@ public:
     return static_cast<uint32_t>(insertedId);
   }
 
-  bool updateSolutionName(uint32_t id, uint32_t userId, const std::string &name) noexcept {
+  void updateSolutionName(uint32_t id, uint32_t userId, const std::string &name) noexcept {
     sqlite3_bind_text(update_name_stmt_, 1, name.c_str(), -1, SQLITE_STATIC);
     sqlite3_bind_int(update_name_stmt_, 2, id);
     sqlite3_bind_int(update_name_stmt_, 3, userId);
     if (sqlite3_step(update_name_stmt_) != SQLITE_DONE) {
       std::cerr << "Failed to execute UPDATE: " << sqlite3_errmsg(db_->getConnection()) << std::endl;
-      return false;
     }
     sqlite3_reset(update_name_stmt_);
-    return true;
   }
 
   void updateSolutionElements(uint32_t id, uint32_t userId, ::nprpc::flat::Span_ref<nscalc::flat::SolutionElement, nscalc::flat::SolutionElement_Direct> elementsToUpdate) {
@@ -91,31 +90,32 @@ public:
   }
 
   std::optional<nscalc::Solution> getSolution(uint32_t id) {
+    std::optional<nscalc::Solution> result;
     sqlite3_bind_int(get_stmt_, 1, id);
-    nscalc::Solution solution;
     if (sqlite3_step(get_stmt_) == SQLITE_ROW) {
+      nscalc::Solution solution;
       solution.id = sqlite3_column_int(get_stmt_, 0);
       solution.userId = sqlite3_column_int(get_stmt_, 1);
       solution.name = reinterpret_cast<const char *>(sqlite3_column_text(get_stmt_, 2));
       for (size_t i = 0; i < nscalc::TARGET_ELEMENT_COUNT; ++i) {
         solution.elements[i] = sqlite3_column_double(get_stmt_, 3 + i);
       }
-    } else {
-      return std::nullopt;
+      result = solution;
     }
     sqlite3_reset(get_stmt_);
-    return solution;
+    return result;
   }
 
   bool deleteSolution(uint32_t id, uint32_t userId) noexcept {
+    bool result = true;
     sqlite3_bind_int(delete_stmt_, 1, id);
     sqlite3_bind_int(delete_stmt_, 2, userId);
     if (sqlite3_step(delete_stmt_) != SQLITE_DONE) {
       std::cerr << "Failed to execute DELETE: " << sqlite3_errmsg(db_->getConnection()) << std::endl;
-      return false;
+      result = false;
     }
     sqlite3_reset(delete_stmt_);
-    return true;
+    return result;
   }
 };
 

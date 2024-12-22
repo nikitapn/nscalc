@@ -138,9 +138,9 @@ int main(int argc, char *argv[]) {
     auto chat = injector2.create<std::shared_ptr<ChatImpl>>();
 
     // Capture SIGINT and SIGTERM to perform a clean shutdown
-    boost::asio::signal_set signals(thread_pool::get_instance().ctx(), SIGINT, SIGTERM);
+    boost::asio::signal_set signals(thread_pool::get_instance().executor(), SIGINT, SIGTERM);
     signals.async_wait([&](boost::beast::error_code const&, int) {
-      thread_pool::get_instance().ctx().stop();
+      thread_pool::get_instance().stop();
     });
 
     host_json.secured = use_ssl;
@@ -160,8 +160,9 @@ int main(int argc, char *argv[]) {
     }
 
     thread_pool::get_instance().ctx().run();
-    thread_pool::get_instance().stop();
-    rpc->destroy();
+    thread_pool::get_instance().wait();
+
+    // rpc->destroy();
 
   } catch (std::exception& ex) {
     std::cerr << ex.what() << '\n';

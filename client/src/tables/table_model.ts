@@ -101,7 +101,7 @@ export function TableModelWithCommands<T extends TableItem>(unused: { new(is_new
 			this.commands_clear();
 			this.sort();
 
-			global.user_data.reg_user.SaveData();
+			// global.user_data.reg_user.SaveData();
 		}
 	}
 }
