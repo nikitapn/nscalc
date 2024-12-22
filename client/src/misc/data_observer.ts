@@ -7,6 +7,9 @@ import * as nscalc from 'rpc/nscalc'
 import { alarms, Alarm } from 'misc/alarm'
 import { Footstep, footsteps } from 'mouse/footstep';
 
+import { renderer } from 'mouse/main';
+import { camera } from 'mouse/camera';
+
 export class DataObserverImpl extends nscalc._IDataObserver_Servant implements nscalc.IDataObserver_Servant {
 	DataChanged(idx: number): void {
 		// console.log("DataObserverImpl(): " + idx.toString());
@@ -27,5 +30,8 @@ export class DataObserverImpl extends nscalc._IDataObserver_Servant implements n
 		let pos = footstep.pos;
 		let dir = footstep.dir;
 		footsteps.push(new Footstep([color.x, color.y, color.z], footstep.idx, [pos.x, pos.y], [dir.x, dir.y]));
+		requestAnimationFrame(() => {
+			renderer.render(camera);
+		});
 	}
 }

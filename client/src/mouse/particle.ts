@@ -24,7 +24,7 @@ export class Particle {
     mat4.translate(t, t, [-this.position[0], -this.position[1], 0]);
 
     let world = mat4.create();
-    mat4.scale(world, world, [ 20, 20, 1 ]);
+    mat4.scale(world, world, [ 14, 14, 1 ]);
     mat4.multiply(world, t, world);
 
     return world;

@@ -88,7 +88,7 @@ export class Renderer {
 		gl.enableVertexAttribArray(ix_texture);
 
 		for (let firework of this.fireworks) {
-			for (let particle of firework.particles) {			
+			for (let particle of firework.particles) {
 			gl.uniformMatrix4fv(ix_world, false, particle.world);
 			gl.uniform4fv(ix_color, particle.color);
 			gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);

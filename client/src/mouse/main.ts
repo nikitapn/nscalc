@@ -43,38 +43,35 @@ export const init = (canvas: HTMLCanvasElement) => {
 
 	timer = new Timer();
 
-
 	document.addEventListener("mousemove", on_mouse_move);
-	//setTimeout(tick, 30);
+
 	the_loop();
 }
-
-let stop = true;
-
 
 let t = 0;
 const the_loop = (): void => {
 	timer.update();
 
-	if (t > 16) firework_system.stop = true;
-	firework_system.update(timer);
-	
-	renderer.render(camera);
-	requestAnimationFrame(the_loop);
-	//if (!stop) requestAnimationFrame(the_loop);
 	t += timer.dt;
+
+	firework_system.update(timer);
+	processFootsteps(timer.dt);	
+
+	renderer.render(camera);
+	
+	if (!firework_system.stop) {
+		requestAnimationFrame(the_loop);
+	} else {
+		setTimeout(the_loop, 100);
+	}
 }
 
-const tick = (): void => {
-	setTimeout(tick, 30);
-
+let last_time = 0;
+const processFootsteps = (dt: number): void => {
+	last_time += dt;
+	if (last_time < 0.028) return;
+	last_time = 0;
 	let k = footsteps.length;
-	
-	if (k === 0) {
-		stop = true;
-		return;
-	}
-	
 	for (let i = 0; i < k; ++i) {
 		if (--footsteps[i].ttl == 0) {
 			if (k <= footsteps.length) {
@@ -84,12 +81,8 @@ const tick = (): void => {
 		}
 	}
 
-	if (k != footsteps.length) footsteps.splice(k);
-
-	if (stop == true) {
-		stop = false;
-		requestAnimationFrame(the_loop);
-	}
+	if (k != footsteps.length)
+		footsteps.splice(k);
 }
 
 let cnt = 0;
@@ -101,7 +94,7 @@ const on_mouse_move = (ev: MouseEvent) => {
 		return;
 	}
 
-	if (cnt % 32 !== 0) return;
+	if (cnt % 16 !== 0) return;
 
 	let pos = camera.screen_to_xy_plane(ev.clientX, ev.clientY);
 	let dir = vec2.fromValues(pos[0] - prev_pos[0], pos[1] - prev_pos[1]);
@@ -114,7 +107,7 @@ const on_mouse_move = (ev: MouseEvent) => {
 		while (distance - 64 > 0) {
 			distance -= 64;
 			vec2.add(prev_pos, prev_pos, dir);
-			//footsteps.push(new Footstep([1, 0, 0], footstep_cnt++, prev_pos, dir));
+			// footsteps.push(new Footstep([1, 0, 0], footstep_cnt++, prev_pos, dir));
 			calculator.SendFootstep({ 
 				color: footstep_color,
 				idx: footstep_cnt++,
@@ -123,7 +116,7 @@ const on_mouse_move = (ev: MouseEvent) => {
 			});
 		}
 	} else{
-		//footsteps.push(new Footstep([1, 0, 0], footstep_cnt++, pos, dir));
+		// footsteps.push(new Footstep([1, 0, 0], footstep_cnt++, pos, dir));
 		calculator.SendFootstep({ 
 			color: footstep_color, 
 			idx: footstep_cnt++,

@@ -26,3 +26,20 @@ export function setCookie(name: string, value: string, days: number, secure: boo
 	}
 	document.cookie = name + "=" + (value || "")  + expires + (secure ? "secure;" : ";") + " path=/";
 }
+
+export const array_fast_remove = <T> (index: number, ar: Array<T>): boolean => {
+	let last_ix = ar.length - 1;
+	if (last_ix === index) {
+		ar.length = last_ix;
+		return false;
+	} else {
+		let tmp = ar[last_ix];
+		ar.length = last_ix;
+		if (ar.length >= 1) {
+			ar[index] = tmp;
+			return true;
+		} else {
+			return false
+		}
+	}
+}

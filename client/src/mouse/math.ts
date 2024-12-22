@@ -41,6 +41,10 @@ export namespace math {
 		return [Math.sin(alpha), Math.cos(alpha)];
 	}
 
+	export const clamp = (value: number, limit: number): number => {
+		return value > limit ? limit : value;
+	}
+
 	export const add_clamp1 = (a: number, value: number, limit: number): number => {
 		let tmp = a + value;
 		return tmp > limit ? limit : tmp;
