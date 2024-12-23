@@ -86,19 +86,23 @@ public:
     return getByKey(lowercase, users_by_email_) == nullptr;
   }
 
-  void addUser(const std::string& username, const std::string& email, const std::string& password) {
-    User user;
-    user.email = email;
-    user.password_sha256 = sha256(password);
-    user.user_name = username;
-
-    sqlite3_bind_text(insert_stmt_, 1, user.email.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_blob(insert_stmt_, 2, user.password_sha256.c_str(), user.password_sha256.length(), SQLITE_STATIC);
-    sqlite3_bind_text(insert_stmt_, 3, user.user_name.c_str(), -1, SQLITE_STATIC);
+  uint32_t addUser(std::unique_ptr<User> user) {
+    sqlite3_bind_text(insert_stmt_, 1, user->user_name.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_blob(insert_stmt_, 2, user->password_sha256.c_str(), user->password_sha256.length(), SQLITE_STATIC);
+    sqlite3_bind_text(insert_stmt_, 3, user->email.c_str(), -1, SQLITE_STATIC);
     if (sqlite3_step(insert_stmt_) != SQLITE_DONE) {
       std::cerr << "Failed to execute INSERT: " << sqlite3_errmsg(db_->getConnection()) << std::endl;
     }
     sqlite3_reset(insert_stmt_);
+
+    auto id = sqlite3_last_insert_rowid(db_->getConnection());
+    user->id = static_cast<uint32_t>(id);
+
+    users_by_email_[user->email] = user.get();
+    users_by_name_[user->user_name] = user.get();
+    users_.emplace_back(std::move(user));
+
+    return id;
   }
 
   const User* getUserByName(std::string_view name) const noexcept {

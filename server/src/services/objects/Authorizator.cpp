@@ -93,20 +93,22 @@ void AuthorizatorImpl::AuthorizatorImpl::RegisterStepOne(::nprpc::flat::Span<cha
   }
 
   NewUser user;
+  user.user = std::make_unique<UserService::User>();
 
-  user.user.email = email;
-  user.user.password_sha256 = UserService::sha256(password);
-  user.user.user_name = username;
+  user.user->password_sha256 = UserService::sha256(password);
+  user.user->user_name = username;
+  user.user->email = email;
+
   std::uniform_int_distribution<std::uint32_t> dist(10000, 99999);
   user.code = dist(rd_);
 
   // std::cerr << "Code: " << user.code << '\n';
 
-  dataObservers_->alarm(nscalc::AlarmType::Info, "Dear " + user.user.user_name + ", here is your confirmation code: " + std::to_string(user.code));
+  dataObservers_->alarm(nscalc::AlarmType::Info, "Dear " + user.user->user_name + ", here is your confirmation code: " + std::to_string(user.code));
 
   {
     std::lock_guard<std::mutex> lk(new_users_mut_);
-    new_users_db_.emplace(user.user.user_name, std::move(user));
+    new_users_db_.emplace(user.user->user_name, std::move(user));
   }
 }
 
@@ -118,11 +120,12 @@ void AuthorizatorImpl::RegisterStepTwo(::nprpc::flat::Span<char> username, uint3
       throw nscalc::RegistrationFailed(nscalc::RegistrationFailed_Reason::incorrect_code);
     }
     dataObservers_->alarm(nscalc::AlarmType::Info, "New user '" + it->first + "' has been registered");
+    auto user = std::move(it->second.user);
+    new_users_db_.erase(it);
     {
       std::lock_guard lk(*userService_);
-      userService_->addUser(it->second.user.user_name, it->second.user.email, it->second.user.password_sha256);
+      userService_->addUser(std::move(user));
     }
-    new_users_db_.erase(it);
   } else {
     throw nscalc::RegistrationFailed(nscalc::RegistrationFailed_Reason::invalid_username);
   }

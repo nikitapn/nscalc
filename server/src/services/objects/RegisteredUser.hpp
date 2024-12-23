@@ -100,7 +100,7 @@ public:
     nscalc::helper::assign_from_flat_UpdateCalculation_calculation(calculationFlat, calculation);
 
     auto id = calculation.id;
-    if (!calculationService_->isExist(id)) {
+    if (!calculationService_->hasCalculation(id)) {
       id = calculationService_->insertCalculation(calculation, user_.id);
     } else {
       calculationService_->updateCalculation(calculation, user_.id);

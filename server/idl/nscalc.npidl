@@ -181,6 +181,8 @@ interface DataObserver {
 	async DataChanged(idx: in u32);
 	async OnAlarm(alarm: in Alarm);
 	async OnFootstep(footstep: in Footstep);
+	// async OnChange_Solution(solution: in Solution);
+	// async OnChange_Fertilizer(fertilizer: in Fertilizer);
 }
 
 [trusted=false]

@@ -97,7 +97,7 @@ include_directories(
 add_executable(nscalc
   src/idl/nscalc.hpp
   src/idl/nscalc.cpp
-  src/util/thread_pool.hpp
+  src/util/util.hpp
   src/services/db/Database.hpp
   src/services/db/SolutionService.hpp
   src/services/db/FertilizerService.hpp

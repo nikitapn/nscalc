@@ -12,7 +12,7 @@
 #include <boost/program_options.hpp>
 #include <nprpc/serialization/oarchive.h>
 #include "services/db/UserService.hpp"
-#include "util/thread_pool.hpp"
+#include "util/util.hpp"
 #include "services/boost/di.hpp"
 #include "services/db/Database.hpp"
 #include "services/db/SolutionService.hpp"
@@ -46,17 +46,6 @@ struct HostJson {
 };
 
 int main(int argc, char *argv[]) {
-  auto toHex = [](std::string_view str) {
-    std::string result;
-    for (auto c : str) {
-      auto b = (unsigned char)c;
-      result += "0123456789ABCDEF"[b >> 4];
-      result += "0123456789ABCDEF"[b & 0x0F];
-    }
-    return result;
-  };
-
-  std::cout << toHex(UserService::sha256("1234")) << std::endl;
   namespace di = boost::di;
   namespace po = boost::program_options;
   namespace fs = std::filesystem;
@@ -76,13 +65,19 @@ int main(int argc, char *argv[]) {
     ("use-ssl", po::value<bool>(&use_ssl)->default_value(false), "Enable SSL")
     ("public-key", po::value<std::string>(&public_key)->default_value(""), "Path to public key")
     ("private-key", po::value<std::string>(&private_key)->default_value(""), "Path to private key")
-    ("dh-params", po::value<std::string>(&dh_params)->default_value(""), "Path to Diffie-Hellman parameters");
+    ("dh-params", po::value<std::string>(&dh_params)->default_value(""), "Path to Diffie-Hellman parameters")
+    ("get-sha256", po::value<std::string>(), "Return SHA256 of the password");
 
   try {
     po::variables_map vm;
     po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
     if (vm.count("help")) {
       std::cout << desc << "\n";
+      return 0;
+    }
+    if (vm.count("get-sha256")) {
+      auto pwd = vm.at("get-sha256").as<std::string>();
+      std::cout << pwd << ":\n  " << nplib::toHex(UserService::sha256(pwd)) << std::endl;
       return 0;
     }
     po::notify(vm);

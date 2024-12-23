@@ -12,6 +12,7 @@
 #include <mutex>
 #include <thread>
 #include <iostream>
+#include <string_view>
 
 namespace nplib {
 
@@ -99,4 +100,17 @@ async(Executor& ctx, Func&& job, Args&&... args) {
 	));
 }
 
+inline std::string toHex(std::string_view str) noexcept {
+  std::string result;
+  for (auto c : str) {
+    auto b = (unsigned char)c;
+    result += "0123456789ABCDEF"[b >> 4];
+    result += "0123456789ABCDEF"[b & 0x0F];
+  }
+  return result;
+};
+
 } // namespace nplib
+
+
+using thread_pool = nplib::thread_pool_4;

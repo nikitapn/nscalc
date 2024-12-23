@@ -19,7 +19,7 @@ export class DataObserverImpl extends nscalc._IDataObserver_Servant implements n
 		for (let i = 0; i < alarms.length; ++i) {
 			if (alarms[i].confirmed) {
 				alarms.splice(i, 0, new Alarm(alarm.id, alarm.type, alarm.msg));
-				return;		
+				return;
 			}
 		}
 		alarms.push(new Alarm(alarm.id, alarm.type, alarm.msg));

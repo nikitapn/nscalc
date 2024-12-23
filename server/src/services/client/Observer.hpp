@@ -1,9 +1,7 @@
 #pragma once
 
 #include <nprpc/nprpc.hpp>
-#include "util/thread_pool.hpp"
-
-using thread_pool = nplib::thread_pool_4;
+#include "util/util.hpp"
 
 template <typename T>
 class ObserversT {

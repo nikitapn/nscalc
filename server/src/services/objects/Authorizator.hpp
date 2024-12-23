@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <unordered_map>
 #include <set>
 #include "idl/nscalc.hpp"
@@ -36,7 +37,7 @@ class AuthorizatorImpl : public nscalc::IAuthorizator_Servant {
   std::set<Session> sessions_;
 
   struct NewUser {
-    UserService::User user;
+    std::unique_ptr<UserService::User> user;
     std::uint32_t code;
   };
 

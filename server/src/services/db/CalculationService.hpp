@@ -48,7 +48,7 @@ public:
     sqlite3_reset(delete_stmt_);
   }
 
-  bool isExist(uint32_t id) {
+  bool hasCalculation(uint32_t id) {
     sqlite3_bind_int(is_exist_stmt_, 1, id);
     bool result = sqlite3_step(is_exist_stmt_) == SQLITE_ROW;
     sqlite3_reset(delete_stmt_);
