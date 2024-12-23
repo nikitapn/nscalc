@@ -3,6 +3,7 @@
 #include <memory>
 #include <unordered_map>
 #include <set>
+#include <random>
 #include "idl/nscalc.hpp"
 #include "services/db/UserService.hpp"
 #include "services/db/FertilizerService.hpp"

@@ -8,6 +8,7 @@ RUN useradd -m -d /home/nscalc -s /bin/bash nscalc
 RUN apt-get update && apt-get install -y \
     libstdc++6 \
     openssl \
+    sqlite3 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Add Boost runtime libraries

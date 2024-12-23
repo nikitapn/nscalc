@@ -39,6 +39,13 @@ SERVER=$(echo $1 | sed -n 's/\(.*\):.*/\1/p')
 
 [ -z $SERVER ] || [ -z $TEMP_DIR ] && echo 'incorrect input' && exit 1
 
+if [ "$DEPLOY_DATA" ]; then
+  scp runtime/nscalc-data.tar.gz $1
+  ssh $SERVER "cd $TEMP_DIR && \
+    tar -xzf nscalc-data.tar.gz -C $APP_DIR \
+  "
+fi;
+
 if [ "$DEPLOY_CLIENT" ]; then
   scp runtime/nscalc-client.tar.gz $1
   ssh $SERVER "cd $TEMP_DIR && \
@@ -66,12 +73,5 @@ if [ "$DEPLOY_SERVER" ]; then
         --public-key cert/fullchain.pem \
         --private-key cert/privkey.pem \
         --dh-params cert/ssl-dhparams.pem \
-  "
-fi;
-
-if [ "$DEPLOY_DATA" ]; then
-  scp runtime/nscalc-data.tar.gz $1
-  ssh $SERVER "cd $TEMP_DIR && \
-    tar -xzf nscalc-data.tar.gz -C $APP_DIR \
   "
 fi;
