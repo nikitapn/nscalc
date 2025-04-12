@@ -15,13 +15,13 @@ export var axis_color_buffer: WebGLBuffer = null;
 export var identity_matrix: mat4 = null;
 
 /*
-	0				1
+	0		1
 	---------
-	|				|
-	|				|
-	|				|
+	|		|
+	|		|
+	|		|
 	---------
-	2				3
+	2		3
 */
 
 const quad_vertices = [

@@ -57,7 +57,7 @@
   {#if $activeTab}
     {#each $tabs as tab (tab.id)}
       {#if tab.id === $activeTab}
-        <svelte:component this={tab.component} {...tab.props} />
+        <tab.component {...tab.props} />
       {/if}
     {/each}
   {:else}
