@@ -1,0 +1,25 @@
+namespace proxy {
+
+using bytestream = vector<u8>;
+
+interface User {
+	/**
+	 * Forwards socks5 request to the server over websocket
+	 * @param data - bytestream of the request
+	 * @return bytestream of the response
+	 */
+	bytestream SendRecive(data: in bytestream);
+}
+
+AuthorizationFailed: exception {}
+
+[trusted=false]
+interface Server {
+	/**
+	 * @param secret - secret key for the server
+	 * @return object - object (User) to communicate with the server
+	 */
+	void LogIn(secret: in string, user: out object) raises(AuthorizationFailed);
+}
+
+} // namespace proxy

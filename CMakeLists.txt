@@ -8,12 +8,19 @@ set(BOOST_LIB_PREFIX "/usr/lib" CACHE STRING "Location of the boost libs")
 
 if("${CMAKE_BUILD_TYPE}" STREQUAL "")
   set(CMAKE_BUILD_TYPE "Release")
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/release)
+elseif("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/debug)
+else()
+  set(CMAKE_BUILD_TYPE "Release")
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/release)
+  message(WARNING "CMAKE_BUILD_TYPE is not set to Debug or Release, defaulting to Release")
 endif()
 
 message("Building: ${CMAKE_BUILD_TYPE}")
 
 set(CMAKE_CXX_STANDARD 20)
-SET(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g")
+set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2 -g")
 
 if(WIN32)
@@ -54,14 +61,14 @@ else()
   #)
 endif()
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 add_subdirectory(external/npsystem/nplib)
 add_subdirectory(external/npsystem/nprpc)
 
 include(external/npsystem/nprpc/cmake/npidl.cmake)
-set(IDL_FILES ${CMAKE_SOURCE_DIR}/idl/nscalc.npidl)
-npidl_generate_idl_files("${IDL_FILES}" nscalc_stub)
+npidl_generate_idl_files("${CMAKE_SOURCE_DIR}/idl/nscalc.npidl" nscalc_stub)
+npidl_generate_idl_files("${CMAKE_SOURCE_DIR}/idl/proxy.npidl" proxy_stub)
 
 add_subdirectory(server)
 add_subdirectory(client)
+add_subdirectory(proxy_client)

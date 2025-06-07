@@ -3,12 +3,15 @@ find_package(SQLite3 REQUIRED)
 
 include_directories(
   ${nscalc_stub_INCLUDE_DIR}
+  ${proxy_stub_INCLUDE_DIR}
   src
 )
 
 add_executable(nscalc
   ${nscalc_stub_GENERATED_HEADERS}
   ${nscalc_stub_GENERATED_SOURCES}
+  ${proxy_stub_GENERATED_HEADERS}
+  ${proxy_stub_GENERATED_SOURCES}
   src/util/util.hpp
   src/services/db/Database.hpp
   src/services/db/SolutionService.hpp
@@ -19,6 +22,7 @@ add_executable(nscalc
   src/services/objects/Calculator.hpp
   src/services/objects/RegisteredUser.hpp
   src/services/objects/Chat.hpp
+  src/services/objects/Proxy.hpp
   src/services/client/Observer.hpp
   src/services/client/DataObserver.hpp
   src/main.cpp
@@ -34,4 +38,4 @@ target_link_libraries(nscalc PRIVATE
 )
 
 # Ensure that the IDL files are generated before building the executable
-add_dependencies(nscalc nscalc_stub_gen)
+add_dependencies(nscalc nscalc_stub_gen proxy_stub_gen)

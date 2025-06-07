@@ -8,10 +8,10 @@
             "defines": [],
             "compilerPath": "/usr/bin/clang",
             "cStandard": "c17",
-            "cppStandard": "c++17",
+            "cppStandard": "c++23",
             "intelliSenseMode": "linux-clang-x64",
             "compileCommands": [
-                "${workspaceFolder}/server/compile_commands.json"
+                "${workspaceFolder}/compile_commands.json"
             ]
         }
     ],

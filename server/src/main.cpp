@@ -21,6 +21,7 @@
 #include "services/objects/Calculator.hpp"
 #include "services/objects/Authorizator.hpp"
 #include "services/objects/Chat.hpp"
+#include "services/objects/Proxy.hpp"
 
 struct HostJson {
   bool secured;
@@ -29,12 +30,14 @@ struct HostJson {
     nprpc::ObjectId calculator;
     nprpc::ObjectId authorizator;
     nprpc::ObjectId chat;
+    nprpc::ObjectId proxy;
 
     template <typename Archive>
     void serialize(Archive& ar) {
       ar & NVP(calculator);
       ar & NVP(authorizator);
       ar & NVP(chat);
+      ar & NVP(proxy);
     }
   } objects;
 
@@ -135,13 +138,14 @@ int main(int argc, char *argv[]) {
 
     // static poa
     auto poa = nprpc::PoaBuilder(rpc)
-		  .with_max_objects(3)
+		  .with_max_objects(4)
 		  .with_lifespan(nprpc::PoaPolicy::Lifespan::Persistent)
 		  .build();
 
     auto calc = injector2.create<std::shared_ptr<CalculatorImpl>>();
     auto authorizator = injector2.create<std::shared_ptr<AuthorizatorImpl>>();
     auto chat = injector2.create<std::shared_ptr<ChatImpl>>();
+    auto proxy = injector2.create<std::shared_ptr<ProxyImpl>>();
 
     // Capture SIGINT and SIGTERM to perform a clean shutdown
     boost::asio::signal_set signals(thread_pool::get_instance().executor(), SIGINT, SIGTERM);
@@ -156,6 +160,7 @@ int main(int argc, char *argv[]) {
     host_json.objects.calculator = poa->activate_object(calc.get(), flags);
     host_json.objects.authorizator = poa->activate_object(authorizator.get(), flags);
     host_json.objects.chat = poa->activate_object(chat.get(), flags);
+    host_json.objects.proxy = poa->activate_object(proxy.get(), flags);
 
     std::cout << "calculator  - poa: " << calc->poa_index() << ", oid: " << calc->oid() << "\n";
     std::cout << "authorizator - poa: " << authorizator->poa_index() << ", oid: " << authorizator->oid() << "\n";

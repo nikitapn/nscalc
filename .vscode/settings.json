@@ -10,6 +10,7 @@
     "ranges": "cpp",
     "span": "cpp",
     "regex": "cpp",
-    "valarray": "cpp"
+    "valarray": "cpp",
+    "qapplication": "cpp"
   }
 }
