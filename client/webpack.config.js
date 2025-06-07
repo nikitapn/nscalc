@@ -4,10 +4,14 @@ const TerserPlugin = require('terser-webpack-plugin');
 const sveltePreprocess = require('svelte-preprocess');
 
 module.exports = env => {
-	let production = env.production ? true : false;
+	const config = {
+		production: env.production == "true" ? true : false,
+		watch: env.watch == "true" ? true : false,
+	};
+	console.log('Webpack configuration:\n' + JSON.stringify(config, null, 2));
 	return {
 		optimization: {
-			minimize: production,
+			minimize: config.production,
 			minimizer: [new TerserPlugin({
 				terserOptions: {
 				ecma: undefined,
@@ -26,14 +30,13 @@ module.exports = env => {
 				safari10: false,
 			}})],
 		},
-		watch: !production,
-		watchOptions: {
-
-		},
-		mode: production ? 'production' : 'development',
+		watch: config.watch,
+		watchOptions: {},
+		mode: config.production ? 'production' : 'development',
 		entry: {
 			home: './src/index.tsx'
 		},
+		devtool: config.production ? undefined : 'source-map',
 		output: {
 			path: path.resolve(__dirname, './public/build'),
 			filename: 'index.js'
@@ -47,7 +50,7 @@ module.exports = env => {
 						options: {
 							emitCss: true,
               hotReload: true,
-							preprocess: sveltePreprocess({ sourceMap: !production })
+							preprocess: sveltePreprocess({ sourceMap: !config.production })
 						}
 					}
 				},
@@ -69,7 +72,7 @@ module.exports = env => {
 		},
 		plugins: [
 			new webpack.DefinePlugin({
-				"process.env.NODE_ENV": JSON.stringify(production ? 'production' : 'development'),
+				"process.env.NODE_ENV": JSON.stringify(config.production ? 'production' : 'development'),
 				"process.env.server": env.server ? true : false
 			})
 		]

@@ -13,7 +13,7 @@ add_custom_command(
 
 add_custom_command(
   OUTPUT nscalc_js.stamp
-  COMMAND  npm ci && npm run build
+  COMMAND  npm ci && npm run build-debug
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   DEPENDS ${NSCALC_DST}
   COMMENT "Building nscalc TypeScript client"
@@ -21,5 +21,7 @@ add_custom_command(
 )
 
 add_custom_target(nscalc_js ALL
-  DEPENDS nscalc_js.stamp ${NSCALC_DST}
+  DEPENDS
+    nscalc_js.stamp
+    nscalc_stub_gen
 )

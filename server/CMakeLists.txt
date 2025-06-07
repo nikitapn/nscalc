@@ -7,6 +7,7 @@ include_directories(
 )
 
 add_executable(nscalc
+  ${nscalc_stub_GENERATED_HEADERS}
   ${nscalc_stub_GENERATED_SOURCES}
   src/util/util.hpp
   src/services/db/Database.hpp
@@ -31,3 +32,6 @@ target_link_libraries(nscalc PRIVATE
   boost_serialization
   SQLite::SQLite3
 )
+
+# Ensure that the IDL files are generated before building the executable
+add_dependencies(nscalc nscalc_stub_gen)
