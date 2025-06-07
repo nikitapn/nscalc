@@ -11,7 +11,10 @@ nscalc::UserData AuthorizatorImpl::tryLogIn(std::string_view user_email, std::st
     }
 
     auto new_user = new RegisteredUser(*user, solutionService_, fertilizerService_, calculationService_, dataObservers_);
-    auto oid = user_poa->activate_object(new_user, &nprpc::get_context(), true);
+    auto oid = user_poa->activate_object(new_user, 
+      nprpc::ObjectActivationFlags::SESSION_SPECIFIC,
+      &nprpc::get_context()
+    );
 
     Session s;
     do {
@@ -143,8 +146,11 @@ AuthorizatorImpl::AuthorizatorImpl(
   , fertilizerService_{fertilizerService}
   , calculationService_{calculationService}
   , dataObservers_{dataObservers}
-{
-  auto policy = std::make_unique<nprpc::Policy_Lifespan>(nprpc::Policy_Lifespan::Transient);
-  user_poa = rpc.create_poa(1024, {policy.get()});
+{	
+  user_poa = nprpc::PoaBuilder(&rpc)
+		.with_max_objects(1024)
+		.with_lifespan(nprpc::PoaPolicy::Lifespan::Transient)
+		.build();
+
   userService_->load();
 }

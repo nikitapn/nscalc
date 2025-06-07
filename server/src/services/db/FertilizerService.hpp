@@ -3,7 +3,7 @@
 #include <memory>
 #include <sqlite3.h>
 #include "Database.hpp"
-#include "idl/nscalc.hpp"
+#include "nscalc_stub/nscalc.hpp"
 
 class FertilizerService {
   std::shared_ptr<Database> db_;

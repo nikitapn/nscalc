@@ -87,19 +87,28 @@ int main(int argc, char *argv[]) {
   }
 
   try {
-    nprpc::Config rpc_cfg;
-    rpc_cfg.debug_level = nprpc::DebugLevel::DebugLevel_Critical;
-    rpc_cfg.port = 0;
-    rpc_cfg.websocket_port = port;
-    rpc_cfg.http_root_dir = http_dir;
-    rpc_cfg.use_ssl = use_ssl;
-    rpc_cfg.ssl_public_key = public_key;
-    rpc_cfg.ssl_secret_key = private_key;
-    rpc_cfg.ssl_dh_params = dh_params;
-    rpc_cfg.hostname = hostname;
-    rpc_cfg.spa_links = { "/calculator", "/solutions", "/fertilizers", "/links", "/chat", "/about" };
+    auto builder = nprpc::RpcBuilder();
+    builder
+      .set_debug_level(nprpc::DebugLevel::DebugLevel_Critical)
+      .set_listen_http_port(port)
+      .set_http_root_dir(http_dir)
+      .set_hostname(hostname)
+      .set_spa_links({
+        "/calculator",
+        "/solutions",
+        "/fertilizers",
+        "/links",
+        "/chat",
+        "/about"
+      });
+    if (use_ssl) {
+      if (public_key.empty() || private_key.empty()) {
+        throw std::runtime_error("Certificate and private key paths must be provided when using SSL.");
+      }
+      builder.enable_ssl_server(public_key, private_key, dh_params);
+    }
 
-    auto rpc = nprpc::init(thread_pool::get_instance().ctx(), std::move(rpc_cfg));
+    auto rpc = builder.build(thread_pool::get_instance().ctx());
 
     auto firstInjector = [&] () { return di::make_injector(
       di::bind<>().to(*rpc),
@@ -125,8 +134,10 @@ int main(int argc, char *argv[]) {
     );
 
     // static poa
-    auto policy = std::make_unique<nprpc::Policy_Lifespan>(nprpc::Policy_Lifespan::Persistent);
-    auto poa = rpc->create_poa(3, {policy.get()});
+    auto poa = nprpc::PoaBuilder(rpc)
+		  .with_max_objects(3)
+		  .with_lifespan(nprpc::PoaPolicy::Lifespan::Persistent)
+		  .build();
 
     auto calc = injector2.create<std::shared_ptr<CalculatorImpl>>();
     auto authorizator = injector2.create<std::shared_ptr<AuthorizatorImpl>>();
@@ -138,10 +149,13 @@ int main(int argc, char *argv[]) {
       thread_pool::get_instance().stop();
     });
 
+    const auto flags = nprpc::ObjectActivationFlags::ALLOW_WEBSOCKET
+      | nprpc::ObjectActivationFlags::ALLOW_SSL_WEBSOCKET;
+
     host_json.secured = use_ssl;
-    host_json.objects.calculator = poa->activate_object(calc.get());
-    host_json.objects.authorizator = poa->activate_object(authorizator.get());
-    host_json.objects.chat = poa->activate_object(chat.get());
+    host_json.objects.calculator = poa->activate_object(calc.get(), flags);
+    host_json.objects.authorizator = poa->activate_object(authorizator.get(), flags);
+    host_json.objects.chat = poa->activate_object(chat.get(), flags);
 
     std::cout << "calculator  - poa: " << calc->poa_index() << ", oid: " << calc->oid() << "\n";
     std::cout << "authorizator - poa: " << authorizator->poa_index() << ", oid: " << authorizator->oid() << "\n";

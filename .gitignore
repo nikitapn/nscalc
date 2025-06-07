@@ -1,4 +1,6 @@
-.build
+/.build
+/.build_local
+/external
 sample_data
 runtime
 database/my.sql

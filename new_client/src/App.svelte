@@ -20,7 +20,7 @@
   {:else if currentView === View.Solutions}
     <Solutions />
   {:else if currentView === View.Fertilizers}
-    <span>Fertilizer</span>
+    <Fertilizers />
   {:else if currentView === View.Chat}
     <span>Chat</span>
   {:else if currentView === View.About}
@@ -125,6 +125,7 @@
 
 <script lang="ts">
   import Solutions from "./view/Solutions.svelte";
+  import Fertilizers from "./view/Fertilizers.svelte";
 
   enum View {
     Calculator,

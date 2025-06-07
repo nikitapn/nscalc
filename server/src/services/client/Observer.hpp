@@ -4,6 +4,7 @@
 #include "util/util.hpp"
 
 template <typename T>
+requires std::is_base_of_v<nprpc::Object, T>
 class ObserversT {
   boost::asio::io_context::strand strand_;
 
@@ -28,8 +29,7 @@ protected:
   struct not_equal_to_endpoint_t {
     const nprpc::EndPoint& endpoint;
     bool operator()(std::unique_ptr<T>& obj) const noexcept {
-      return obj->_data().ip4 == endpoint.ip4 &&
-             obj->_data().port == endpoint.port;
+      return obj->get_endpoint() == endpoint;
     }
   };
 

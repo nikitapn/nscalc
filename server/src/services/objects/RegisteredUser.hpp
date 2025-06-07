@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-#include "idl/nscalc.hpp"
+#include "nscalc_stub/nscalc.hpp"
 #include "services/client/DataObserver.hpp"
 #include "services/db/UserService.hpp"
 #include "services/db/FertilizerService.hpp"
