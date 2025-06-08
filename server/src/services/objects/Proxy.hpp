@@ -115,16 +115,12 @@ public:
   
   virtual void RegisterCallbacks(nprpc::Object* callbacks) override {
     session_callbacks_ = nprpc::narrow<proxy::SessionCallbacks>(callbacks);
-    std::cout << "ProxyUser::RegisterCallbacks - Callbacks registered" << std::endl;
   }
   
   virtual uint32_t EstablishTunnel(::nprpc::flat::Span<char> target_host, uint16_t target_port) override {
     std::string host = target_host;
-    std::cout << "ProxyUser::EstablishTunnel to " << host << ":" << target_port << std::endl;
-    
     try {
       // Create new connection
-      std::cout << "++Creating new ProxyConnection for " << host << ":" << target_port << std::endl;
       auto connection = std::make_shared<ProxyConnection>(ioc_);
       uint32_t connection_id = next_connection_id_++;
       
@@ -134,8 +130,6 @@ public:
       
       boost::system::error_code ec;
       boost::asio::connect(connection->socket(), endpoints, ec);
-      
-      std::cout << "--DONE connecting to " << host << ":" << target_port << std::endl;
 
       if (ec) {
         std::cerr << "Failed to connect to " << host << ":" << target_port 
@@ -152,12 +146,9 @@ public:
           session_callbacks_->OnDataReceived(std::nullopt, connection_id, data);
         }
       });
-      
+
       connection->start_reading();
-      
-      std::cout << "Successfully established tunnel " << connection_id 
-                << " to " << host << ":" << target_port << std::endl;
-      
+
       return connection_id;
       
     } catch (const std::exception& e) {
@@ -167,15 +158,12 @@ public:
   }
   
   virtual bool SendData(uint32_t session_id, ::nprpc::flat::Span<uint8_t> data) override {
-    std::cout << "ProxyUser::SendData - session " << session_id 
-              << ", " << data.size() << " bytes" << std::endl;
-    
     auto it = connections_.find(session_id);
     if (it == connections_.end()) {
       std::cerr << "Connection " << session_id << " not found" << std::endl;
       return false;
     }
-    
+
     try {
       it->second->send_data(data);
       return true;
@@ -187,8 +175,6 @@ public:
   }
   
   virtual void CloseTunnel(uint32_t session_id) override {
-    std::cout << "ProxyUser::CloseTunnel - session " << session_id << std::endl;
-    
     auto it = connections_.find(session_id);
     if (it != connections_.end()) {
       it->second->socket().close();
@@ -213,14 +199,12 @@ public:
   virtual void LogIn (::nprpc::flat::Span<char> secret, nprpc::detail::flat::ObjectId_Direct user)
   {
     // TODO: Check secret to some database or something
-    std::cout << "ProxyImpl::LogIn called." << std::endl;
     auto oid = poa_->activate_object(
       new ProxyUser(ioc_), // create a new ProxyUser object
       nprpc::ObjectActivationFlags::SESSION_SPECIFIC, // activation_flags
       &nprpc::get_context() // session context
     );
     nprpc::Object::assign_to_direct(oid, user);
-    std::cout << "User logged in with ID: " << oid.object_id() << std::endl;
   }
 
   ProxyImpl(nprpc::Rpc& rpc)

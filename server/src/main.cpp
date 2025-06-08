@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
   try {
     auto builder = nprpc::RpcBuilder();
     builder
-      .set_debug_level(nprpc::DebugLevel::DebugLevel_EveryCall)
+      .set_debug_level(nprpc::DebugLevel::DebugLevel_Critical)
       .set_listen_http_port(port)
       .set_http_root_dir(http_dir)
       .set_hostname(hostname)

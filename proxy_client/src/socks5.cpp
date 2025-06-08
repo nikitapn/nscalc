@@ -283,12 +283,9 @@ private:
   }
 
   void establish_tunnel() {
-    std::cout << "++Establishing tunnel to " << target_host_ << ":" << target_port_ << std::endl;
-    
     try {
       // Use the new EstablishTunnel method
       session_id_ = proxy_user_->EstablishTunnel(target_host_, target_port_);
-      std::cout << "--Tunnel established with session id: " << session_id_ << std::endl;
       if (session_id_ == 0) {
         std::cerr << "Failed to establish tunnel. Session id: " << session_id_ << std::endl;
         send_connect_response(SOCKS5_REP::GENERAL_FAILURE);
@@ -365,10 +362,8 @@ private:
         if (self->session_id_ != 0 && self->tunnel_established_) {
           try {
             proxy::bytestream data(self->buffer_.begin(), self->buffer_.begin() + length);
-            std::cout << "++Forwarding " << length << " bytes to proxy session " << self->session_id_ << std::endl;
             self->proxy_user_->set_timeout(2000); // Set timeout for proxy operations
             bool success = self->proxy_user_->SendData(self->session_id_, data);
-            std::cout << "--Data sent through proxy" << std::endl;
             if (!success) {
               std::cerr << "Failed to send data through proxy" << std::endl;
             }
@@ -407,7 +402,6 @@ private:
         if (ec) {
           fail(ec, "accept");
         } else {
-          std::cout << "New SOCKS5 connection accepted\n";
           std::make_shared<SOCKS5Session>(std::move(socket), proxy_user_)->start();
         }
         
@@ -420,7 +414,6 @@ private:
 class ProxySessionCallbacks : public proxy::ISessionCallbacks_Servant {
 public:
   void OnDataReceived(uint32_t session_id, ::nprpc::flat::Span<uint8_t> data) override {
-    std::cout << "OnDataReceived: session " << session_id << ", " << data.size() << " bytes" << std::endl;
     auto session = SessionManager::getInstance().getSession(session_id);
     if (session) {
       session->onDataFromServer(data);
@@ -430,7 +423,6 @@ public:
   }
 
   void OnSessionClosed(uint32_t session_id, uint32_t reason) override {
-    std::cout << "OnSessionClosed: session " << session_id << ", reason " << reason << std::endl;
     auto session = SessionManager::getInstance().getSession(session_id);
     if (session) {
       session->onServerClosed(reason);
@@ -443,13 +435,13 @@ public:
 void SessionManager::registerSession(uint32_t session_id, std::shared_ptr<SOCKS5Session> session) {
   std::lock_guard<std::mutex> lock(mutex_);
   sessions_[session_id] = session;
-  std::cout << "Registered session " << session_id << std::endl;
+  // std::cout << "Registered session " << session_id << std::endl;
 }
 
 void SessionManager::unregisterSession(uint32_t session_id) {
   std::lock_guard<std::mutex> lock(mutex_);
   sessions_.erase(session_id);
-  std::cout << "Unregistered session " << session_id << std::endl;
+  // std::cout << "Unregistered session " << session_id << std::endl;
 }
 
 std::shared_ptr<SOCKS5Session> SessionManager::getSession(uint32_t session_id) {
@@ -501,7 +493,7 @@ public:
     try {
       // Initialize NPRPC
       rpc_ = nprpc::RpcBuilder()
-        .set_debug_level(nprpc::DebugLevel::DebugLevel_EveryCall)
+        .set_debug_level(nprpc::DebugLevel::DebugLevel_Critical)
         .build(thpool::get_instance().ctx());
 
       poa_ = nprpc::PoaBuilder(rpc_)
