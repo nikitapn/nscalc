@@ -2,10 +2,9 @@
 // Copyright (C) 2016 The Qt Company Ltd.
 // SPDX-License-Identifier: LicenseRef-Qt-Commercial OR BSD-3-Clause
 
-#ifndef WINDOW_H
-#define WINDOW_H
+#pragma once
 
-#include "proxy.hpp"
+#include "socks5.hpp"
 
 #include <memory>
 
@@ -83,5 +82,3 @@ private:
 //! [0]
 
 #endif // QT_NO_SYSTEMTRAYICON
-
-#endif

@@ -2,13 +2,50 @@ namespace proxy {
 
 using bytestream = vector<u8>;
 
+interface SessionCallbacks {
+	/**
+	 * Called when data is received from the target server
+	 * @param session_id - unique session identifier
+	 * @param data - data received from target server
+	 */
+	async OnDataReceived(session_id: in u32, data: in bytestream);
+	
+	/**
+	 * Called when a session is closed
+	 * @param session_id - unique session identifier
+	 * @param reason - reason for closure (0=normal, 1=error)
+	 */
+	async OnSessionClosed(session_id: in u32, reason: in u32);
+}
+
 interface User {
 	/**
-	 * Forwards socks5 request to the server over websocket
-	 * @param data - bytestream of the request
-	 * @return bytestream of the response
+	 * Register callback object for receiving data from server
+	 * @param callbacks - callback object implementing SessionCallbacks
 	 */
-	bytestream SendRecive(data: in bytestream);
+	void RegisterCallbacks(callbacks: in object);
+	
+	/**
+	 * Establish a new SOCKS5 tunnel session
+	 * @param target_host - target hostname or IP
+	 * @param target_port - target port
+	 * @return session_id - unique session identifier (0 on failure)
+	 */
+	u32 EstablishTunnel(target_host: in string, target_port: in u16);
+	
+	/**
+	 * Send data through an established tunnel
+	 * @param session_id - session identifier
+	 * @param data - data to send to target server
+	 * @return success - true if data was sent successfully
+	 */
+	boolean SendData(session_id: in u32, data: in bytestream);
+	
+	/**
+	 * Close a tunnel session
+	 * @param session_id - session identifier
+	 */
+	void CloseTunnel(session_id: in u32);
 }
 
 AuthorizationFailed: exception {}

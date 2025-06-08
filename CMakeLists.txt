@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25.1)
+cmake_minimum_required(VERSION 4.0.1)
 project(nscalc)
 
 set(BOOST_LIB_PREFIX "/usr/lib" CACHE STRING "Location of the boost libs")
@@ -19,9 +19,10 @@ endif()
 
 message("Building: ${CMAKE_BUILD_TYPE}")
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2 -g")
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(WIN32)
   if ("${OPT_BOOST_INCLUDE_DIR}" STREQUAL "")

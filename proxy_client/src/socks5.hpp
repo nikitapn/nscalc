@@ -1,5 +1,4 @@
-#ifndef PROXY_HPP
-#define PROXY_HPP
+#pragma once
 
 #include <string_view>
 
@@ -12,7 +11,5 @@ public:
     std::string_view host,
     std::string_view port,
     std::string_view secret);
+  ~Proxy();
 };
-
-
-#endif // PROXY_HPP

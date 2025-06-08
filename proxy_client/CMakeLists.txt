@@ -1,18 +1,6 @@
-cmake_minimum_required(VERSION 4.0.1)
-
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 COMPONENTS Core Gui Widgets REQUIRED)
 qt_standard_project_setup()
-
-if (UNIX)
-  set(BOOST_LIB_PREFIX "/usr/lib" CACHE STRING "Location of the boost libs")
-  set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-  set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
-  set(CMAKE_CXX_FLAGS_RELEASE "-O2")
-endif()
-
 
 if (WIN32)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zc:__cplusplus")
@@ -50,8 +38,8 @@ set(SOURCES
   src/main.cpp
   src/MainWindow.hpp
   src/MainWindow.cpp
-  src/proxy.hpp
-  src/proxy.cpp
+  src/socks5.hpp
+  src/socks5_bidirectional.cpp
 )
 
 qt_add_resources(SOURCES src/systray.qrc)
