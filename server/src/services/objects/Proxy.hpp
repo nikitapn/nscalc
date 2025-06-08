@@ -69,13 +69,16 @@ public:
     do_read();
   }
   
-  void send_data(const proxy::bytestream& data) {
+  void send_data(const nprpc::flat::Span<uint8_t>& data) {
     auto self = shared_from_this();
-    boost::asio::async_write(socket_, boost::asio::buffer(data.data(), data.size()),
-      [self](boost::system::error_code ec, std::size_t) {
+    // Make a copy of the data to keep it alive during the async operation
+    auto data_copy = std::make_shared<std::vector<uint8_t>>(data.begin(), data.end());
+    boost::asio::async_write(socket_, boost::asio::buffer(data_copy->data(), data_copy->size()),
+      [self, data_copy](boost::system::error_code ec, std::size_t) {
         if (ec) {
           std::cerr << "Error writing to target socket: " << ec.message() << std::endl;
         }
+        // data_copy will be automatically destroyed when lambda goes out of scope
       });
   }
   
@@ -107,7 +110,7 @@ private:
 public:
   ProxyUser(boost::asio::io_context& ioc) : ioc_(ioc) {}
   ~ProxyUser() {
-    std::cout << "ProxyUser destructor called, cleaning up connections" << std::endl;
+    std::cout << "ProxyUser destructor called." << std::endl;
   }
   
   virtual void RegisterCallbacks(nprpc::Object* callbacks) override {
@@ -121,6 +124,7 @@ public:
     
     try {
       // Create new connection
+      std::cout << "++Creating new ProxyConnection for " << host << ":" << target_port << std::endl;
       auto connection = std::make_shared<ProxyConnection>(ioc_);
       uint32_t connection_id = next_connection_id_++;
       
@@ -131,6 +135,8 @@ public:
       boost::system::error_code ec;
       boost::asio::connect(connection->socket(), endpoints, ec);
       
+      std::cout << "--DONE connecting to " << host << ":" << target_port << std::endl;
+
       if (ec) {
         std::cerr << "Failed to connect to " << host << ":" << target_port 
                   << " - " << ec.message() << std::endl;
@@ -171,8 +177,7 @@ public:
     }
     
     try {
-      proxy::bytestream data_vec(data.begin(), data.end());
-      it->second->send_data(data_vec);
+      it->second->send_data(data);
       return true;
     } catch (const std::exception& e) {
       std::cerr << "Error sending data to connection " << session_id 
@@ -200,13 +205,17 @@ public:
 class ProxyImpl : public proxy::IServer_Servant {
   nprpc::Rpc& rpc_;
   nprpc::Poa* poa_ = nullptr;
+  boost::asio::io_context ioc_;
+  boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard_ = 
+    boost::asio::make_work_guard(ioc_);
+  std::thread ioc_thread_;
 public:
   virtual void LogIn (::nprpc::flat::Span<char> secret, nprpc::detail::flat::ObjectId_Direct user)
   {
     // TODO: Check secret to some database or something
     std::cout << "ProxyImpl::LogIn called." << std::endl;
     auto oid = poa_->activate_object(
-      new ProxyUser(thread_pool::get_instance().ctx()), // create a new ProxyUser object
+      new ProxyUser(ioc_), // create a new ProxyUser object
       nprpc::ObjectActivationFlags::SESSION_SPECIFIC, // activation_flags
       &nprpc::get_context() // session context
     );
@@ -221,5 +230,13 @@ public:
       .with_lifespan(nprpc::PoaPolicy::Lifespan::Transient)
       .with_max_objects(32)
       .build();
+    
+    ioc_thread_ = std::thread([this]() {
+      try {
+        ioc_.run();
+      } catch (const std::exception& e) {
+        std::cerr << "IO context thread exception: " << e.what() << std::endl;
+      }
+    });
   }
 };

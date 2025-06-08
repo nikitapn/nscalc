@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <optional>
 #include <unordered_map>
+#include <mutex>
 
 #include "socks5.hpp"
 #include "util.hpp"
@@ -16,50 +17,79 @@
 
 #include <proxy_stub/proxy.hpp>
 
+// SOCKS5 Protocol Constants
+enum class SOCKS5_AUTH : uint8_t {
+  NO_AUTH           = 0x00,
+  GSSAPI            = 0x01,
+  USERNAME_PASSWORD = 0x02,
+  NO_ACCEPTABLE     = 0xFF
+};
+
+enum class SOCKS5_CMD : uint8_t {
+  CONNECT       = 0x01,
+  BIND          = 0x02,
+  UDP_ASSOCIATE = 0x03
+};
+
+enum class SOCKS5_ATYP : uint8_t {
+  IPV4        = 0x01,
+  DOMAINNAME  = 0x03,
+  IPV6        = 0x04
+};
+
+enum class SOCKS5_REP : uint8_t {
+  SUCCEEDED                   = 0x00,
+  GENERAL_FAILURE             = 0x01,
+  CONNECTION_NOT_ALLOWED      = 0x02,
+  NETWORK_UNREACHABLE         = 0x03,
+  HOST_UNREACHABLE            = 0x04,
+  CONNECTION_REFUSED          = 0x05,
+  TTL_EXPIRED                 = 0x06,
+  COMMAND_NOT_SUPPORTED       = 0x07,
+  ADDRESS_TYPE_NOT_SUPPORTED  = 0x08
+};
+
+
+
+// Forward declaration
 
 namespace {
-  // SOCKS5 Protocol Constants
-  enum class SOCKS5_AUTH : uint8_t {
-    NO_AUTH = 0x00,
-    GSSAPI = 0x01,
-    USERNAME_PASSWORD = 0x02,
-    NO_ACCEPTABLE = 0xFF
-  };
 
-  enum class SOCKS5_CMD : uint8_t {
-    CONNECT = 0x01,
-    BIND = 0x02,
-    UDP_ASSOCIATE = 0x03
-  };
-
-  enum class SOCKS5_ATYP : uint8_t {
-    IPV4 = 0x01,
-    DOMAINNAME = 0x03,
-    IPV6 = 0x04
-  };
-
-  enum class SOCKS5_REP : uint8_t {
-    SUCCEEDED = 0x00,
-    GENERAL_FAILURE = 0x01,
-    CONNECTION_NOT_ALLOWED = 0x02,
-    NETWORK_UNREACHABLE = 0x03,
-    HOST_UNREACHABLE = 0x04,
-    CONNECTION_REFUSED = 0x05,
-    TTL_EXPIRED = 0x06,
-    COMMAND_NOT_SUPPORTED = 0x07,
-    ADDRESS_TYPE_NOT_SUPPORTED = 0x08
-  };
-
-  void fail(boost::system::error_code ec, char const* what) {
-     std::cerr << what << ": " << ec.message() << "\n";
-  }
+void fail(boost::system::error_code ec, char const* what) {
+  std::cerr << what << ": " << ec.message() << "\n";
 }
+
+class SOCKS5Session;
+// Session manager to map session IDs to SOCKS5Session objects
+class SessionManager {
+private:
+  static SessionManager* instance_;
+  std::unordered_map<uint32_t, std::weak_ptr<SOCKS5Session>> sessions_;
+  mutable std::mutex mutex_;
+
+public:
+  static SessionManager& getInstance() {
+    if (!instance_) {
+      instance_ = new SessionManager();
+    }
+    return *instance_;
+  }
+
+  void registerSession(uint32_t session_id, std::shared_ptr<SOCKS5Session> session);
+
+  void unregisterSession(uint32_t session_id); 
+
+  std::shared_ptr<SOCKS5Session> getSession(uint32_t session_id);
+  
+};
+
+SessionManager* SessionManager::instance_ = nullptr;
 
 class SOCKS5Session : public std::enable_shared_from_this<SOCKS5Session> {
 private:
   boost::asio::ip::tcp::socket client_socket_;
   proxy::User* proxy_user_;
-  std::array<uint8_t, 8192> buffer_;
+  std::array<uint8_t, 8192 * 1024> buffer_;
   std::string target_host_;
   uint16_t target_port_;
   uint32_t session_id_;
@@ -75,6 +105,30 @@ public:
 
   void start() {
     do_read_auth_request();
+  }
+
+  // Called when data is received from the proxy server
+  void onDataFromServer(::nprpc::flat::Span<uint8_t> data) {
+    if (!tunnel_established_) {
+      std::cerr << "Received data but tunnel not established" << std::endl;
+      return;
+    }
+
+    // Forward data to client
+    auto self = shared_from_this();
+    auto data_copy = std::make_shared<std::vector<uint8_t>>(data.begin(), data.end());
+    boost::asio::async_write(client_socket_, boost::asio::buffer(data_copy->data(), data_copy->size()),
+      [self, data_copy](boost::system::error_code ec, std::size_t) {
+        if (ec) {
+          std::cerr << "Error writing to client: " << ec.message() << std::endl;
+        }
+      });
+  }
+
+  // Called when the server closes the session
+  void onServerClosed(uint32_t reason) {
+    std::cout << "Server closed session, reason: " << reason << std::endl;
+    client_socket_.close();
   }
 
 private:
@@ -107,7 +161,7 @@ private:
     auto self = shared_from_this();
     client_socket_.async_read_some(
       boost::asio::buffer(buffer_.data(), nmethods),
-      [self](boost::system::error_code ec, std::size_t length) {
+      [self, nmethods](boost::system::error_code ec, std::size_t length) {
         if (ec) {
           fail(ec, "auth methods read");
           return;
@@ -202,7 +256,7 @@ private:
       client_socket_.async_read_some(
         boost::asio::buffer(buffer_.data(), 1), // domain length
         [self](boost::system::error_code ec, std::size_t length) {
-          if (ec || length < 1) {
+          if (ec || length < 1ul) {
             fail(ec, "domain length read");
             return;
           }
@@ -211,7 +265,7 @@ private:
           self->client_socket_.async_read_some(
             boost::asio::buffer(self->buffer_.data(), domain_len + 2), // domain + port
             [self, domain_len](boost::system::error_code ec, std::size_t length) {
-              if (ec || length < domain_len + 2) {
+              if (ec || length < domain_len + 2ul) {
                 fail(ec, "domain address read");
                 return;
               }
@@ -224,60 +278,29 @@ private:
             });
         });
     } else {
-      send_connect_response(SOCKS5_REP::ADDRESS_TYPE_NOT_SUPPORTED);
+      self->send_connect_response(SOCKS5_REP::ADDRESS_TYPE_NOT_SUPPORTED);
     }
   }
 
   void establish_tunnel() {
-    // Create SOCKS5 connect request to send through NPRPC
-    std::vector<uint8_t> connect_request;
-    
-    // SOCKS5 header
-    connect_request.push_back(0x05); // Version
-    connect_request.push_back(0x01); // CMD: CONNECT
-    connect_request.push_back(0x00); // Reserved
-    
-    // Check if target_host_ is an IP address or domain name
-    boost::system::error_code ec;
-    auto addr = boost::asio::ip::address::from_string(target_host_, ec);
-    
-    if (!ec && addr.is_v4()) {
-      // IPv4 address
-      connect_request.push_back(0x01); // ATYP: IPv4
-      auto bytes = addr.to_v4().to_bytes();
-      connect_request.insert(connect_request.end(), bytes.begin(), bytes.end());
-    } else {
-      // Domain name
-      connect_request.push_back(0x03); // ATYP: Domain name
-      connect_request.push_back(static_cast<uint8_t>(target_host_.length()));
-      connect_request.insert(connect_request.end(), target_host_.begin(), target_host_.end());
-    }
-    
-    // Port (big-endian)
-    connect_request.push_back((target_port_ >> 8) & 0xFF);
-    connect_request.push_back(target_port_ & 0xFF);
-    
-    std::cout << "Establishing tunnel to " << target_host_ << ":" << target_port_ << std::endl;
+    std::cout << "++Establishing tunnel to " << target_host_ << ":" << target_port_ << std::endl;
     
     try {
-      proxy::bytestream data(connect_request.begin(), connect_request.end());
-      auto response = proxy_user_->SendRecive(data);
-      
-      // Parse SOCKS5 response
-      if (response.size() >= 2 && response[0] == 0x05) {
-        SOCKS5_REP rep = static_cast<SOCKS5_REP>(response[1]);
-        
-        if (rep == SOCKS5_REP::SUCCEEDED) {
-          tunnel_established_ = true;
-          send_connect_response(SOCKS5_REP::SUCCEEDED);
-          return;
-        } else {
-          send_connect_response(rep);
-          return;
-        }
+      // Use the new EstablishTunnel method
+      session_id_ = proxy_user_->EstablishTunnel(target_host_, target_port_);
+      std::cout << "--Tunnel established with session id: " << session_id_ << std::endl;
+      if (session_id_ == 0) {
+        std::cerr << "Failed to establish tunnel. Session id: " << session_id_ << std::endl;
+        send_connect_response(SOCKS5_REP::GENERAL_FAILURE);
+        return;
       }
       
-      send_connect_response(SOCKS5_REP::GENERAL_FAILURE);
+      // Register this session with the session manager
+      SessionManager::getInstance().registerSession(session_id_, shared_from_this());
+      
+      tunnel_established_ = true;
+      send_connect_response(SOCKS5_REP::SUCCEEDED);
+      
     } catch (const std::exception& e) {
       std::cerr << "Tunnel establishment failed: " << e.what() << std::endl;
       send_connect_response(SOCKS5_REP::GENERAL_FAILURE);
@@ -327,36 +350,34 @@ private:
           if (ec != boost::asio::error::eof) {
             fail(ec, "client read");
           }
+          // Close the tunnel when client disconnects
+          if (self->session_id_ != 0) {
+            try {
+              self->proxy_user_->CloseTunnel(self->session_id_);
+            } catch (const std::exception& e) {
+              std::cerr << "Error closing tunnel: " << e.what() << std::endl;
+            }
+          }
           return;
         }
         
-        // Forward data through NPRPC proxy
-        proxy::bytestream data(self->buffer_.begin(), self->buffer_.begin() + length);
-        
-        try {
-          auto response = self->proxy_user_->SendRecive(data);
-          self->do_write_to_client(std::move(response));
-        } catch (const std::exception& e) {
-          std::cerr << "Proxy error: " << e.what() << std::endl;
-        }
-      });
-  }
-
-  void do_write_to_client(proxy::bytestream&& data) {
-    if (data.empty()) {
-      // Continue reading if no response data
-      do_read_from_client();
-      return;
-    }
-
-    auto self = shared_from_this();
-    boost::asio::async_write(client_socket_, boost::asio::buffer(data.data(), data.size()),
-      [self](boost::system::error_code ec, std::size_t) {
-        if (ec) {
-          fail(ec, "client write");
-          return;
+        // Forward data through NPRPC proxy using SendData
+        if (self->session_id_ != 0 && self->tunnel_established_) {
+          try {
+            proxy::bytestream data(self->buffer_.begin(), self->buffer_.begin() + length);
+            std::cout << "++Forwarding " << length << " bytes to proxy session " << self->session_id_ << std::endl;
+            self->proxy_user_->set_timeout(2000); // Set timeout for proxy operations
+            bool success = self->proxy_user_->SendData(self->session_id_, data);
+            std::cout << "--Data sent through proxy" << std::endl;
+            if (!success) {
+              std::cerr << "Failed to send data through proxy" << std::endl;
+            }
+          } catch (const std::exception& e) {
+            std::cerr << "Proxy send error: " << e.what() << std::endl;
+          }
         }
         
+        // Continue reading from client
         self->do_read_from_client();
       });
   }
@@ -381,7 +402,7 @@ public:
 
 private:
   void do_accept() {
-    acceptor_.async_accept(
+    acceptor_.async_accept(boost::asio::make_strand(ioc_),
       [this](boost::system::error_code ec, boost::asio::ip::tcp::socket socket) {
         if (ec) {
           fail(ec, "accept");
@@ -395,22 +416,98 @@ private:
   }
 };
 
+// Callback implementation for receiving data from proxy server
+class ProxySessionCallbacks : public proxy::ISessionCallbacks_Servant {
+public:
+  void OnDataReceived(uint32_t session_id, ::nprpc::flat::Span<uint8_t> data) override {
+    std::cout << "OnDataReceived: session " << session_id << ", " << data.size() << " bytes" << std::endl;
+    auto session = SessionManager::getInstance().getSession(session_id);
+    if (session) {
+      session->onDataFromServer(data);
+    } else {
+      std::cerr << "Session " << session_id << " not found for data forwarding" << std::endl;
+    }
+  }
+
+  void OnSessionClosed(uint32_t session_id, uint32_t reason) override {
+    std::cout << "OnSessionClosed: session " << session_id << ", reason " << reason << std::endl;
+    auto session = SessionManager::getInstance().getSession(session_id);
+    if (session) {
+      session->onServerClosed(reason);
+    }
+    SessionManager::getInstance().unregisterSession(session_id);
+  }
+};
+
+// SessionManager implementation should be placed after the SOCKS5Session class
+void SessionManager::registerSession(uint32_t session_id, std::shared_ptr<SOCKS5Session> session) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  sessions_[session_id] = session;
+  std::cout << "Registered session " << session_id << std::endl;
+}
+
+void SessionManager::unregisterSession(uint32_t session_id) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  sessions_.erase(session_id);
+  std::cout << "Unregistered session " << session_id << std::endl;
+}
+
+std::shared_ptr<SOCKS5Session> SessionManager::getSession(uint32_t session_id) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  auto it = sessions_.find(session_id);
+  if (it != sessions_.end()) {
+    return it->second.lock();
+  }
+  return nullptr;
+}
+
+} // anonymous namespace
+
 class Proxy::Impl {
   nprpc::Rpc* rpc_;
+  nprpc::Poa* poa_;
   proxy::Server* server_;
   proxy::User* user_;
   std::shared_ptr<SOCKS5Server> socks5_server_;
-  
+  std::unique_ptr<ProxySessionCallbacks> callbacks_;
+  nprpc::ObjectId callbacks_activation_;
+  boost::asio::io_context ioc_;
+  boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard_ = 
+    boost::asio::make_work_guard(ioc_);
+  std::thread ioc_thread_;
+  std::thread ioc_thread2_;
 public:
   Impl(
     std::string_view host,
     std::string_view port, 
     std::string_view secret)
   {
+    ioc_thread_ = std::thread([this]() {
+      try {
+        ioc_.run();
+        std::cout << "IO context thread finished" << std::endl;
+      } catch (const std::exception& e) {
+        std::cerr << "IO context thread exception: " << e.what() << std::endl;
+      }
+    });
+    // ioc_thread2_ = std::thread([this]() {
+    //   try {
+    //     ioc_.run();
+    //     std::cout << "IO context thread finished" << std::endl;
+    //   } catch (const std::exception& e) {
+    //     std::cerr << "IO context thread exception: " << e.what() << std::endl;
+    //   }
+    // });
     try {
       // Initialize NPRPC
-      rpc_ = nprpc::RpcBuilder().build(thpool::get_instance().ctx());
-    
+      rpc_ = nprpc::RpcBuilder()
+        .set_debug_level(nprpc::DebugLevel::DebugLevel_EveryCall)
+        .build(thpool::get_instance().ctx());
+
+      poa_ = nprpc::PoaBuilder(rpc_)
+        .with_lifespan(nprpc::PoaPolicy::Lifespan::Persistent)
+        .build();
+
       server_ = new proxy::Server(0); // Assuming 0 is the interface index
       auto& oid = server_->get_data();
       oid.object_id = 3;
@@ -424,21 +521,34 @@ public:
       server_->select_endpoint(std::nullopt);
 
       // Login to get the User proxy object
-      nprpc::Object* user_obj;
-      server_->LogIn(std::string(secret), user_obj);
-      user_ = nprpc::narrow<proxy::User>(user_obj);
       
+      nprpc::Object* out;
+      server_->LogIn(std::string(secret), out);
+      user_ = nprpc::narrow<proxy::User>(out);
+      assert(out == nullptr); // Ensure out is null after narrow
+
       if (!user_) {
         throw std::runtime_error("Failed to cast to proxy::User");
       }
 
+      user_->add_ref(); // Increase reference count
+
       std::cout << "Successfully connected to proxy server" << std::endl;
+
+      // Create and register session callbacks
+      callbacks_ = std::make_unique<ProxySessionCallbacks>();
+      callbacks_activation_ = poa_->activate_object(
+        callbacks_.get(), 
+        nprpc::ObjectActivationFlags::SESSION_SPECIFIC);
+      
+      user_->RegisterCallbacks(callbacks_activation_);
+      std::cout << "Session callbacks registered" << std::endl;
 
       // Start SOCKS5 server on port 1080
       socks5_server_ = std::make_shared<SOCKS5Server>(
-        thpool::get_instance().ctx(), 1080, user_);
+        ioc_, 1080, user_);
       socks5_server_->start();
-      
+
       std::cout << "SOCKS5 server started on port 1080" << std::endl;
       
     } catch (const proxy::AuthorizationFailed& ex) {

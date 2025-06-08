@@ -39,7 +39,7 @@ set(SOURCES
   src/MainWindow.hpp
   src/MainWindow.cpp
   src/socks5.hpp
-  src/socks5_bidirectional.cpp
+  src/socks5.cpp
 )
 
 qt_add_resources(SOURCES src/systray.qrc)

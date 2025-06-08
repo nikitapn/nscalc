@@ -3,7 +3,9 @@
 
 #include <QApplication>
 
-//#define QT_NO_SYSTEMTRAYICON
+#include "socks5.hpp"
+
+#define QT_NO_SYSTEMTRAYICON
 
 #ifndef QT_NO_SYSTEMTRAYICON
 
@@ -46,6 +48,7 @@ int main(int argc, char* argv[])
   label->resize(400, 100);
   qDebug() << text;
 
+  auto proxy = std::make_unique<Proxy>("127.0.0.1", "8080", "password");
 
   app.exec();
 }
