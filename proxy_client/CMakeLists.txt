@@ -61,5 +61,7 @@ target_link_libraries(proxy_client PRIVATE
   nprpc
 )
 
+add_dependencies(proxy_client proxy_stub_gen)
+
 #install(TARGETS ${PROJECT_NAME} DESTINATION bin)
 

@@ -20,8 +20,6 @@ endif()
 message("Building: ${CMAKE_BUILD_TYPE}")
 
 set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O2 -g")
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(WIN32)
@@ -46,30 +44,46 @@ if(WIN32)
 
   add_definitions(
     -D_WIN32_WINNT=0x0A00
+    -DBOOST_DISABLE_CURRENT_LOCATION
+    -DBOOST_ASIO_DISABLE_CO_AWAIT
+    -DBOOST_ASIO_DISABLE_STD_COROUTINE
+    -D_SILENCE_CXX23_ALIGNED_STORAGE_DEPRECATION_WARNING
   )
 
-  add_compile_options(/W3 /bigobj)
+  # Debugging flags
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Zi /Od")
+  set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /DEBUG")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /DEBUG")
+  set(CMAKE_PDB_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/pdb)
+
+  # Release flags
+  set(CMAKE_CXX_FLAGS_RELEASE "/O2")
+
+  add_compile_options(/W3 /bigobj /EHsc)
 else()
-  add_compile_options(-Wall -Wno-deprecated-declarations)
+  set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g")
+  set(CMAKE_CXX_FLAGS_RELEASE "-O2 -g")
   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-  include_directories(
-    "${CMAKE_SOURCE_DIR}/external/npsystem/nprpc/include"
-  )
-
-  #link_directories(
-  #  "${CMAKE_SOURCE_DIR}/../../npsystem/build/linux/nprpc"
-  #)
+  add_compile_options(-Wall -Wno-deprecated-declarations)
 endif()
 
+include_directories(
+  "${CMAKE_SOURCE_DIR}/external/npsystem/nprpc/include"
+)
 
 add_subdirectory(external/npsystem/nplib)
 add_subdirectory(external/npsystem/nprpc)
 
 include(external/npsystem/nprpc/cmake/npidl.cmake)
-npidl_generate_idl_files("${CMAKE_SOURCE_DIR}/idl/nscalc.npidl" nscalc_stub)
+
+if (UNIX)
+  npidl_generate_idl_files("${CMAKE_SOURCE_DIR}/idl/nscalc.npidl" nscalc_stub)
+endif()
 npidl_generate_idl_files("${CMAKE_SOURCE_DIR}/idl/proxy.npidl" proxy_stub)
 
-add_subdirectory(server)
-add_subdirectory(client)
+if (UNIX)
+  add_subdirectory(server)
+  add_subdirectory(client)
+endif()
+
 add_subdirectory(proxy_client)

@@ -3,9 +3,9 @@
 set -e
 
 cmake -B .build_local -S . -DOPT_NPRPC_SKIP_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
-# cmake --build .build_local
-cmake --build .build_local --target=nscalc
-cmake --build .build_local --target=proxy_client
+cmake --build .build_local
+# cmake --build .build_local --target=nscalc
+# cmake --build .build_local --target=proxy_client
 
 CMD=".build_local/debug/nscalc --hostname archvm --http-dir ./client/public --data-dir ./sample_data"
 
