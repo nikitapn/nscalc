@@ -2,12 +2,19 @@
 
 set -e
 
-cmake -B .build_local -S . -DOPT_NPRPC_SKIP_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
-cmake --build .build_local
-# cmake --build .build_local --target=nscalc
+# cmake -B .build_local -S . -DOPT_NPRPC_SKIP_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
+# cmake --build .build_local
+cmake --build .build_local --target=nscalc
 # cmake --build .build_local --target=proxy_client
 
-CMD=".build_local/debug/nscalc --hostname archvm --http-dir ./client/public --data-dir ./sample_data"
+CMD=".build_local/debug/nscalc \
+    --hostname archvm.lan \
+    --http-dir ./client/public \
+    --data-dir ./sample_data \
+    --use-ssl 1 \
+    --public-key certs/archvm.lan.crt \
+    --private-key certs/archvm.lan.key \
+    --dh-params certs/dhparam.pem"
 
 if [ "$1" == "debug" ]; then
     CMD="gdb --args $CMD"

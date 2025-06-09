@@ -153,8 +153,10 @@ int main(int argc, char *argv[]) {
       thread_pool::get_instance().stop();
     });
 
-    const auto flags = nprpc::ObjectActivationFlags::ALLOW_WEBSOCKET
-      | nprpc::ObjectActivationFlags::ALLOW_SSL_WEBSOCKET;
+
+    // Forbid unsecured WebSocket connections when SSL is enabled
+    const auto flags = use_ssl ? nprpc::ObjectActivationFlags::ALLOW_SSL_WEBSOCKET
+      : nprpc::ObjectActivationFlags::ALLOW_SSL_WEBSOCKET;
 
     host_json.secured = use_ssl;
     host_json.objects.calculator = poa->activate_object(calc.get(), flags);
@@ -181,6 +183,7 @@ int main(int argc, char *argv[]) {
 
   } catch (std::exception& ex) {
     std::cerr << ex.what() << '\n';
+    thread_pool::get_instance().stop();
     return EXIT_FAILURE;
   }
 

@@ -485,10 +485,13 @@ public:
       // Initialize NPRPC
       rpc_ = nprpc::RpcBuilder()
         .set_debug_level(nprpc::DebugLevel::DebugLevel_Critical)
+        // TODO: Don't forget to remove this in production
+        .disable_ssl_client_verification()
         .build(thpool::get_instance().ctx());
 
       poa_ = nprpc::PoaBuilder(rpc_)
         .with_lifespan(nprpc::PoaPolicy::Lifespan::Persistent)
+        .with_max_objects(1) // one object for callbacks
         .build();
 
       // Filling manually for now, need to implement json config parsing later or use some existing library
@@ -499,7 +502,7 @@ public:
       oid.flags = 1;
       oid.class_id = "proxy/proxy.Server";
       // Use the provided host and port
-      oid.urls = "ws://" + std::string(host) + ":" + std::string(port);
+      oid.urls = "wss://" + std::string(host) + ":" + std::string(port);
 
       server_->select_endpoint(std::nullopt);
 
@@ -541,6 +544,11 @@ public:
   }
 
   ~Impl() {
+    if (ioc_thread_.joinable()) {
+      ioc_.stop();
+      ioc_thread_.join();
+    }
+    thpool::get_instance().stop();
     if(callbacks_) {
       callbacks_->release();
     }
@@ -552,7 +560,6 @@ public:
     }
     if (poa_) {
       poa_->deactivate_object(callbacks_activation_.object_id());
-      delete poa_;
     }
     if (rpc_) {
       rpc_->destroy();

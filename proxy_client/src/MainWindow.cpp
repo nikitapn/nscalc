@@ -49,7 +49,7 @@ Window::Window()
   setWindowTitle(tr("Systray"));
   resize(400, 300);
 
-  proxy_ = std::make_unique<Proxy>("127.0.0.1", "8080", "password");
+  proxy_ = std::make_unique<Proxy>("archvm.lan", "8080", "password");
 }
 //! [0]
 
@@ -83,11 +83,11 @@ void Window::closeEvent(QCloseEvent* event)
 //! [3]
 void Window::setIcon(int index)
 {
-  QIcon icon = iconComboBox->itemIcon(index);
-  trayIcon->setIcon(icon);
-  setWindowIcon(icon);
+  //QIcon icon = iconComboBox->itemIcon(index);
+  //trayIcon->setIcon(icon);
+  //setWindowIcon(icon);
 
-  trayIcon->setToolTip(iconComboBox->itemText(index));
+  //trayIcon->setToolTip(iconComboBox->itemText(index));
 }
 //! [3]
 
@@ -245,6 +245,10 @@ void Window::createTrayIcon()
 
   trayIcon = new QSystemTrayIcon(this);
   trayIcon->setContextMenu(trayIconMenu);
+
+  auto icon = QIcon(":/images/trayicon.png");
+  trayIcon->setIcon(icon);
+  setWindowIcon(icon);
 }
 
 #endif
