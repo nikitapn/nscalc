@@ -25,6 +25,8 @@ class QMenu;
 class QPushButton;
 class QSpinBox;
 class QTextEdit;
+class QGridLayout;
+class QFrame;
 QT_END_NAMESPACE
 
 //! [0]
@@ -36,38 +38,39 @@ public:
   Window();
 
   void setVisible(bool visible) override;
+  void dispose();
 
 protected:
   void closeEvent(QCloseEvent* event) override;
 
 private slots:
-  void setIcon(int index);
   void iconActivated(QSystemTrayIcon::ActivationReason reason);
-  void showMessage();
-  void messageClicked();
+  void onButtonConnectClicked();
 
 private:
-  void createIconGroupBox();
-  void createMessageGroupBox();
+  void createMainGroupBox();
   void createActions();
   void createTrayIcon();
+  void updateStatusIndicator(ProxyStatus status);
+  void updatePasswordField();
+  void onEditConfigToggled(bool enabled);
 
-  QGroupBox* iconGroupBox;
-  QLabel* iconLabel;
-  QComboBox* iconComboBox;
-  QCheckBox* showIconCheckBox;
+  void onProxyStatusChanged(ProxyStatus status);
 
-  QGroupBox* messageGroupBox;
-  QLabel* typeLabel;
-  QLabel* durationLabel;
-  QLabel* durationWarningLabel;
-  QLabel* titleLabel;
-  QLabel* bodyLabel;
-  QComboBox* typeComboBox;
-  QSpinBox* durationSpinBox;
-  QLineEdit* titleEdit;
-  QTextEdit* bodyEdit;
-  QPushButton* showMessageButton;
+  QGroupBox* configGroupBox;
+  QCheckBox* editConfigCheckBox;
+  
+  // Configuration fields
+  QLineEdit* hostnameEdit;
+  QLineEdit* portEdit;
+  QLineEdit* loginEdit;
+  QLineEdit* passwordEdit;
+  
+  // Status indicator
+  QFrame* statusIndicator;
+  QLabel* statusLabel;
+  
+  QPushButton* connectButton;
 
   QAction* minimizeAction;
   QAction* maximizeAction;
@@ -78,6 +81,8 @@ private:
   QMenu* trayIconMenu;
 
   std::unique_ptr<Proxy> proxy_;
+  ProxyStatus currentStatus_;
+  QString actualPassword_;
 };
 //! [0]
 

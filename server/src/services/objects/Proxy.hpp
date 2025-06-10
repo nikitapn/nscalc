@@ -14,39 +14,36 @@
 // SOCKS5 Protocol Constants
 namespace socks5 {
   enum class AUTH : uint8_t {
-    NO_AUTH = 0x00,
-    GSSAPI = 0x01,
+    NO_AUTH           = 0x00,
+    GSSAPI            = 0x01,
     USERNAME_PASSWORD = 0x02,
-    NO_ACCEPTABLE = 0xFF
+    NO_ACCEPTABLE     = 0xFF
   };
 
   enum class CMD : uint8_t {
-    CONNECT = 0x01,
-    BIND = 0x02,
+    CONNECT       = 0x01,
+    BIND          = 0x02,
     UDP_ASSOCIATE = 0x03
   };
 
   enum class ATYP : uint8_t {
-    IPV4 = 0x01,
-    DOMAINNAME = 0x03,
-    IPV6 = 0x04
+    IPV4          = 0x01,
+    DOMAINNAME    = 0x03,
+    IPV6          = 0x04
   };
 
   enum class REP : uint8_t {
-    SUCCEEDED = 0x00,
-    GENERAL_FAILURE = 0x01,
-    CONNECTION_NOT_ALLOWED = 0x02,
-    NETWORK_UNREACHABLE = 0x03,
-    HOST_UNREACHABLE = 0x04,
-    CONNECTION_REFUSED = 0x05,
-    TTL_EXPIRED = 0x06,
-    COMMAND_NOT_SUPPORTED = 0x07,
+    SUCCEEDED                  = 0x00,
+    GENERAL_FAILURE            = 0x01,
+    CONNECTION_NOT_ALLOWED     = 0x02,
+    NETWORK_UNREACHABLE        = 0x03,
+    HOST_UNREACHABLE           = 0x04,
+    CONNECTION_REFUSED         = 0x05,
+    TTL_EXPIRED                = 0x06,
+    COMMAND_NOT_SUPPORTED      = 0x07,
     ADDRESS_TYPE_NOT_SUPPORTED = 0x08
   };
 }
-
-
-
 
 // TCP Connection management for SOCKS5 tunnels
 class ProxyConnection : public std::enable_shared_from_this<ProxyConnection> {
@@ -121,6 +118,7 @@ public:
     std::string host = target_host;
     try {
       // Create new connection
+      // Don't need strand for now as there is only one thread handling connections
       auto connection = std::make_shared<ProxyConnection>(ioc_);
       uint32_t connection_id = next_connection_id_++;
       
@@ -173,7 +171,7 @@ public:
       return false;
     }
   }
-  
+
   virtual void CloseTunnel(uint32_t session_id) override {
     auto it = connections_.find(session_id);
     if (it != connections_.end()) {
@@ -190,15 +188,32 @@ public:
 
 class ProxyImpl : public proxy::IServer_Servant {
   nprpc::Rpc& rpc_;
+  std::shared_ptr<UserService> userService_;
   nprpc::Poa* poa_ = nullptr;
   boost::asio::io_context ioc_;
   boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard_ = 
     boost::asio::make_work_guard(ioc_);
   std::thread ioc_thread_;
 public:
-  virtual void LogIn (::nprpc::flat::Span<char> secret, nprpc::detail::flat::ObjectId_Direct user)
+  void LogIn (::nprpc::flat::Span<char> login, ::nprpc::flat::Span<char> password, nprpc::detail::flat::ObjectId_Direct user) override
   {
-    // TODO: Check secret to some database or something
+    if (password.size() == 0 || login.size() == 0)
+      throw proxy::AuthorizationFailed();
+    {
+      std::lock_guard lk(*userService_);
+      if (auto user = userService_->getUserByName(login); user) {
+        if (UserService::checkPassword(*user, password) == false)
+          throw proxy::AuthorizationFailed();
+        if (UserService::isUserAllowedToUseProxy(*user) == false)
+          throw proxy::AuthorizationFailed();
+        // User exists and password is correct and user is allowed to use proxy
+        std::cout << "[proxy] User \"" << user->user_name << "\" logged in successfully." << std::endl;
+      } else {
+        throw proxy::AuthorizationFailed();
+      }
+    }
+
+    // Create a new ProxyUser object and activate it in the POA
     auto oid = poa_->activate_object(
       new ProxyUser(ioc_), // create a new ProxyUser object
       nprpc::ObjectActivationFlags::SESSION_SPECIFIC, // activation_flags
@@ -207,19 +222,33 @@ public:
     nprpc::Object::assign_to_direct(oid, user);
   }
 
-  ProxyImpl(nprpc::Rpc& rpc)
+  ProxyImpl(nprpc::Rpc& rpc, std::shared_ptr<UserService> userService)
     : rpc_(rpc)
+    , userService_{userService}
   {
     poa_ = nprpc::PoaBuilder(&rpc_)
       .with_lifespan(nprpc::PoaPolicy::Lifespan::Transient)
       .with_max_objects(32)
       .build();
-    
-    ioc_thread_ = std::thread([this]() {
-      try {
-        ioc_.run();
-      } catch (const std::exception& e) {
-        std::cerr << "IO context thread exception: " << e.what() << std::endl;
+
+    ioc_thread_ = std::thread([this]() { 
+      // In case of any communication failure triggered by NPRPC, we will retry running the IO context
+      // which handles non-NPRPC related tasks with socks5 connections.
+      while(true) {
+        try {
+          ioc_.run();
+          break; // Exit the loop if run() completes normally
+        } catch (nprpc::ExceptionCommFailure& e) {
+          std::cerr << "Communication failure in IO context thread: " << e.what << std::endl;
+        } catch (nprpc::Exception& e) {
+          std::cerr << "NPRPC exception in IO context thread: " << e.what() << std::endl;
+        } catch (const std::exception& e) {
+          std::cerr << "Error in IO context thread: " << e.what() << std::endl;
+          break; // Exit on other exceptions
+        } catch (...) {
+          std::cerr << "Unknown error in IO context thread." << std::endl;
+          break; // Exit on unknown errors
+        }
       }
     });
   }

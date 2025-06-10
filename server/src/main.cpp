@@ -156,7 +156,7 @@ int main(int argc, char *argv[]) {
 
     // Forbid unsecured WebSocket connections when SSL is enabled
     const auto flags = use_ssl ? nprpc::ObjectActivationFlags::ALLOW_SSL_WEBSOCKET
-      : nprpc::ObjectActivationFlags::ALLOW_SSL_WEBSOCKET;
+      : nprpc::ObjectActivationFlags::ALLOW_WEBSOCKET;
 
     host_json.secured = use_ssl;
     host_json.objects.calculator = poa->activate_object(calc.get(), flags);

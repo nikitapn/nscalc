@@ -101,6 +101,7 @@ void AuthorizatorImpl::AuthorizatorImpl::RegisterStepOne(::nprpc::flat::Span<cha
   user.user->password_sha256 = UserService::sha256(password);
   user.user->user_name = username;
   user.user->email = email;
+  user.user->permissions = 0;
 
   std::uniform_int_distribution<std::uint32_t> dist(10000, 99999);
   user.code = dist(rd_);

@@ -2,18 +2,33 @@
 // SPDX-License-Identifier: LicenseRef-Qt-Commercial OR BSD-3-Clause
 
 #include <QApplication>
-
-#include "socks5.hpp"
-
-// #define QT_NO_SYSTEMTRAYICON
-
-#ifndef QT_NO_SYSTEMTRAYICON
-
 #include <QMessageBox>
+
 #include "MainWindow.hpp"
+#include "socks5.hpp"
+#include "util.hpp"
+
+nprpc::Rpc* rpc_instance = nullptr;
+
+std::unique_ptr<Proxy> Proxy::create()
+{
+  assert(rpc_instance);
+  return std::make_unique<Proxy>(*rpc_instance);
+}
+
+void init_rpc() {
+  // Initialize NPRPC
+  rpc_instance = nprpc::RpcBuilder()
+    .set_debug_level(nprpc::DebugLevel::DebugLevel_Critical)
+    // TODO: Don't forget to remove this in production
+    .disable_ssl_client_verification()
+    .build(thpool::get_instance().ctx());
+}
 
 int main(int argc, char* argv[])
 {
+  init_rpc();
+
   QApplication app(argc, argv);
 
   if (!QSystemTrayIcon::isSystemTrayAvailable()) {
@@ -22,35 +37,19 @@ int main(int argc, char* argv[])
       QMessageBox::Close | QMessageBox::Ignore);
     if (choice == QMessageBox::Close)
       return 1;
-    // Otherwise "lurk": if a system tray is started later, the icon will appear.
   }
   QApplication::setQuitOnLastWindowClosed(false);
 
   Window window;
   window.show();
-  return app.exec();
+  auto qt_exit_code = app.exec();
+  
+  // Delete proxy object
+  window.dispose();
+  // Stop the thread pool
+  thpool::get_instance().stop();
+  if (rpc_instance) {
+    rpc_instance->destroy();
+  }
+  return qt_exit_code;
 }
-
-#else
-
-#include <QLabel>
-#include <QDebug>
-
-int main(int argc, char* argv[])
-{
-  QApplication app(argc, argv);
-  QString text("QSystemTrayIcon is not supported on this platform");
-
-  QLabel* label = new QLabel(text);
-  label->setWordWrap(true);
-
-  label->show();
-  label->resize(400, 100);
-  qDebug() << text;
-
-  auto proxy = std::make_unique<Proxy>("archvm.lan", "8080", "password");
-
-  app.exec();
-}
-
-#endif

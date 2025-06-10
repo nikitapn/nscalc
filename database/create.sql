@@ -6,7 +6,10 @@ CREATE TABLE IF NOT EXISTS User (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   pwd BLOB, -- sha 256
-  email TEXT NOT NULL UNIQUE
+  email TEXT NOT NULL UNIQUE,
+  permissions INTEGER DEFAULT 0 -- bitmask of permissions
+                                -- (1 << 0) admin, 
+                                -- (1 << 1) allowed to use socks5 proxy
 );
 
 -- User sessions
@@ -63,9 +66,9 @@ CREATE TABLE IF NOT EXISTS Fertilizer (
   FOREIGN KEY (userId) REFERENCES User (id)
 );
 
-INSERT INTO User (id, name, pwd, email) VALUES
-  (1, 'superuser', x'03AC674216F3E15C761EE1A5E255F067953623C8B388B4459E13F978D7C846F4', 'superuser@nscalc.com'), -- 1234
-  (2, 'guest', x'AB6E4C3DD47810AE0ABC821A2DE8A25B38C1DF86B49CDEFCB58C4A55F9923902', 'guest@nscalc.com') -- 3c2G4sc*vs2#1zf
+INSERT INTO User (id, name, pwd, email, permissions) VALUES
+  (1, 'superuser', x'03AC674216F3E15C761EE1A5E255F067953623C8B388B4459E13F978D7C846F4', 'superuser@nscalc.com', 3), -- 1234
+  (2, 'guest', x'AB6E4C3DD47810AE0ABC821A2DE8A25B38C1DF86B49CDEFCB58C4A55F9923902', 'guest@nscalc.com', 0) -- 3c2G4sc*vs2#1zf
   ;
 
 INSERT INTO Solution (id, userId, name, NO3, NH4, P, K, Ca, Mg, S, Cl, Fe, Zn, B, Mn, Cu, Mo) VALUES

@@ -17,6 +17,7 @@ public:
     std::string email;
     std::string password_sha256; // SHA256 stores 32 bytes
     std::string user_name;
+    std::uint32_t permissions;
   };
 
   static std::string create_uuid() {
@@ -68,6 +69,7 @@ public:
       auto pwd = sqlite3_column_blob(select_all_stmt_, 2);
       user->password_sha256 = std::string(reinterpret_cast<const char *>(pwd), sqlite3_column_bytes(select_all_stmt_, 2));
       user->email = reinterpret_cast<const char *>(sqlite3_column_text(select_all_stmt_, 3));
+      user->permissions = sqlite3_column_int(select_all_stmt_, 4);
 
       users_by_email_[user->email] = user.get();
       users_by_name_[user->user_name] = user.get();
@@ -90,6 +92,7 @@ public:
     sqlite3_bind_text(insert_stmt_, 1, user->user_name.c_str(), -1, SQLITE_STATIC);
     sqlite3_bind_blob(insert_stmt_, 2, user->password_sha256.c_str(), user->password_sha256.length(), SQLITE_STATIC);
     sqlite3_bind_text(insert_stmt_, 3, user->email.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_int(insert_stmt_,  4, user->permissions);
     if (sqlite3_step(insert_stmt_) != SQLITE_DONE) {
       std::cerr << "Failed to execute INSERT: " << sqlite3_errmsg(db_->getConnection()) << std::endl;
     }
@@ -121,13 +124,21 @@ public:
     mut_.unlock();
   }
 
+  static bool isUserAdmin(const User& user) {
+    return (user.permissions & 0x01) != 0;
+  }
+  
+  static bool isUserAllowedToUseProxy(const User& user) {
+    return (user.permissions & 0x02) != 0;
+  }
+
   static bool checkPassword(const User& user, std::string_view password) {
     return user.password_sha256 == sha256(password);
   }
 
   explicit UserService(const std::shared_ptr<Database>& database)
     : db_(database) {
-      insert_stmt_ = db_->prepareStatement("INSERT INTO User (name, pwd, email) VALUES (?, ?, ?);");
+      insert_stmt_ = db_->prepareStatement("INSERT INTO User (name, pwd, email, permissions) VALUES (?, ?, ?, ?);");
       select_all_stmt_ = db_->prepareStatement("SELECT * FROM User;");
     }
 };

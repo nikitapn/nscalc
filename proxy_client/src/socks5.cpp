@@ -32,9 +32,9 @@ enum class SOCKS5_CMD : uint8_t {
 };
 
 enum class SOCKS5_ATYP : uint8_t {
-  IPV4        = 0x01,
-  DOMAINNAME  = 0x03,
-  IPV6        = 0x04
+  IPV4       = 0x01,
+  DOMAINNAME = 0x03,
+  IPV6       = 0x04
 };
 
 enum class SOCKS5_REP : uint8_t {
@@ -453,7 +453,7 @@ std::shared_ptr<SOCKS5Session> SessionManager::getSession(uint32_t session_id) {
 } // anonymous namespace
 
 class Proxy::Impl {
-  nprpc::Rpc* rpc_ = nullptr;
+  nprpc::Rpc& rpc_;
   nprpc::Poa* poa_ = nullptr;
   nprpc::ObjectPtr<proxy::Server> server_;
   nprpc::ObjectPtr<proxy::User> user_;
@@ -467,11 +467,11 @@ class Proxy::Impl {
     boost::asio::make_work_guard(ioc_);
   // running IO context in a separate thread to prevent deadlock with NPRPC thread pool
   std::thread ioc_thread_;
+
+  std::function<void(ProxyStatus)> status_callback_;
 public:
-  Impl(
-    std::string_view host,
-    std::string_view port, 
-    std::string_view secret)
+  Impl(nprpc::Rpc& rpc)
+    : rpc_(rpc)
   {
     ioc_thread_ = std::thread([this]() {
       try {
@@ -481,76 +481,85 @@ public:
         std::cerr << "IO context thread exception: " << e.what() << std::endl;
       }
     });
-    try {
-      // Initialize NPRPC
-      rpc_ = nprpc::RpcBuilder()
-        .set_debug_level(nprpc::DebugLevel::DebugLevel_Critical)
-        // TODO: Don't forget to remove this in production
-        .disable_ssl_client_verification()
-        .build(thpool::get_instance().ctx());
-
-      poa_ = nprpc::PoaBuilder(rpc_)
-        .with_lifespan(nprpc::PoaPolicy::Lifespan::Persistent)
-        .with_max_objects(1) // one object for callbacks
-        .build();
-
-      // Filling manually for now, need to implement json config parsing later or use some existing library
-      server_.reset(new proxy::Server(0)); // Assuming 0 is the interface index
-      auto& oid = server_->get_data();
-      oid.object_id = 3;
-      oid.poa_idx = 0;
-      oid.flags = 1;
-      oid.class_id = "proxy/proxy.Server";
-      // Use the provided host and port
-      oid.urls = "wss://" + std::string(host) + ":" + std::string(port);
-
-      server_->select_endpoint(std::nullopt);
-
-      // Login to get the User proxy object
-      nprpc::Object* out;
-      server_->LogIn(std::string(secret), out);
-      user_.reset(nprpc::narrow<proxy::User>(out));
-      assert(out == nullptr); // Ensure out is null after narrow
-
-      if (!user_) {
-        throw std::runtime_error("Failed to cast to proxy::User");
-      }
-
-      std::cout << "Successfully connected to proxy server" << std::endl;
-
-      // Create and register session callbacks
-      callbacks_ = new ProxySessionCallbacks();
-      callbacks_activation_ = poa_->activate_object(
-        callbacks_, 
-        nprpc::ObjectActivationFlags::SESSION_SPECIFIC);
-
-      user_->RegisterCallbacks(callbacks_activation_);
-      std::cout << "Session callbacks registered" << std::endl;
-
-      // Start SOCKS5 server on port 1080
-      socks5_server_ = std::make_shared<SOCKS5Server>(
-        ioc_, 1080, user_.get());
-      socks5_server_->start();
-
-      std::cout << "SOCKS5 server started on port 1080" << std::endl;
-
-    } catch (const proxy::AuthorizationFailed& ex) {
-      std::cerr << "Authorization failed" << std::endl;
-      throw;
-    } catch (const std::exception& ex) {
-      std::cerr << "An error occurred: " << ex.what() << std::endl;
-      throw;
-    }
   }
 
-  ~Impl() {
+  // This method is single used to connect to the proxy server
+  void connect(
+    std::string_view host,
+    std::string_view port, 
+    std::string_view login,
+    std::string_view password,
+    std::function<void(ProxyStatus)> status_callback)
+  {
+    status_callback_ = std::move(status_callback);
+
+    status_callback_(ProxyStatus::Connecting);
+
+    poa_ = nprpc::PoaBuilder(&rpc_)
+      .with_lifespan(nprpc::PoaPolicy::Lifespan::Persistent)
+      .with_max_objects(1) // one object for callbacks
+      .build();
+
+    // Filling manually for now, need to implement json config parsing later or use some existing library
+    server_.reset(new proxy::Server(0)); // Assuming 0 is the interface index
+    auto& oid = server_->get_data();
+    oid.object_id = 3;
+    oid.poa_idx = 0;
+    oid.flags = 1;
+    oid.class_id = "proxy/proxy.Server";
+    // Use the provided host and port
+    oid.urls = "wss://" + std::string(host) + ":" + std::string(port);
+
+    server_->select_endpoint(std::nullopt);
+
+    // Login to get the User proxy object
+    nprpc::Object* out;
+    
+    try {
+      server_->LogIn(std::string(login), std::string(password), out);
+    } catch (...) {
+      cleanUp();
+      // re-throw the exception to be handled by the caller
+      throw;
+    }
+
+    user_.reset(nprpc::narrow<proxy::User>(out));
+    assert(out == nullptr); // Ensure out is null after narrow
+
+    if (!user_) {
+      throw std::runtime_error("Failed to cast to proxy::User");
+    }
+
+    std::cout << "Successfully connected to proxy server" << std::endl;
+
+    // Create and register session callbacks
+    callbacks_ = new ProxySessionCallbacks();
+    callbacks_activation_ = poa_->activate_object(
+      callbacks_, 
+      nprpc::ObjectActivationFlags::SESSION_SPECIFIC);
+
+    user_->RegisterCallbacks(callbacks_activation_);
+    std::cout << "Session callbacks registered" << std::endl;
+
+    // Start SOCKS5 server on port 1080
+    socks5_server_ = std::make_shared<SOCKS5Server>(
+      ioc_, 1080, user_.get());
+    socks5_server_->start();
+
+    std::cout << "SOCKS5 server started on port 1080" << std::endl;
+
+    status_callback_(ProxyStatus::Connected);
+    // Notify the user that the connection is established
+  }
+
+  void cleanUp() {
     if (ioc_thread_.joinable()) {
       ioc_.stop();
       ioc_thread_.join();
     }
-    thpool::get_instance().stop();
-    if(callbacks_) {
+    if (callbacks_) {
       callbacks_->release();
+      callbacks_ = nullptr;
     }
     if (user_) {
       user_.reset();
@@ -560,21 +569,32 @@ public:
     }
     if (poa_) {
       poa_->deactivate_object(callbacks_activation_.object_id());
+      rpc_.destroy_poa(poa_);
+      poa_ = nullptr;
     }
-    if (rpc_) {
-      rpc_->destroy();
-    }
+  }
+
+  ~Impl() {
+    cleanUp();
   }
 };
 
-Proxy::Proxy(
-    std::string_view host,
-    std::string_view port,
-    std::string_view secret) 
+Proxy::Proxy(nprpc::Rpc& rpc)
 {
-  impl_ = new Impl(host, port, secret);
+  impl_ = new Impl(rpc);
 }
 
-Proxy::~Proxy() {
+void Proxy::connect(
+    std::string_view host,
+    std::string_view port,
+    std::string_view login,
+    std::string_view password,
+    std::function<void(ProxyStatus)> status_callback)
+{
+  impl_->connect(host, port, login, password, status_callback);
+}
+
+Proxy::~Proxy()
+{
   delete impl_;
 }

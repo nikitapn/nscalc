@@ -53,10 +53,12 @@ AuthorizationFailed: exception {}
 [trusted=false]
 interface Server {
 	/**
-	 * @param secret - secret key for the server
+	 * @param login - user login (username)
+	 * @param password - user password (plaintext)
 	 * @return object - object (User) to communicate with the server
 	 */
-	void LogIn(secret: in string, user: out object) raises(AuthorizationFailed);
+	void LogIn(login: in string, password: in string, user: out object)
+		raises(AuthorizationFailed);
 }
 
 } // namespace proxy

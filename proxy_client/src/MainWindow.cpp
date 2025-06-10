@@ -3,8 +3,6 @@
 
 #include "MainWindow.hpp"
 
-#ifndef QT_NO_SYSTEMTRAYICON
-
 #include <QAction>
 #include <QCheckBox>
 #include <QComboBox>
@@ -18,214 +16,240 @@
 #include <QSpinBox>
 #include <QTextEdit>
 #include <QVBoxLayout>
+#include <QGridLayout>
 #include <QMessageBox>
+#include <QFrame>
+#include <functional>
+
+#include "proxy_stub/proxy.hpp"
 
 //! [0]
 Window::Window()
+  : currentStatus_(ProxyStatus::Disconnected)
+  , actualPassword_("1234") // Default password
 {
-  createIconGroupBox();
-  createMessageGroupBox();
-
-  iconLabel->setMinimumWidth(durationLabel->sizeHint().width());
-
+  createMainGroupBox();
   createActions();
   createTrayIcon();
 
-  connect(showMessageButton, &QAbstractButton::clicked, this, &Window::showMessage);
-  connect(showIconCheckBox, &QAbstractButton::toggled, trayIcon, &QSystemTrayIcon::setVisible);
-  connect(iconComboBox, &QComboBox::currentIndexChanged,
-    this, &Window::setIcon);
-  connect(trayIcon, &QSystemTrayIcon::messageClicked, this, &Window::messageClicked);
+  connect(connectButton, &QAbstractButton::clicked, this, &Window::onButtonConnectClicked);
+  connect(editConfigCheckBox, &QCheckBox::toggled, this, &Window::onEditConfigToggled);
+  connect(trayIcon, &QSystemTrayIcon::messageClicked, this, &Window::onButtonConnectClicked);
   connect(trayIcon, &QSystemTrayIcon::activated, this, &Window::iconActivated);
 
   QVBoxLayout* mainLayout = new QVBoxLayout;
-  mainLayout->addWidget(iconGroupBox);
-  mainLayout->addWidget(messageGroupBox);
+  mainLayout->addWidget(configGroupBox);
   setLayout(mainLayout);
 
-  iconComboBox->setCurrentIndex(1);
+  // Initialize UI state
+  updatePasswordField();
+  updateStatusIndicator(currentStatus_);
+
   trayIcon->show();
 
-  setWindowTitle(tr("Systray"));
-  resize(400, 300);
+  setWindowTitle(tr("Proxy Client"));
+  resize(450, 200);
 
-  proxy_ = std::make_unique<Proxy>("archvm.lan", "8080", "password");
+  setWindowFlags(Qt::Window | Qt::MSWindowsFixedSizeDialogHint);
 }
-//! [0]
 
-//! [1]
 void Window::setVisible(bool visible)
 {
   minimizeAction->setEnabled(visible);
-  maximizeAction->setEnabled(!isMaximized());
   restoreAction->setEnabled(isMaximized() || !visible);
   QDialog::setVisible(visible);
 }
-//! [1]
 
-//! [2]
 void Window::closeEvent(QCloseEvent* event)
 {
   if (!event->spontaneous() || !isVisible())
     return;
   if (trayIcon->isVisible()) {
-    QMessageBox::information(this, tr("Systray"),
+    /*QMessageBox::information(this, tr("Systray"),
       tr("The program will keep running in the "
         "system tray. To terminate the program, "
         "choose <b>Quit</b> in the context menu "
-        "of the system tray entry."));
+        "of the system tray entry."));*/
     hide();
     event->ignore();
   }
 }
-//! [2]
 
-//! [3]
-void Window::setIcon(int index)
-{
-  //QIcon icon = iconComboBox->itemIcon(index);
-  //trayIcon->setIcon(icon);
-  //setWindowIcon(icon);
-
-  //trayIcon->setToolTip(iconComboBox->itemText(index));
-}
-//! [3]
-
-//! [4]
 void Window::iconActivated(QSystemTrayIcon::ActivationReason reason)
 {
   switch (reason) {
   case QSystemTrayIcon::Trigger:
   case QSystemTrayIcon::DoubleClick:
-    iconComboBox->setCurrentIndex((iconComboBox->currentIndex() + 1) % iconComboBox->count());
+    // Show the main window when the icon is clicked
+    if (isVisible()) {
+      showNormal();
+      raise();
+    } else {
+      show();
+      activateWindow();
+    }
     break;
   case QSystemTrayIcon::MiddleClick:
-    showMessage();
     break;
   default:
     ;
   }
 }
-//! [4]
 
-//! [5]
-void Window::showMessage()
+void Window::onProxyStatusChanged(ProxyStatus status)
 {
-  showIconCheckBox->setChecked(true);
-  int selectedIcon = typeComboBox->itemData(typeComboBox->currentIndex()).toInt();
-  QSystemTrayIcon::MessageIcon msgIcon = QSystemTrayIcon::MessageIcon(selectedIcon);
-
-  if (selectedIcon == -1) { // custom icon
-    QIcon icon(iconComboBox->itemIcon(iconComboBox->currentIndex()));
-    trayIcon->showMessage(titleEdit->text(), bodyEdit->toPlainText(), icon,
-      durationSpinBox->value() * 1000);
+  currentStatus_ = status;
+  updateStatusIndicator(status);
+  
+  // Update connect button text based on status
+  switch (status) {
+    case ProxyStatus::Disconnected:
+    case ProxyStatus::Error:
+      connectButton->setText(tr("Connect"));
+      connectButton->setEnabled(true);
+      break;
+    case ProxyStatus::Connecting:
+      connectButton->setText(tr("Connecting..."));
+      connectButton->setEnabled(false);
+      break;
+    case ProxyStatus::Connected:
+      connectButton->setText(tr("Disconnect"));
+      connectButton->setEnabled(true);
+      break;
   }
-  else {
-    trayIcon->showMessage(titleEdit->text(), bodyEdit->toPlainText(), msgIcon,
-      durationSpinBox->value() * 1000);
+}
+
+void Window::onButtonConnectClicked()
+{
+  if (currentStatus_ == ProxyStatus::Connected) {
+    // Disconnect
+    proxy_.reset();
+    onProxyStatusChanged(ProxyStatus::Disconnected);
+    return;
+  }
+
+  if (currentStatus_ == ProxyStatus::Connecting) {
+    return; // Already connecting
+  }
+
+  // Get connection parameters from UI
+  QString hostname = hostnameEdit->text().trimmed();
+  QString port = portEdit->text().trimmed();
+  QString login = loginEdit->text().trimmed();
+  QString password = editConfigCheckBox->isChecked() ? passwordEdit->text() : actualPassword_;
+
+  if (hostname.isEmpty() || port.isEmpty() || login.isEmpty() || password.isEmpty()) {
+    QMessageBox::warning(this, tr("Warning"), tr("Please fill in all connection fields."));
+    return;
+  }
+
+  onProxyStatusChanged(ProxyStatus::Connecting);
+
+  proxy_ = Proxy::create();
+  try {
+    proxy_->connect(
+      hostname.toStdString(), 
+      port.toStdString(), 
+      login.toStdString(), 
+      password.toStdString(), 
+      std::bind(&Window::onProxyStatusChanged, this, std::placeholders::_1)
+    );
+    onProxyStatusChanged(ProxyStatus::Connected);
+  } catch (const proxy::AuthorizationFailed& e) {
+    onProxyStatusChanged(ProxyStatus::Error);
+    QMessageBox::critical(this, tr("Error"), tr("Authorization failed: %1").arg(e.what()));
+    return;
+  } catch (const nprpc::Exception& e) {
+    onProxyStatusChanged(ProxyStatus::Error);
+    QMessageBox::critical(this, tr("Error"), tr("Failed to connect to proxy server: %1").arg(e.what()));
+    return;
+  } catch (const std::exception& e) {
+    onProxyStatusChanged(ProxyStatus::Error);
+    QMessageBox::critical(this, tr("Error"), tr("An unexpected error occurred: %1").arg(e.what()));
+    return;
+  } catch (...) {
+    onProxyStatusChanged(ProxyStatus::Error);
+    QMessageBox::critical(this, tr("Error"), tr("An unknown error occurred while connecting to the proxy server."));
+    return;
   }
 }
-//! [5]
 
-//! [6]
-void Window::messageClicked()
+void Window::createMainGroupBox()
 {
-  QMessageBox::information(nullptr, tr("Systray"),
-    tr("Sorry, I already gave what help I could.\n"
-      "Maybe you should try asking a human?"));
-}
-//! [6]
+  configGroupBox = new QGroupBox();
+  
+  // Create "Edit Config" checkbox at the top
+  editConfigCheckBox = new QCheckBox(tr("Edit Config"));
+  editConfigCheckBox->setChecked(false);
+  
+  // Create configuration input fields
+  hostnameEdit = new QLineEdit("archvm.lan");
+  portEdit = new QLineEdit("8080");
+  loginEdit = new QLineEdit("superuser");
+  passwordEdit = new QLineEdit();
+  passwordEdit->setEchoMode(QLineEdit::Password);
+  
+  // Create status section
+  statusIndicator = new QFrame();
+  statusIndicator->setFixedSize(20, 20);
+  statusIndicator->setFrameStyle(QFrame::Box);
+  statusIndicator->setStyleSheet("border-radius: 10px; background-color: red;");
+  
+  statusLabel = new QLabel(tr("Status:\nDisconnected."));
+  
+  // Create connect button
+  connectButton = new QPushButton(tr("Connect"));
+  connectButton->setDefault(true);
+  connectButton->setMinimumHeight(40);
 
-void Window::createIconGroupBox()
-{
-  iconGroupBox = new QGroupBox(tr("Tray Icon"));
-
-  iconLabel = new QLabel("Icon:");
-
-  iconComboBox = new QComboBox;
-  iconComboBox->addItem(QIcon(":/images/trayicon.png"), tr("Bad"));
-  //iconComboBox->addItem(QIcon(":/images/heart.png"), tr("Heart"));
-  //iconComboBox->addItem(QIcon(":/images/trash.png"), tr("Trash"));
-
-  showIconCheckBox = new QCheckBox(tr("Show icon"));
-  showIconCheckBox->setChecked(true);
-
-  QHBoxLayout* iconLayout = new QHBoxLayout;
-  iconLayout->addWidget(iconLabel);
-  iconLayout->addWidget(iconComboBox);
-  iconLayout->addStretch();
-  iconLayout->addWidget(showIconCheckBox);
-  iconGroupBox->setLayout(iconLayout);
-}
-
-void Window::createMessageGroupBox()
-{
-  messageGroupBox = new QGroupBox(tr("Balloon Message"));
-
-  typeLabel = new QLabel(tr("Type:"));
-
-  typeComboBox = new QComboBox;
-  typeComboBox->addItem(tr("None"), QSystemTrayIcon::NoIcon);
-  typeComboBox->addItem(style()->standardIcon(
-    QStyle::SP_MessageBoxInformation), tr("Information"),
-    QSystemTrayIcon::Information);
-  typeComboBox->addItem(style()->standardIcon(
-    QStyle::SP_MessageBoxWarning), tr("Warning"),
-    QSystemTrayIcon::Warning);
-  typeComboBox->addItem(style()->standardIcon(
-    QStyle::SP_MessageBoxCritical), tr("Critical"),
-    QSystemTrayIcon::Critical);
-  typeComboBox->addItem(QIcon(), tr("Custom icon"),
-    -1);
-  typeComboBox->setCurrentIndex(1);
-
-  durationLabel = new QLabel(tr("Duration:"));
-
-  durationSpinBox = new QSpinBox;
-  durationSpinBox->setRange(5, 60);
-  durationSpinBox->setSuffix(" s");
-  durationSpinBox->setValue(15);
-
-  durationWarningLabel = new QLabel(tr("(some systems might ignore this "
-    "hint)"));
-  durationWarningLabel->setIndent(10);
-
-  titleLabel = new QLabel(tr("Title:"));
-
-  titleEdit = new QLineEdit(tr("Cannot connect to network"));
-
-  bodyLabel = new QLabel(tr("Body:"));
-
-  bodyEdit = new QTextEdit;
-  bodyEdit->setPlainText(tr("Don't believe me. Honestly, I don't have a "
-    "clue.\nClick this balloon for details."));
-
-  showMessageButton = new QPushButton(tr("Show Message"));
-  showMessageButton->setDefault(true);
-
-  QGridLayout* messageLayout = new QGridLayout;
-  messageLayout->addWidget(typeLabel, 0, 0);
-  messageLayout->addWidget(typeComboBox, 0, 1, 1, 2);
-  messageLayout->addWidget(durationLabel, 1, 0);
-  messageLayout->addWidget(durationSpinBox, 1, 1);
-  messageLayout->addWidget(durationWarningLabel, 1, 2, 1, 3);
-  messageLayout->addWidget(titleLabel, 2, 0);
-  messageLayout->addWidget(titleEdit, 2, 1, 1, 4);
-  messageLayout->addWidget(bodyLabel, 3, 0);
-  messageLayout->addWidget(bodyEdit, 3, 1, 2, 4);
-  messageLayout->addWidget(showMessageButton, 5, 4);
-  messageLayout->setColumnStretch(3, 1);
-  messageLayout->setRowStretch(4, 1);
-  messageGroupBox->setLayout(messageLayout);
+  // Layout everything
+  QGridLayout* layout = new QGridLayout;
+  
+  // Row 0: Edit Config checkbox
+  layout->addWidget(editConfigCheckBox, 0, 0, 1, 2);
+  
+  // Left side - Configuration fields (rows 1-4)
+  layout->addWidget(new QLabel(tr("hostname = ")), 1, 0);
+  layout->addWidget(hostnameEdit, 1, 1);
+  
+  layout->addWidget(new QLabel(tr("port = ")), 2, 0);
+  layout->addWidget(portEdit, 2, 1);
+  
+  layout->addWidget(new QLabel(tr("login = ")), 3, 0);
+  layout->addWidget(loginEdit, 3, 1);
+  
+  layout->addWidget(new QLabel(tr("password = ")), 4, 0);
+  layout->addWidget(passwordEdit, 4, 1);
+  
+  // Right side - Status and button (spanning multiple rows)
+  QVBoxLayout* rightLayout = new QVBoxLayout;
+  
+  QHBoxLayout* statusLayout = new QHBoxLayout;
+  statusLayout->addWidget(statusLabel);
+  statusLayout->addStretch();
+  statusLayout->addWidget(statusIndicator);
+  
+  rightLayout->addLayout(statusLayout);
+  rightLayout->addStretch();
+  rightLayout->addWidget(connectButton);
+  
+  QWidget* rightWidget = new QWidget;
+  rightWidget->setLayout(rightLayout);
+  rightWidget->setMinimumWidth(200);
+  
+  layout->addWidget(rightWidget, 1, 2, 4, 1);
+  
+  // Set column stretch to make the layout responsive
+  layout->setColumnStretch(1, 1);
+  layout->setColumnStretch(2, 1);
+  
+  configGroupBox->setLayout(layout);
 }
 
 void Window::createActions()
 {
   minimizeAction = new QAction(tr("Mi&nimize"), this);
   connect(minimizeAction, &QAction::triggered, this, &QWidget::hide);
-
-  maximizeAction = new QAction(tr("Ma&ximize"), this);
-  connect(maximizeAction, &QAction::triggered, this, &QWidget::showMaximized);
 
   restoreAction = new QAction(tr("&Restore"), this);
   connect(restoreAction, &QAction::triggered, this, &QWidget::showNormal);
@@ -238,7 +262,6 @@ void Window::createTrayIcon()
 {
   trayIconMenu = new QMenu(this);
   trayIconMenu->addAction(minimizeAction);
-  trayIconMenu->addAction(maximizeAction);
   trayIconMenu->addAction(restoreAction);
   trayIconMenu->addSeparator();
   trayIconMenu->addAction(quitAction);
@@ -251,4 +274,66 @@ void Window::createTrayIcon()
   setWindowIcon(icon);
 }
 
-#endif
+void Window::updateStatusIndicator(ProxyStatus status)
+{
+  QString color;
+  QString statusText;
+  QString buttonText = tr("Connect");
+  
+  switch (status) {
+    case ProxyStatus::Disconnected:
+      color = "red";
+      statusText = tr("Status:\nDisconnected.");
+      break;
+    case ProxyStatus::Connecting:
+      color = "yellow";
+      statusText = tr("Status:\nConnecting...");
+      break;
+    case ProxyStatus::Connected:
+      color = "green";
+      statusText = tr("Status:\nConnected.");
+      buttonText = tr("Disconnect");
+      break;
+    case ProxyStatus::Error:
+      color = "red";
+      statusText = tr("Status:\nError.");
+      break;
+  }
+  
+  statusIndicator->setStyleSheet(QString("border-radius: 10px; background-color: %1; border: 1px solid black;").arg(color));
+  statusLabel->setText(statusText);
+  connectButton->setText(buttonText);
+}
+
+void Window::updatePasswordField()
+{
+  if (editConfigCheckBox->isChecked()) {
+    passwordEdit->setEchoMode(QLineEdit::Normal);
+    passwordEdit->setText(actualPassword_);
+    passwordEdit->setEnabled(true);
+  } else {
+    passwordEdit->setEchoMode(QLineEdit::Password);
+    passwordEdit->setText(actualPassword_);
+    passwordEdit->setEnabled(false);
+  }
+}
+
+void Window::onEditConfigToggled(bool enabled)
+{
+  // Enable/disable editing of all config fields
+  hostnameEdit->setEnabled(enabled);
+  portEdit->setEnabled(enabled);
+  loginEdit->setEnabled(enabled);
+  
+  // Update password field display
+  if (enabled) {
+    // Save the actual password when switching to edit mode
+    actualPassword_ = passwordEdit->text();
+  }
+  updatePasswordField();
+}
+
+void Window::dispose()
+{
+  proxy_.reset();
+}
