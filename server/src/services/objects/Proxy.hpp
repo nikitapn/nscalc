@@ -73,7 +73,7 @@ public:
     boost::asio::async_write(socket_, boost::asio::buffer(data_copy->data(), data_copy->size()),
       [self, data_copy](boost::system::error_code ec, std::size_t) {
         if (ec) {
-          std::cerr << "Error writing to target socket: " << ec.message() << std::endl;
+          std::cerr << "[proxy] Error writing to target socket: " << ec.message() << std::endl;
         }
         // data_copy will be automatically destroyed when lambda goes out of scope
       });
@@ -91,7 +91,7 @@ private:
           }
           self->do_read();
         } else if (ec != boost::asio::error::eof) {
-          std::cerr << "Error reading from target socket: " << ec.message() << std::endl;
+          std::cerr << "[proxy] Error reading from target socket: " << ec.message() << std::endl;
         }
       });
   }
@@ -107,7 +107,7 @@ private:
 public:
   ProxyUser(boost::asio::io_context& ioc) : ioc_(ioc) {}
   ~ProxyUser() {
-    std::cout << "ProxyUser destructor called." << std::endl;
+    std::cout << "[proxy] ProxyUser destructor called." << std::endl;
   }
   
   virtual void RegisterCallbacks(nprpc::Object* callbacks) override {
@@ -130,7 +130,7 @@ public:
       boost::asio::connect(connection->socket(), endpoints, ec);
 
       if (ec) {
-        std::cerr << "Failed to connect to " << host << ":" << target_port 
+        std::cerr << "[proxy] Failed to connect to " << host << ":" << target_port 
                   << " - " << ec.message() << std::endl;
         return 0; // Return 0 to indicate failure
       }
@@ -150,7 +150,7 @@ public:
       return connection_id;
       
     } catch (const std::exception& e) {
-      std::cerr << "Exception during EstablishTunnel: " << e.what() << std::endl;
+      std::cerr << "[proxy] Exception during EstablishTunnel: " << e.what() << std::endl;
       return 0; // Return 0 to indicate failure
     }
   }
@@ -158,7 +158,7 @@ public:
   virtual bool SendData(uint32_t session_id, ::nprpc::flat::Span<uint8_t> data) override {
     auto it = connections_.find(session_id);
     if (it == connections_.end()) {
-      std::cerr << "Connection " << session_id << " not found" << std::endl;
+      std::cerr << "[proxy] Connection " << session_id << " not found" << std::endl;
       return false;
     }
 
@@ -166,7 +166,7 @@ public:
       it->second->send_data(data);
       return true;
     } catch (const std::exception& e) {
-      std::cerr << "Error sending data to connection " << session_id 
+      std::cerr << "[proxy] Error sending data to connection " << session_id 
                 << ": " << e.what() << std::endl;
       return false;
     }
@@ -239,14 +239,14 @@ public:
           ioc_.run();
           break; // Exit the loop if run() completes normally
         } catch (nprpc::ExceptionCommFailure& e) {
-          std::cerr << "Communication failure in IO context thread: " << e.what << std::endl;
+          std::cerr << "[proxy] Communication failure in IO context thread: " << e.what << std::endl;
         } catch (nprpc::Exception& e) {
-          std::cerr << "NPRPC exception in IO context thread: " << e.what() << std::endl;
+          std::cerr << "[proxy] NPRPC exception in IO context thread: " << e.what() << std::endl;
         } catch (const std::exception& e) {
-          std::cerr << "Error in IO context thread: " << e.what() << std::endl;
+          std::cerr << "[proxy] Error in IO context thread: " << e.what() << std::endl;
           break; // Exit on other exceptions
         } catch (...) {
-          std::cerr << "Unknown error in IO context thread." << std::endl;
+          std::cerr << "[proxy] Unknown error in IO context thread." << std::endl;
           break; // Exit on unknown errors
         }
       }

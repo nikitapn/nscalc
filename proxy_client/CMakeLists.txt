@@ -2,36 +2,6 @@
 find_package(Qt6 COMPONENTS Core Gui Widgets REQUIRED)
 qt_standard_project_setup()
 
-if (WIN32)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zc:__cplusplus")
-
-  set(BOOST_DIR "$ENV{BOOST_DIR}")
-
-  if ("${BOOST_DIR}" STREQUAL "")
-    message(FATAL_ERROR "BOOST_DIR is not set")
-  endif()
-
-  set(OPT_OPENSSL_DIR "C:\\Program Files\\OpenSSL" CACHE STRING "Path to OpenSSL directory")
-
-  include_directories(
-    "${BOOST_DIR}"
-    "${OPT_OPENSSL_DIR}/include"
-  )
-
-  link_directories(
-    "${BOOST_DIR}/stage_x64/lib"
-    "${OPT_OPENSSL_DIR}/lib"
-  )
-  add_definitions(
-    -DBOOST_DISABLE_CURRENT_LOCATION
-    -DBOOST_ASIO_DISABLE_CO_AWAIT
-    -DBOOST_ASIO_DISABLE_STD_COROUTINE
-    -D_WIN32_WINNT=0x0A00
-    -D_SILENCE_CXX23_ALIGNED_STORAGE_DEPRECATION_WARNING
-  )
-  add_compile_options(/W3 /bigobj)
-endif()
-
 set(SOURCES
   ${proxy_stub_GENERATED_HEADERS}
   ${proxy_stub_GENERATED_SOURCES}
@@ -63,5 +33,73 @@ target_link_libraries(proxy_client PRIVATE
 
 add_dependencies(proxy_client proxy_stub_gen)
 
-#install(TARGETS ${PROJECT_NAME} DESTINATION bin)
+# Installation and packaging setup
+set(INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install")
+
+# Install the executable
+install(TARGETS proxy_client
+  RUNTIME DESTINATION bin
+  BUNDLE DESTINATION .
+  LIBRARY DESTINATION lib
+)
+
+# Platform-specific deployment
+if(WIN32)
+  # Find Qt6 deployment tool
+  find_program(QT_DEPLOY_EXECUTABLE windeployqt HINTS ${QT6_INSTALL_PREFIX}/bin)
+  
+  if(QT_DEPLOY_EXECUTABLE)
+    # Add custom target for Windows deployment
+    add_custom_target(deploy_proxy_client
+      COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --prefix ${INSTALL_PREFIX}
+      COMMAND ${QT_DEPLOY_EXECUTABLE} --verbose 2 --no-compiler-runtime --no-opengl-sw 
+              "${INSTALL_PREFIX}/bin/proxy_client.exe"
+      DEPENDS proxy_client
+      COMMENT "Deploying Qt libraries and creating distributable package"
+    )
+  endif()
+  
+elseif(APPLE)
+  # Find Qt6 deployment tool for macOS
+  find_program(QT_DEPLOY_EXECUTABLE macdeployqt HINTS ${QT6_INSTALL_PREFIX}/bin)
+  
+  if(QT_DEPLOY_EXECUTABLE)
+    add_custom_target(deploy_proxy_client
+      COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --prefix ${INSTALL_PREFIX}
+      COMMAND ${QT_DEPLOY_EXECUTABLE} "${INSTALL_PREFIX}/proxy_client.app" -verbose=2
+      DEPENDS proxy_client
+      COMMENT "Creating macOS app bundle with Qt libraries"
+    )
+  endif()
+  
+elseif(UNIX)
+  # For Linux, we'll create a simple packaging script
+  add_custom_target(deploy_proxy_client
+    COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --prefix ${INSTALL_PREFIX}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/deploy/linux ${INSTALL_PREFIX}
+    DEPENDS proxy_client
+    COMMENT "Installing proxy_client for Linux distribution"
+  )
+endif()
+
+# CPack configuration for creating installers
+set(CPACK_PACKAGE_NAME "NSCalc Proxy Client")
+set(CPACK_PACKAGE_VERSION "1.0.0")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "SOCKS5 Proxy Client for NSCalc")
+set(CPACK_PACKAGE_VENDOR "NSCalc Project")
+
+if(WIN32)
+  set(CPACK_GENERATOR "NSIS;ZIP")
+  set(CPACK_NSIS_DISPLAY_NAME "NSCalc Proxy Client")
+  set(CPACK_NSIS_PACKAGE_NAME "NSCalc Proxy Client")
+  set(CPACK_NSIS_CONTACT "nikitapnn1@gmail.com")
+elseif(APPLE)
+  set(CPACK_GENERATOR "DragNDrop")
+elseif(UNIX)
+  set(CPACK_GENERATOR "TGZ;DEB")
+  set(CPACK_DEBIAN_PACKAGE_MAINTAINER "nikitapnn1@gmail.com")
+  set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6, libqt6core6, libqt6gui6, libqt6widgets6")
+endif()
+
+include(CPack)
 
