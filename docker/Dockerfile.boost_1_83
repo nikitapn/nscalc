@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y \
     tar \
     openssl \
     libssl-dev \
+    nodejs \
+    npm \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Set Boost version
@@ -16,7 +18,7 @@ ARG BOOST_VERSION=1.83.0
 ARG BOOST_DIR=boost_1_83_0
 
 # Download and build Boost
-RUN wget https://boostorg.jfrog.io/artifactory/main/release/${BOOST_VERSION}/source/${BOOST_DIR}.tar.gz && \
+RUN wget https://archives.boost.io/release/${BOOST_VERSION}/source/${BOOST_DIR}.tar.gz && \
     tar -xzf ${BOOST_DIR}.tar.gz && \
     cd ${BOOST_DIR} && \
     ./bootstrap.sh && \

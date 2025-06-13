@@ -9,12 +9,15 @@ cd $ROOT_DIR
 
 docker run --rm \
   -v $ROOT_DIR:/app \
-  -v $(readlink -f server/external/npsystem):/app/server/external/npsystem \
+  -v $(readlink -f external/npsystem):/app/external/npsystem \
   -w /app cpp-dev-env:latest \
-  cmake -B $BUILD_DIR -S server/ -DBOOST_LIB_PREFIX=/usr/local/lib
+  cmake -B $BUILD_DIR \
+    -DBOOST_LIB_PREFIX=/usr/local/lib \
+    -DOPT_BUILD_PROXY_CLIENT=OFF \
+    -DOPT_NPRPC_SKIP_TESTS=ON
 
 docker run --rm \
   -v $ROOT_DIR:/app \
-  -v $(readlink -f server/external/npsystem):/app/server/external/npsystem \
+  -v $(readlink -f external/npsystem):/app/external/npsystem \
   -w /app cpp-dev-env:latest \
   cmake --build $BUILD_DIR

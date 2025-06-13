@@ -6,7 +6,15 @@
       "request": "launch",
       "name": "Launch debug",
       "program": "${workspaceFolder}/.build_local/debug/${input:executableName}",
-      "args": ["--hostname=archvm", "--http-dir=./client/public", "--data-dir=./sample_data"],
+      "args": [
+        "--hostname=archvm.lan",
+        "--http-dir=./client/public",
+        "--data-dir=./sample_data",
+        "--use-ssl=1",
+        "--public-key=certs/archvm.lan.crt",
+        "--private-key=certs/archvm.lan.key",
+        "--dh-params=certs/dhparam.pem"
+        ],
       "cwd": "${workspaceFolder}",
       "stopAtEntry": false,
       "setupCommands": [

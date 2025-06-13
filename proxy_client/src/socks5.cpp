@@ -85,7 +85,7 @@ SessionManager* SessionManager::instance_ = nullptr;
 class SOCKS5Session : public std::enable_shared_from_this<SOCKS5Session> {
 private:
   boost::asio::ip::tcp::socket client_socket_;
-  proxy::User* proxy_user_;
+  nprpc::ObjectPtr<proxy::User> proxy_user_;
   std::array<uint8_t, 8192 * 1024> buffer_;
   std::string target_host_;
   uint16_t target_port_;
@@ -93,7 +93,7 @@ private:
   bool tunnel_established_;
 
 public:
-  SOCKS5Session(boost::asio::ip::tcp::socket socket, proxy::User* proxy_user)
+  SOCKS5Session(boost::asio::ip::tcp::socket socket, nprpc::ObjectPtr<proxy::User> proxy_user)
     : client_socket_(std::move(socket))
     , proxy_user_(proxy_user)
     , session_id_(0)
@@ -379,10 +379,10 @@ class SOCKS5Server : public std::enable_shared_from_this<SOCKS5Server> {
 private:
   boost::asio::io_context& ioc_;
   boost::asio::ip::tcp::acceptor acceptor_;
-  proxy::User* proxy_user_;
-
+  nprpc::ObjectPtr<proxy::User> proxy_user_;
+  std::atomic_bool running_{ true };
 public:
-  SOCKS5Server(boost::asio::io_context& ioc, unsigned short port, proxy::User* proxy_user)
+  SOCKS5Server(boost::asio::io_context& ioc, unsigned short port, nprpc::ObjectPtr<proxy::User> proxy_user)
     : ioc_(ioc)
     , acceptor_(ioc, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port))
     , proxy_user_(proxy_user) {
@@ -392,17 +392,29 @@ public:
     do_accept();
   }
 
+  void stop() {
+    running_ = false;
+    boost::system::error_code ec;
+    acceptor_.close(ec);
+    if (ec) {
+      std::cerr << "Error closing acceptor: " << ec.message() << std::endl;
+    }
+  }
+
 private:
   void do_accept() {
+    if (running_.load() == false)
+      return;
+
     acceptor_.async_accept(boost::asio::make_strand(ioc_),
-      [this](boost::system::error_code ec, boost::asio::ip::tcp::socket socket) {
+      [self = shared_from_this()](boost::system::error_code ec, boost::asio::ip::tcp::socket socket) {
         if (ec) {
           fail(ec, "accept");
         } else {
-          std::make_shared<SOCKS5Session>(std::move(socket), proxy_user_)->start();
+          std::make_shared<SOCKS5Session>(std::move(socket), self->proxy_user_)->start();
         }
 
-        do_accept();
+        self->do_accept();
       });
   }
 };
@@ -425,6 +437,10 @@ public:
       session->onServerClosed(reason);
     }
     SessionManager::getInstance().unregisterSession(session_id);
+  }
+
+  ~ProxySessionCallbacks() override {
+    std::cout << "ProxySessionCallbacks destroyed" << std::endl;
   }
 };
 
@@ -458,17 +474,17 @@ class Proxy::Impl {
   nprpc::ObjectPtr<proxy::Server> server_;
   nprpc::ObjectPtr<proxy::User> user_;
   // lifetime of the callbacks is managed by the NPRPC
+  // so we don't need to delete them manually or call release()
   ProxySessionCallbacks* callbacks_ = nullptr;
   nprpc::ObjectId callbacks_activation_;
-
   std::shared_ptr<SOCKS5Server> socks5_server_;
-  boost::asio::io_context ioc_;
-  boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard_ = 
-    boost::asio::make_work_guard(ioc_);
   // running IO context in a separate thread to prevent deadlock with NPRPC thread pool
   std::thread ioc_thread_;
-
   std::function<void(ProxyStatus)> status_callback_;
+
+  static inline boost::asio::io_context ioc_;
+  static inline boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard_ =
+    boost::asio::make_work_guard(ioc_);
 public:
   Impl(nprpc::Rpc& rpc)
     : rpc_(rpc)
@@ -496,7 +512,7 @@ public:
     status_callback_(ProxyStatus::Connecting);
 
     poa_ = nprpc::PoaBuilder(&rpc_)
-      .with_lifespan(nprpc::PoaPolicy::Lifespan::Persistent)
+      .with_lifespan(nprpc::PoaPolicy::Lifespan::Transient)
       .with_max_objects(1) // one object for callbacks
       .build();
 
@@ -532,18 +548,20 @@ public:
 
     std::cout << "Successfully connected to proxy server" << std::endl;
 
+    auto sessionContext = rpc_.get_object_session_context(server_.get());
+    assert(sessionContext != nullptr);
     // Create and register session callbacks
     callbacks_ = new ProxySessionCallbacks();
     callbacks_activation_ = poa_->activate_object(
       callbacks_, 
-      nprpc::ObjectActivationFlags::SESSION_SPECIFIC);
+      nprpc::ObjectActivationFlags::SESSION_SPECIFIC,
+      sessionContext);
 
     user_->RegisterCallbacks(callbacks_activation_);
     std::cout << "Session callbacks registered" << std::endl;
 
     // Start SOCKS5 server on port 1080
-    socks5_server_ = std::make_shared<SOCKS5Server>(
-      ioc_, 1080, user_.get());
+    socks5_server_ = std::make_shared<SOCKS5Server>(ioc_, 1080, user_);
     socks5_server_->start();
 
     std::cout << "SOCKS5 server started on port 1080" << std::endl;
@@ -553,20 +571,16 @@ public:
   }
 
   void cleanUp() {
-    if (ioc_thread_.joinable()) {
-      ioc_.stop();
+    if (socks5_server_)
+      socks5_server_->stop();
+    ioc_.stop();
+    if (ioc_thread_.joinable())
       ioc_thread_.join();
-    }
-    if (callbacks_) {
-      callbacks_->release();
-      callbacks_ = nullptr;
-    }
-    if (user_) {
+    ioc_.restart();
+    if (user_)
       user_.reset();
-    }
-    if (server_) {
-      server_->release();
-    }
+    if (server_)
+      server_.reset();
     if (poa_) {
       poa_->deactivate_object(callbacks_activation_.object_id());
       rpc_.destroy_poa(poa_);

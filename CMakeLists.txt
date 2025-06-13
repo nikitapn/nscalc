@@ -1,5 +1,7 @@
-cmake_minimum_required(VERSION 4.0.1)
+cmake_minimum_required(VERSION 3.25.1)
 project(nscalc)
+
+option(OPT_BUILD_PROXY_CLIENT "Build the proxy client" ON)
 
 set(BOOST_LIB_PREFIX "/usr/lib" CACHE STRING "Location of the boost libs")
 
@@ -100,4 +102,9 @@ if (UNIX)
   add_subdirectory(client)
 endif()
 
-add_subdirectory(proxy_client)
+if (OPT_BUILD_PROXY_CLIENT)
+  message(STATUS "Building proxy client")
+  add_subdirectory(proxy_client)
+else()
+  message(STATUS "Skipping proxy client build")
+endif()

@@ -6,10 +6,22 @@ RUN apt-get update && apt-get install -y \
     cmake \
     sqlite3 \
     libsqlite3-dev \
+    sudo \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
+# Create user 'user' with same UID/GID as host user to avoid permission issues
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+RUN groupadd -g ${GROUP_ID} user && \
+    useradd -u ${USER_ID} -g ${GROUP_ID} -m -s /bin/bash user && \
+    echo 'user ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+# Set working directory and change ownership
 WORKDIR /app
+RUN chown -R user:user /app
+
+# Switch to user
+USER user
 
 # Default command
 CMD ["/bin/bash"]

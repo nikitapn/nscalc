@@ -13,7 +13,7 @@ add_custom_command(
 
 add_custom_command(
   OUTPUT nscalc_js.stamp
-  COMMAND  npm ci && npm run build-debug
+  COMMAND  npm ci && npm run build-prd
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   DEPENDS ${NSCALC_DST}
   COMMENT "Building nscalc TypeScript client"

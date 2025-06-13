@@ -4,8 +4,8 @@
   "main": "index.tsx",
   "description": "Hydroponics nutrient calculator",
   "scripts": {
-    "build-debug": "webpack --env NODE_ENV=true --env production=false --config webpack.config.js",
     "build-prd": "webpack --env NODE_ENV=true --env production=true --config webpack.config.js",
+    "build-debug": "webpack --env NODE_ENV=true --env production=false --config webpack.config.js",
     "dev": "webpack --env NODE_ENV=true --env watch=true --config webpack.config.js",
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
