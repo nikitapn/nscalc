@@ -20,8 +20,6 @@ void init_rpc() {
   // Initialize NPRPC
   rpc_instance = nprpc::RpcBuilder()
     .set_debug_level(nprpc::DebugLevel::DebugLevel_Critical)
-    // TODO: Don't forget to remove this in production
-    .disable_ssl_client_verification()
     .build(thpool::get_instance().ctx());
 }
 
