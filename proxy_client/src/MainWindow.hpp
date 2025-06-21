@@ -5,6 +5,7 @@
 #pragma once
 
 #include "socks5.hpp"
+#include "LogWindow.hpp"
 
 #include <memory>
 
@@ -46,6 +47,8 @@ protected:
 private slots:
   void iconActivated(QSystemTrayIcon::ActivationReason reason);
   void onButtonConnectClicked();
+  void showLogWindow();
+  void onLogWindowHidden();
 
 private:
   void createMainGroupBox();
@@ -71,10 +74,12 @@ private:
   QLabel* statusLabel;
   
   QPushButton* connectButton;
+  QPushButton* showLogButton;
 
   QAction* minimizeAction;
   QAction* maximizeAction;
   QAction* restoreAction;
+  QAction* showLogAction;
   QAction* quitAction;
 
   QSystemTrayIcon* trayIcon;
@@ -83,6 +88,8 @@ private:
   std::unique_ptr<Proxy> proxy_;
   ProxyStatus currentStatus_;
   QString actualPassword_;
+  
+  std::unique_ptr<LogWindow> logWindow_;
 };
 //! [0]
 

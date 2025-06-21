@@ -63,10 +63,11 @@ if [ "$DEPLOY_SERVER" ]; then
     docker run -d --name nscalc \
       -v ${APP_DIR}:/app \
       -w /app \
-      -p 8080:8080 \
+      -p 8080:443 \
       cpp-runtime-env \
       nscalc \
         --hostname $HOSTNAME \
+        --port 443 \
         --http-dir www \
         --data-dir data \
         --use-ssl 1 \

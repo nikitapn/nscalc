@@ -106,8 +106,6 @@ void AuthorizatorImpl::AuthorizatorImpl::RegisterStepOne(::nprpc::flat::Span<cha
   std::uniform_int_distribution<std::uint32_t> dist(10000, 99999);
   user.code = dist(rd_);
 
-  // std::cerr << "Code: " << user.code << '\n';
-
   dataObservers_->alarm(nscalc::AlarmType::Info, "Dear " + user.user->user_name + ", here is your confirmation code: " + std::to_string(user.code));
 
   {

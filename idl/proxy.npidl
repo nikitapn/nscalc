@@ -2,7 +2,21 @@ namespace proxy {
 
 using bytestream = vector<u8>;
 
+enum CloseReason {
+	Normal						= 0, // Normal closure
+	Error 						= 1, // Error occurred
+	DnsError					= 2, // DNS resolution error
+	ConnectionRefused = 3, // Connection refused by target server
+	Timeout 					= 4, // Connection timed out
+};
+
 interface SessionCallbacks {
+	/**
+	 * Called when a tunnel session is established successfully
+	 * @param session_id - unique session identifier previously returned by EstablishTunnel
+	 */
+	async OnTunnelEstablished(session_id: in u32);
+
 	/**
 	 * Called when data is received from the target server
 	 * @param session_id - unique session identifier
@@ -15,7 +29,7 @@ interface SessionCallbacks {
 	 * @param session_id - unique session identifier
 	 * @param reason - reason for closure (0=normal, 1=error)
 	 */
-	async OnSessionClosed(session_id: in u32, reason: in u32);
+	async OnSessionClosed(session_id: in u32, reason: in CloseReason);
 }
 
 interface User {
@@ -29,7 +43,7 @@ interface User {
 	 * Establish a new SOCKS5 tunnel session
 	 * @param target_host - target hostname or IP
 	 * @param target_port - target port
-	 * @return session_id - unique session identifier (0 on failure)
+	 * @return session_id - unique session identifier
 	 */
 	u32 EstablishTunnel(target_host: in string, target_port: in u16);
 	

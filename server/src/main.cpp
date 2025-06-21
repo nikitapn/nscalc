@@ -10,6 +10,7 @@
 #include <boost/asio/signal_set.hpp>
 #include <boost/beast/core/error.hpp>
 #include <boost/program_options.hpp>
+#include <spdlog/spdlog.h>
 #include <nprpc/serialization/oarchive.h>
 #include "services/db/UserService.hpp"
 #include "util/util.hpp"
@@ -85,7 +86,7 @@ int main(int argc, char *argv[]) {
     }
     po::notify(vm);
   } catch (std::exception& e) {
-    std::cerr << e.what() << '\n';
+    std::cerr << "Exception during command line parsing: " << e.what() << std::endl;
     return -1;
   }
 
@@ -164,11 +165,10 @@ int main(int argc, char *argv[]) {
     host_json.objects.chat = poa->activate_object(chat.get(), flags);
     host_json.objects.proxy = poa->activate_object(proxy.get(), flags);
 
-    std::cout << "calculator  - poa: " << calc->poa_index() << ", oid: " << calc->oid() << "\n";
-    std::cout << "authorizator - poa: " << authorizator->poa_index() << ", oid: " << authorizator->oid() << "\n";
-    std::cout << "chat - poa: " << chat->poa_index() << ", oid: " << chat->oid() << "\n";
-    std::cout << "proxy - poa: " << proxy->poa_index() << ", oid: " << proxy->oid() << "\n";
-    std::cout.flush();
+    spdlog::info("calculator  - poa: {}, oid: {}", calc->poa_index(), calc->oid());
+    spdlog::info("authorizator  - poa: {}, oid: {}", authorizator->poa_index(), authorizator->oid());
+    spdlog::info("chat  - poa: {}, oid: {}", chat->poa_index(), chat->oid());
+    spdlog::info("proxy  - poa: {}, oid: {}", proxy->poa_index(), proxy->oid());
 
     {
       std::ofstream os(fs::path(http_dir) / "host.json");
@@ -182,12 +182,12 @@ int main(int argc, char *argv[]) {
     // rpc->destroy();
 
   } catch (std::exception& ex) {
-    std::cerr << ex.what() << '\n';
+    spdlog::critical("Exception occurred: {}", ex.what());
     thread_pool::get_instance().stop();
     return EXIT_FAILURE;
   }
 
-  std::cout << "calculator is shutting down..." << std::endl;
+  spdlog::info("nscalc is shutting down gracefully");
 
   return EXIT_SUCCESS;
 }

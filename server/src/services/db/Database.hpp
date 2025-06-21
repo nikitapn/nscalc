@@ -1,9 +1,10 @@
 #pragma once
 
+#include <spdlog/spdlog.h>
+
 #include <sqlite3.h>
 #include <stdexcept>
 #include <string>
-#include <iostream>
 
 class Database {
   sqlite3 *db_;
@@ -18,10 +19,10 @@ public:
       throw std::runtime_error("Threading mode isn't set to 'SQLITE_CONFIG_SERIALIZED'");
     }
     if (sqlite3_open(dbPath_.c_str(), &db_) != SQLITE_OK) {
-      std::cerr << "Failed to open database: " << sqlite3_errmsg(db_) << std::endl;
+      spdlog::warn("[Database] Failed to open database: {}", sqlite3_errmsg(db_));
       throw std::runtime_error("Database connection failed");
     }
-    std::cout << "Database is open: " << path << std::endl;
+    spdlog::info("Database is open: {}", path);
     execute("PRAGMA foreign_keys = ON;");
   }
 
@@ -39,7 +40,7 @@ public:
   void execute(const std::string &query) {
     char *errMsg = nullptr;
     if (sqlite3_exec(db_, query.c_str(), nullptr, nullptr, &errMsg) != SQLITE_OK) {
-      std::cerr << "Error executing query: " << errMsg << std::endl;
+      spdlog::warn("[Database] Error executing query: {}", errMsg);
       sqlite3_free(errMsg);
     }
   }
@@ -47,7 +48,7 @@ public:
   sqlite3_stmt* prepareStatement(const std::string& sql) {
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        std::cerr << "Failed to prepare statement: " << sqlite3_errmsg(db_) << std::endl;
+        spdlog::error("Failed to prepare statement: {}", sqlite3_errmsg(db_));
         throw std::runtime_error("Failed to prepare statement");
     }
     return stmt;

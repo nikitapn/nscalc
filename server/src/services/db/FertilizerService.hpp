@@ -44,7 +44,7 @@ public:
     sqlite3_bind_text(insert_stmt_, 2, name.c_str(), -1, SQLITE_STATIC);
     sqlite3_bind_text(insert_stmt_, 3, formula.c_str(), -1, SQLITE_STATIC);
     if (sqlite3_step(insert_stmt_) != SQLITE_DONE) {
-      std::cerr << "Failed to execute INSERT: " << sqlite3_errmsg(db_->getConnection()) << std::endl;
+      spdlog::warn("[FertilizedService] Failed to execute INSERT: {}", sqlite3_errmsg(db_->getConnection()));
     }
     auto insertedId = sqlite3_last_insert_rowid(db_->getConnection());
     sqlite3_reset(insert_stmt_);
@@ -56,7 +56,7 @@ public:
     sqlite3_bind_int(update_name_stmt_, 1, id);
     sqlite3_bind_int(update_name_stmt_, 1, userId);
     if (sqlite3_step(update_name_stmt_) != SQLITE_DONE) {
-      std::cerr << "Failed to execute UPDATE: " << sqlite3_errmsg(db_->getConnection()) << std::endl;
+      spdlog::warn("[FertizilerService] Failed to execute UPDATE: {}", sqlite3_errmsg(db_->getConnection()));
     }
     sqlite3_reset(update_name_stmt_);
   }
@@ -66,7 +66,7 @@ public:
     sqlite3_bind_int(update_formula_stmt_, 1, id);
     sqlite3_bind_int(update_formula_stmt_, 1, userId);
     if (sqlite3_step(update_formula_stmt_) != SQLITE_DONE) {
-      std::cerr << "Failed to execute UPDATE: " << sqlite3_errmsg(db_->getConnection()) << std::endl;
+      spdlog::warn("[FertilizedService] Failed to execute UPDATE: {}", sqlite3_errmsg(db_->getConnection()));
     }
     sqlite3_reset(update_formula_stmt_);
   }
@@ -90,7 +90,7 @@ public:
     sqlite3_bind_int(delete_stmt_, 1, id);
     sqlite3_bind_int(delete_stmt_, 2, userId);
     if (sqlite3_step(delete_stmt_) != SQLITE_DONE) {
-      std::cerr << "Failed to execute DELETE: " << sqlite3_errmsg(db_->getConnection()) << std::endl;
+      spdlog::warn("[FertilizerService] Failed to execute DELETE: {}", sqlite3_errmsg(db_->getConnection()));
       result = false;
     }
     sqlite3_reset(delete_stmt_);

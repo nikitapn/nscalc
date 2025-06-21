@@ -1,5 +1,6 @@
 #pragma once
 
+#include <spdlog/spdlog.h>
 #include <memory>
 #include <unordered_map>
 #include <set>
@@ -67,6 +68,6 @@ public:
   );
 
   ~AuthorizatorImpl() {
-    std::cout << "AuthorizatorImpl destroyed" << std::endl;
+    spdlog::info("AuthorizatorImpl destroyed");
   }
 };

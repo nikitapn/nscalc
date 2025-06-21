@@ -1,4 +1,3 @@
-#include <iostream>
 #include <memory>
 #include <deque>
 #include <array>
@@ -10,6 +9,7 @@
 #include "socks5.hpp"
 #include "util.hpp"
 
+#include <spdlog/spdlog.h>
 #include <boost/asio.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/beast/core.hpp>
@@ -52,7 +52,7 @@ enum class SOCKS5_REP : uint8_t {
 namespace {
 
 void fail(boost::system::error_code ec, char const* what) {
-  std::cerr << what << ": " << ec.message() << "\n";
+  spdlog::info("{}: {}", what, ec.message());
 }
 
 // Forward declaration
@@ -77,7 +77,6 @@ public:
   void unregisterSession(uint32_t session_id); 
 
   std::shared_ptr<SOCKS5Session> getSession(uint32_t session_id);
-  
 };
 
 SessionManager* SessionManager::instance_ = nullptr;
@@ -86,28 +85,39 @@ class SOCKS5Session : public std::enable_shared_from_this<SOCKS5Session> {
 private:
   boost::asio::ip::tcp::socket client_socket_;
   nprpc::ObjectPtr<proxy::User> proxy_user_;
-  std::array<uint8_t, 8192 * 1024> buffer_;
+  std::array<uint8_t, 8192> buffer_;
   std::string target_host_;
   uint16_t target_port_;
   uint32_t session_id_;
   bool tunnel_established_;
+  boost::asio::system_timer timeout_timer_;
 
 public:
-  SOCKS5Session(boost::asio::ip::tcp::socket socket, nprpc::ObjectPtr<proxy::User> proxy_user)
+  SOCKS5Session(
+    boost::asio::io_context& ioc,
+    boost::asio::ip::tcp::socket socket,
+    nprpc::ObjectPtr<proxy::User> proxy_user)
     : client_socket_(std::move(socket))
     , proxy_user_(proxy_user)
     , session_id_(0)
-    , tunnel_established_(false) {
+    , tunnel_established_(false) 
+    , timeout_timer_(ioc)
+  {
   }
 
   void start() {
     do_read_auth_request();
   }
 
+  void onTunnelEstablished() {
+    timeout_timer_.cancel(); // Cancel timeout
+    continue_establish_tunnel();
+  }
+
   // Called when data is received from the proxy server
   void onDataFromServer(::nprpc::flat::Span<uint8_t> data) {
     if (!tunnel_established_) {
-      std::cerr << "Received data but tunnel not established" << std::endl;
+      spdlog::warn("[SOCKS5Session] Received data but tunnel not established");
       return;
     }
 
@@ -117,14 +127,18 @@ public:
     boost::asio::async_write(client_socket_, boost::asio::buffer(data_copy->data(), data_copy->size()),
       [self, data_copy](boost::system::error_code ec, std::size_t) {
         if (ec) {
-          std::cerr << "Error writing to client: " << ec.message() << std::endl;
+          spdlog::warn("[SOCKS5Session] Error writing to client: {}", ec.message());
         }
       });
   }
 
   // Called when the server closes the session
-  void onServerClosed(uint32_t reason) {
-    std::cout << "Server closed session, reason: " << reason << std::endl;
+  void onServerClosed(proxy::CloseReason reason) {
+    if (!tunnel_established_) {
+      fail_tunnel_establishment("Tunnel not established, cannot close session");
+      return;
+    }
+    spdlog::info("Server closed session, reason: {}", static_cast<uint32_t>(reason));
     client_socket_.close();
   }
 
@@ -135,18 +149,18 @@ private:
       boost::asio::buffer(buffer_.data(), 2),
       [self](boost::system::error_code ec, std::size_t length) {
         if (ec) {
-          fail(ec, "auth request read");
+          fail(ec, "[SOCKS5Session] auth request read");
           return;
         }
 
         if (length < 2 || self->buffer_[0] != 0x05) {
-          std::cerr << "Invalid SOCKS5 version\n";
+          spdlog::warn("[SOCKS5Session] Invalid SOCKS5 version");
           return;
         }
 
         uint8_t nmethods = self->buffer_[1];
         if (nmethods == 0) {
-          std::cerr << "No authentication methods\n";
+          spdlog::warn("[SOCKS5Session] No authentication methods");
           return;
         }
 
@@ -160,7 +174,7 @@ private:
       boost::asio::buffer(buffer_.data(), nmethods),
       [self, nmethods](boost::system::error_code ec, std::size_t length) {
         if (ec) {
-          fail(ec, "auth methods read");
+          fail(ec, "[SOCKS5Session] auth methods read");
           return;
         }
 
@@ -188,12 +202,12 @@ private:
     boost::asio::async_write(client_socket_, boost::asio::buffer(buffer_.data(), 2),
       [self](boost::system::error_code ec, std::size_t) {
         if (ec) {
-          fail(ec, "auth response write");
+          fail(ec, "[SOCKS5Session] auth response write");
           return;
         }
 
         if (self->buffer_[1] == static_cast<uint8_t>(SOCKS5_AUTH::NO_ACCEPTABLE)) {
-          std::cerr << "No acceptable authentication method\n";
+          spdlog::warn("[SOCKS5Session] No acceptable authentication method");
           return;
         }
 
@@ -207,12 +221,12 @@ private:
       boost::asio::buffer(buffer_.data(), 4),
       [self](boost::system::error_code ec, std::size_t length) {
         if (ec) {
-          fail(ec, "connect request read");
+          fail(ec, "[SOCKS5Session] connect request read");
           return;
         }
 
         if (length < 4 || self->buffer_[0] != 0x05) {
-          std::cerr << "Invalid SOCKS5 connect request\n";
+          spdlog::warn("[SOCKS5Session] Invalid SOCKS5 connect request");
           return;
         }
 
@@ -236,7 +250,7 @@ private:
         boost::asio::buffer(buffer_.data(), 6), // 4 bytes IP + 2 bytes port
         [self](boost::system::error_code ec, std::size_t length) {
           if (ec || length < 6) {
-            fail(ec, "IPv4 address read");
+            fail(ec, "[SOCKS5Session] IPv4 address read");
             return;
           }
 
@@ -247,14 +261,14 @@ private:
                               std::to_string(self->buffer_[3]);
           
           self->target_port_ = (self->buffer_[4] << 8) | self->buffer_[5];
-          self->establish_tunnel();
+          self->start_establish_tunnel();
         });
     } else if (atyp == SOCKS5_ATYP::DOMAINNAME) {
       client_socket_.async_read_some(
         boost::asio::buffer(buffer_.data(), 1), // domain length
         [self](boost::system::error_code ec, std::size_t length) {
           if (ec || length < 1ul) {
-            fail(ec, "domain length read");
+            fail(ec, "[SOCKS5Session] domain length read");
             return;
           }
 
@@ -263,7 +277,7 @@ private:
             boost::asio::buffer(self->buffer_.data(), domain_len + 2), // domain + port
             [self, domain_len](boost::system::error_code ec, std::size_t length) {
               if (ec || length < domain_len + 2ul) {
-                fail(ec, "domain address read");
+                fail(ec, "[SOCKS5Session] domain address read");
                 return;
               }
 
@@ -271,7 +285,7 @@ private:
                 reinterpret_cast<char*>(self->buffer_.data()), domain_len);
               self->target_port_ = (self->buffer_[domain_len] << 8) | 
                                   self->buffer_[domain_len + 1];
-              self->establish_tunnel();
+              self->start_establish_tunnel();
             });
         });
     } else {
@@ -279,26 +293,48 @@ private:
     }
   }
 
-  void establish_tunnel() {
+  void start_establish_tunnel() {
     try {
       // Use the new EstablishTunnel method
       session_id_ = proxy_user_->EstablishTunnel(target_host_, target_port_);
       if (session_id_ == 0) {
-        std::cerr << "Failed to establish tunnel. Session id: " << session_id_ << std::endl;
+        spdlog::warn("[SOCKS5Session] Failed to establish tunnel. Session id: {}", session_id_);
         send_connect_response(SOCKS5_REP::GENERAL_FAILURE);
         return;
       }
-
       // Register this session with the session manager
       SessionManager::getInstance().registerSession(session_id_, shared_from_this());
-
-      tunnel_established_ = true;
-      send_connect_response(SOCKS5_REP::SUCCEEDED);
-
+      
+      // Keep this session alive for a while to allow for tunnel establishment
+      timeout_timer_.expires_after(std::chrono::seconds(5));
+      timeout_timer_.async_wait([self = shared_from_this()](const boost::system::error_code& ec) {
+        if (ec == boost::asio::error::operation_aborted) {
+          // Timer was cancelled - this is normal when tunnel establishes successfully
+          spdlog::info("[SOCKS5Session] Tunnel establishment timer cancelled (tunnel established), id = {}", self->session_id_);
+          return;
+        }
+        if (ec) {
+          spdlog::warn("[SOCKS5Session] Timer error: {}", ec.message());
+          return;
+        }
+        // Only timeout if no error and not cancelled
+        SessionManager::getInstance().unregisterSession(self->session_id_);
+        self->fail_tunnel_establishment("Tunnel establishment timed out");
+      });
     } catch (const std::exception& e) {
-      std::cerr << "Tunnel establishment failed: " << e.what() << std::endl;
+      spdlog::warn("[SOCKS5Session] Tunnel establishment failed: {}", e.what());
       send_connect_response(SOCKS5_REP::GENERAL_FAILURE);
     }
+  }
+
+  void continue_establish_tunnel() {
+      tunnel_established_ = true;
+      send_connect_response(SOCKS5_REP::SUCCEEDED);
+  }
+
+  void fail_tunnel_establishment(const std::string& reason) {
+    spdlog::warn("[SOCKS5Session] Tunnel establishment for session {} failed: {}", session_id_, reason);
+    send_connect_response(SOCKS5_REP::GENERAL_FAILURE);
   }
 
   void send_connect_response(SOCKS5_REP rep) {
@@ -320,7 +356,7 @@ private:
     boost::asio::async_write(client_socket_, boost::asio::buffer(buffer_.data(), 10),
       [self, rep](boost::system::error_code ec, std::size_t) {
         if (ec) {
-          fail(ec, "connect response write");
+          fail(ec, "[SOCKS5Session] connect response write");
           return;
         }
 
@@ -342,14 +378,14 @@ private:
       [self](boost::system::error_code ec, std::size_t length) {
         if (ec) {
           if (ec != boost::asio::error::eof) {
-            fail(ec, "client read");
+            fail(ec, "[SOCKS5Session] client read");
           }
           // Close the tunnel when client disconnects
           if (self->session_id_ != 0) {
             try {
               self->proxy_user_->CloseTunnel(self->session_id_);
             } catch (const std::exception& e) {
-              std::cerr << "Error closing tunnel: " << e.what() << std::endl;
+              spdlog::warn("[SOCKS5Session] Error closing tunnel: {}", e.what());
             }
           }
           return;
@@ -362,10 +398,10 @@ private:
             self->proxy_user_->set_timeout(2000); // Set timeout for proxy operations
             bool success = self->proxy_user_->SendData(self->session_id_, data);
             if (!success) {
-              std::cerr << "Failed to send data through proxy" << std::endl;
+              spdlog::warn("[SOCKS5Session] Failed to send data through proxy");
             }
           } catch (const std::exception& e) {
-            std::cerr << "Proxy send error: " << e.what() << std::endl;
+            spdlog::warn("[SOCKS5Session] Proxy send error: {}", e.what());
           }
         }
 
@@ -397,7 +433,7 @@ public:
     boost::system::error_code ec;
     acceptor_.close(ec);
     if (ec) {
-      std::cerr << "Error closing acceptor: " << ec.message() << std::endl;
+      spdlog::warn("[SOCKS5Server] Error closing acceptor: {}", ec.message());
     }
   }
 
@@ -409,9 +445,9 @@ private:
     acceptor_.async_accept(boost::asio::make_strand(ioc_),
       [self = shared_from_this()](boost::system::error_code ec, boost::asio::ip::tcp::socket socket) {
         if (ec) {
-          fail(ec, "accept");
+          fail(ec, "[SOCKS5Server] accept");
         } else {
-          std::make_shared<SOCKS5Session>(std::move(socket), self->proxy_user_)->start();
+          std::make_shared<SOCKS5Session>(self->ioc_, std::move(socket), self->proxy_user_)->start();
         }
 
         self->do_accept();
@@ -422,16 +458,27 @@ private:
 // Callback implementation for receiving data from proxy server
 class ProxySessionCallbacks : public proxy::ISessionCallbacks_Servant {
 public:
+  void OnTunnelEstablished (uint32_t session_id) override {
+    auto session = SessionManager::getInstance().getSession(session_id);
+    if (session) {
+      spdlog::info("Tunnel established for session = {}",session_id);
+      // Notify the session that the tunnel is established
+      session->onTunnelEstablished();
+    } else {
+      spdlog::warn("[PCS] Session id = {} not found for tunnel establishment", session_id);
+    }
+  }
+
   void OnDataReceived(uint32_t session_id, ::nprpc::flat::Span<uint8_t> data) override {
     auto session = SessionManager::getInstance().getSession(session_id);
     if (session) {
       session->onDataFromServer(data);
     } else {
-      std::cerr << "Session " << session_id << " not found for data forwarding" << std::endl;
+      spdlog::warn("[PSC] Session id = {} not found for data forwarding", session_id);
     }
   }
 
-  void OnSessionClosed(uint32_t session_id, uint32_t reason) override {
+  void OnSessionClosed(uint32_t session_id, proxy::CloseReason reason) override {
     auto session = SessionManager::getInstance().getSession(session_id);
     if (session) {
       session->onServerClosed(reason);
@@ -440,7 +487,7 @@ public:
   }
 
   ~ProxySessionCallbacks() override {
-    std::cout << "ProxySessionCallbacks destroyed" << std::endl;
+    spdlog::info("[PCS] ProxySessionCallbacks destroyed");
   }
 };
 
@@ -448,13 +495,13 @@ public:
 void SessionManager::registerSession(uint32_t session_id, std::shared_ptr<SOCKS5Session> session) {
   std::lock_guard<std::mutex> lock(mutex_);
   sessions_[session_id] = session;
-  // std::cout << "Registered session " << session_id << std::endl;
+  spdlog::info("[SessionManager] Registered session id = {}", session_id);
 }
 
 void SessionManager::unregisterSession(uint32_t session_id) {
   std::lock_guard<std::mutex> lock(mutex_);
   sessions_.erase(session_id);
-  // std::cout << "Unregistered session " << session_id << std::endl;
+  spdlog::info("[SessionManager] Unregistered session id = {}", session_id);
 }
 
 std::shared_ptr<SOCKS5Session> SessionManager::getSession(uint32_t session_id) {
@@ -492,9 +539,9 @@ public:
     ioc_thread_ = std::thread([this]() {
       try {
         ioc_.run();
-        std::cout << "IO context thread finished" << std::endl;
+        spdlog::info("IO context thread finished");
       } catch (const std::exception& e) {
-        std::cerr << "IO context thread exception: " << e.what() << std::endl;
+        spdlog::critical("[Proxy::Impl] IO context thread exception: {}", e.what());
       }
     });
   }
@@ -546,7 +593,7 @@ public:
       throw std::runtime_error("Failed to cast to proxy::User");
     }
 
-    std::cout << "Successfully connected to proxy server" << std::endl;
+    spdlog::info("Successfully connected to proxy server");
 
     auto sessionContext = rpc_.get_object_session_context(server_.get());
     assert(sessionContext != nullptr);
@@ -558,13 +605,13 @@ public:
       sessionContext);
 
     user_->RegisterCallbacks(callbacks_activation_);
-    std::cout << "Session callbacks registered" << std::endl;
+    spdlog::info("Session callbacks registered");
 
     // Start SOCKS5 server on port 1080
     socks5_server_ = std::make_shared<SOCKS5Server>(ioc_, 1080, user_);
     socks5_server_->start();
 
-    std::cout << "SOCKS5 server started on port 1080" << std::endl;
+    spdlog::info("SOCKS5 server started on port 1080");
 
     status_callback_(ProxyStatus::Connected);
     // Notify the user that the connection is established

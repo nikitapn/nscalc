@@ -1,5 +1,7 @@
 #pragma once
 
+#include <spdlog/spdlog.h>
+
 #include "services/db/SolutionService.hpp"
 #include "services/db/FertilizerService.hpp"
 #include "services/db/CalculationService.hpp"
@@ -53,7 +55,7 @@ public:
     }
 
   ~CalculatorImpl() {
-    std::cout << "CalculatorImpl destroyed" << std::endl;
+    spdlog::info("CalculatorImpl destroyed");
   }
 };
 

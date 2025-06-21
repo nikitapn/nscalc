@@ -94,7 +94,7 @@ public:
     sqlite3_bind_text(insert_stmt_, 3, user->email.c_str(), -1, SQLITE_STATIC);
     sqlite3_bind_int(insert_stmt_,  4, user->permissions);
     if (sqlite3_step(insert_stmt_) != SQLITE_DONE) {
-      std::cerr << "Failed to execute INSERT: " << sqlite3_errmsg(db_->getConnection()) << std::endl;
+      spdlog::warn("[UserService] Failed to execute INSERT: {}", sqlite3_errmsg(db_->getConnection()));
     }
     sqlite3_reset(insert_stmt_);
 

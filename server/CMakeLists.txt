@@ -35,6 +35,7 @@ target_link_libraries(nscalc PRIVATE
   boost_program_options
   boost_serialization
   SQLite::SQLite3
+  spdlog::spdlog $<$<BOOL:${MINGW}>:ws2_32>
 )
 
 # Ensure that the IDL files are generated before building the executable

@@ -3,6 +3,8 @@
 #include "proxy_stub/proxy.hpp"
 #include <boost/asio.hpp>
 #include <boost/asio/ip/tcp.hpp>
+#include <spdlog/spdlog.h>
+#include <spdlog/spdlog.h>
 
 #include <memory>
 #include <map>
@@ -51,21 +53,21 @@ private:
   boost::asio::ip::tcp::socket socket_;
   std::array<uint8_t, 8192> buffer_;
   std::function<void(const proxy::bytestream&)> data_callback_;
-  
+
 public:
   ProxyConnection(boost::asio::io_context& ioc) 
     : socket_(ioc) {}
-  
+
   boost::asio::ip::tcp::socket& socket() { return socket_; }
-  
+
   void set_data_callback(std::function<void(const proxy::bytestream&)> callback) {
     data_callback_ = callback;
   }
-  
+
   void start_reading() {
     do_read();
   }
-  
+
   void send_data(const nprpc::flat::Span<uint8_t>& data) {
     auto self = shared_from_this();
     // Make a copy of the data to keep it alive during the async operation
@@ -73,12 +75,12 @@ public:
     boost::asio::async_write(socket_, boost::asio::buffer(data_copy->data(), data_copy->size()),
       [self, data_copy](boost::system::error_code ec, std::size_t) {
         if (ec) {
-          std::cerr << "[proxy] Error writing to target socket: " << ec.message() << std::endl;
+          spdlog::warn("[Proxy] Error writing to target socket: {}", ec.message());
         }
         // data_copy will be automatically destroyed when lambda goes out of scope
       });
   }
-  
+
 private:
   void do_read() {
     auto self = shared_from_this();
@@ -91,7 +93,7 @@ private:
           }
           self->do_read();
         } else if (ec != boost::asio::error::eof) {
-          std::cerr << "[proxy] Error reading from target socket: " << ec.message() << std::endl;
+          spdlog::warn("[Proxy] Error reading from target socket: {}", ec.message());
         }
       });
   }
@@ -103,62 +105,84 @@ private:
   std::map<uint32_t, std::shared_ptr<ProxyConnection>> connections_;
   uint32_t next_connection_id_ = 1;
   proxy::SessionCallbacks* session_callbacks_ = nullptr;
-  
+
 public:
   ProxyUser(boost::asio::io_context& ioc) : ioc_(ioc) {}
   ~ProxyUser() {
-    std::cout << "[proxy] ProxyUser destructor called." << std::endl;
+    spdlog::info("[Proxy] ProxyUser destructor called");
   }
-  
+
   virtual void RegisterCallbacks(nprpc::Object* callbacks) override {
     session_callbacks_ = nprpc::narrow<proxy::SessionCallbacks>(callbacks);
   }
-  
+
   virtual uint32_t EstablishTunnel(::nprpc::flat::Span<char> target_host, uint16_t target_port) override {
     std::string host = target_host;
+    std::string port = std::to_string(target_port);
+    auto this_ = this;
     try {
       // Create new connection
       // Don't need strand for now as there is only one thread handling connections
       auto connection = std::make_shared<ProxyConnection>(ioc_);
       uint32_t connection_id = next_connection_id_++;
-      
+
       // Set up connection resolver and connect
       auto resolver = std::make_shared<boost::asio::ip::tcp::resolver>(ioc_);
-      auto endpoints = resolver->resolve(host, std::to_string(target_port));
-      
-      boost::system::error_code ec;
-      boost::asio::connect(connection->socket(), endpoints, ec);
+      this->add_ref(); // Increase reference count to keep ProxyUser alive during async operations
+      resolver->async_resolve(host, port, [connection, connection_id, this_] (
+        boost::system::error_code ec, 
+        const boost::asio::ip::tcp::resolver::results_type& endpoints)
+        {
+          if (ec) {
+            spdlog::warn("[Proxy] Resolver error: {}", ec.message());
+            this_->release(); // Decrease reference count
+            return;
+          }
+          boost::asio::async_connect(connection->socket(), endpoints,
+            [this_, connection, connection_id](
+              boost::system::error_code ec,
+              const boost::asio::ip::tcp::endpoint&)
+            {
+              if (ec) {
+                spdlog::warn("[Proxy] Failed to connect: {}", ec.message());
+                // Handle connection failure
+                if (this_->session_callbacks_) {
+                  this_->session_callbacks_->OnSessionClosed(std::nullopt, connection_id, proxy::CloseReason::ConnectionRefused);
+                }
+                this_->release(); // Decrease reference count
+                return;
+              }
 
-      if (ec) {
-        std::cerr << "[proxy] Failed to connect to " << host << ":" << target_port 
-                  << " - " << ec.message() << std::endl;
-        return 0; // Return 0 to indicate failure
-      }
-      
-      // Store connection
-      connections_[connection_id] = connection;
-      
-      // Set up data forwarding callback
-      connection->set_data_callback([this, connection_id](const proxy::bytestream& data) {
-        if (session_callbacks_) {
-          session_callbacks_->OnDataReceived(std::nullopt, connection_id, data);
-        }
+              // Connection successful - set up data forwarding and start reading
+              connection->set_data_callback([this_, connection_id](const proxy::bytestream& data) {
+                if (this_->session_callbacks_) {
+                  this_->session_callbacks_->OnDataReceived(std::nullopt, connection_id, data);
+                }
+              });
+          
+              if (this_->session_callbacks_) {
+                this_->session_callbacks_->OnTunnelEstablished(std::nullopt, connection_id);
+              }
+
+              connection->start_reading();
+              this_->release(); // Decrease reference count
+            });
       });
 
-      connection->start_reading();
-
+      spdlog::info("[Proxy] Establishing tunnel to {}:{}", host, port);
+      // Store connection immediately and return ID
+      connections_[connection_id] = connection;
       return connection_id;
-      
     } catch (const std::exception& e) {
-      std::cerr << "[proxy] Exception during EstablishTunnel: " << e.what() << std::endl;
+      spdlog::warn("[Proxy] Exception during EstablishTunnel: {}", e.what());
       return 0; // Return 0 to indicate failure
     }
   }
-  
+
   virtual bool SendData(uint32_t session_id, ::nprpc::flat::Span<uint8_t> data) override {
     auto it = connections_.find(session_id);
     if (it == connections_.end()) {
-      std::cerr << "[proxy] Connection " << session_id << " not found" << std::endl;
+      spdlog::warn("[Proxy] Connection {} not found", session_id);
       return false;
     }
 
@@ -166,8 +190,7 @@ public:
       it->second->send_data(data);
       return true;
     } catch (const std::exception& e) {
-      std::cerr << "[proxy] Error sending data to connection " << session_id 
-                << ": " << e.what() << std::endl;
+      spdlog::warn("[Proxy] Error sending data to connection {}: {}",session_id, e.what());
       return false;
     }
   }
@@ -180,7 +203,7 @@ public:
       
       // Notify client that session is closed
       if (session_callbacks_) {
-        session_callbacks_->OnSessionClosed(std::nullopt, session_id, 0);
+        session_callbacks_->OnSessionClosed(std::nullopt, session_id, proxy::CloseReason::Normal);
       }
     }
   }
@@ -207,7 +230,7 @@ public:
         if (UserService::isUserAllowedToUseProxy(*user) == false)
           throw proxy::AuthorizationFailed();
         // User exists and password is correct and user is allowed to use proxy
-        std::cout << "[proxy] User \"" << user->user_name << "\" logged in successfully." << std::endl;
+        spdlog::info("[Proxy] User \"{}\" logged in successfully", user->user_name);
       } else {
         throw proxy::AuthorizationFailed();
       }
@@ -239,14 +262,14 @@ public:
           ioc_.run();
           break; // Exit the loop if run() completes normally
         } catch (nprpc::ExceptionCommFailure& e) {
-          std::cerr << "[proxy] Communication failure in IO context thread: " << e.what << std::endl;
+          spdlog::warn("[Proxy] Communication failure in IO context thread: {}", e.what);
         } catch (nprpc::Exception& e) {
-          std::cerr << "[proxy] NPRPC exception in IO context thread: " << e.what() << std::endl;
+          spdlog::warn("[Proxy] NPRPC exception in IO context thread: {}", e.what());
         } catch (const std::exception& e) {
-          std::cerr << "[proxy] Error in IO context thread: " << e.what() << std::endl;
+          spdlog::warn("[Proxy] Error in IO context thread: {}", e.what());
           break; // Exit on other exceptions
         } catch (...) {
-          std::cerr << "[proxy] Unknown error in IO context thread." << std::endl;
+          spdlog::error("[Proxy] Unknown error in IO context thread.");
           break; // Exit on unknown errors
         }
       }

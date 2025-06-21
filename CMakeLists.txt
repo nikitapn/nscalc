@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.25.1)
 project(nscalc)
 
+add_subdirectory(external/npsystem/3rd/spdlog)
+
 option(OPT_BUILD_PROXY_CLIENT "Build the proxy client" ON)
 
 set(BOOST_LIB_PREFIX "/usr/lib" CACHE STRING "Location of the boost libs")

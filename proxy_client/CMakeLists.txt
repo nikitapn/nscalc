@@ -8,6 +8,8 @@ set(SOURCES
   src/main.cpp
   src/MainWindow.hpp
   src/MainWindow.cpp
+  src/LogWindow.hpp
+  src/LogWindow.cpp
   src/socks5.hpp
   src/socks5.cpp
 )
@@ -29,6 +31,7 @@ target_link_libraries(proxy_client PRIVATE
   Qt6::Gui
   Qt6::Widgets
   nprpc
+  spdlog::spdlog $<$<BOOL:${MINGW}>:ws2_32>
 )
 
 add_dependencies(proxy_client proxy_stub_gen)

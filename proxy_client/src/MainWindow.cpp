@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LicenseRef-Qt-Commercial OR BSD-3-Clause
 
 #include "MainWindow.hpp"
+#include "LogWindow.hpp"
 
 #include <QAction>
 #include <QCheckBox>
@@ -21,6 +22,8 @@
 #include <QFrame>
 #include <functional>
 
+#include <spdlog/spdlog.h>
+
 #include "proxy_stub/proxy.hpp"
 
 //! [0]
@@ -28,11 +31,23 @@ Window::Window()
   : currentStatus_(ProxyStatus::Disconnected)
   , actualPassword_("1234") // Default password
 {
+  // Create log window first (as independent window)
+  logWindow_ = std::make_unique<LogWindow>(nullptr);
+  
+  // Set the Qt logger as the default logger, but first drop any existing default logger
+  spdlog::drop_all(); // Clear all existing loggers
+  spdlog::set_default_logger(logWindow_->getLogger());
+  
+  // Log application startup
+  spdlog::info("NSCalc Proxy Client starting up...");
+  
   createMainGroupBox();
   createActions();
   createTrayIcon();
 
   connect(connectButton, &QAbstractButton::clicked, this, &Window::onButtonConnectClicked);
+  connect(showLogButton, &QAbstractButton::clicked, this, &Window::showLogWindow);
+  connect(logWindow_.get(), &LogWindow::windowHidden, this, &Window::onLogWindowHidden);
   connect(editConfigCheckBox, &QCheckBox::toggled, this, &Window::onEditConfigToggled);
   connect(trayIcon, &QSystemTrayIcon::messageClicked, this, &Window::onButtonConnectClicked);
   connect(trayIcon, &QSystemTrayIcon::activated, this, &Window::iconActivated);
@@ -123,6 +138,7 @@ void Window::onButtonConnectClicked()
 {
   if (currentStatus_ == ProxyStatus::Connected) {
     // Disconnect
+    spdlog::info("Disconnecting from proxy server");
     proxy_.reset();
     onProxyStatusChanged(ProxyStatus::Disconnected);
     return;
@@ -139,9 +155,13 @@ void Window::onButtonConnectClicked()
   QString password = editConfigCheckBox->isChecked() ? passwordEdit->text() : actualPassword_;
 
   if (hostname.isEmpty() || port.isEmpty() || login.isEmpty() || password.isEmpty()) {
+    spdlog::warn("Connection attempt failed: missing required fields");
     QMessageBox::warning(this, tr("Warning"), tr("Please fill in all connection fields."));
     return;
   }
+
+  spdlog::info("Attempting to connect to proxy server {}:{} with user '{}'", 
+               hostname.toStdString(), port.toStdString(), login.toStdString());
 
   onProxyStatusChanged(ProxyStatus::Connecting);
 
@@ -154,20 +174,25 @@ void Window::onButtonConnectClicked()
       password.toStdString(), 
       std::bind(&Window::onProxyStatusChanged, this, std::placeholders::_1)
     );
+    spdlog::info("Successfully connected to proxy server");
     onProxyStatusChanged(ProxyStatus::Connected);
   } catch (const proxy::AuthorizationFailed& e) {
+    spdlog::error("Authorization failed: {}", e.what());
     onProxyStatusChanged(ProxyStatus::Error);
     QMessageBox::critical(this, tr("Error"), tr("Authorization failed: %1").arg(e.what()));
     return;
   } catch (const nprpc::Exception& e) {
+    spdlog::error("Failed to connect to proxy server: {}", e.what());
     onProxyStatusChanged(ProxyStatus::Error);
     QMessageBox::critical(this, tr("Error"), tr("Failed to connect to proxy server: %1").arg(e.what()));
     return;
   } catch (const std::exception& e) {
+    spdlog::error("Unexpected error occurred: {}", e.what());
     onProxyStatusChanged(ProxyStatus::Error);
     QMessageBox::critical(this, tr("Error"), tr("An unexpected error occurred: %1").arg(e.what()));
     return;
   } catch (...) {
+    spdlog::error("Unknown error occurred while connecting to the proxy server");
     onProxyStatusChanged(ProxyStatus::Error);
     QMessageBox::critical(this, tr("Error"), tr("An unknown error occurred while connecting to the proxy server."));
     return;
@@ -184,7 +209,7 @@ void Window::createMainGroupBox()
   
   // Create configuration input fields
   hostnameEdit = new QLineEdit("archvm.lan");
-  portEdit = new QLineEdit("8080");
+  portEdit = new QLineEdit("8443");
   loginEdit = new QLineEdit("superuser");
   passwordEdit = new QLineEdit();
   passwordEdit->setEchoMode(QLineEdit::Password);
@@ -201,6 +226,10 @@ void Window::createMainGroupBox()
   connectButton = new QPushButton(tr("Connect"));
   connectButton->setDefault(true);
   connectButton->setMinimumHeight(40);
+  
+  // Create show log button
+  showLogButton = new QPushButton(tr("Show Log"));
+  showLogButton->setMinimumHeight(30);
 
   // Layout everything
   QGridLayout* layout = new QGridLayout;
@@ -232,6 +261,7 @@ void Window::createMainGroupBox()
   rightLayout->addLayout(statusLayout);
   rightLayout->addStretch();
   rightLayout->addWidget(connectButton);
+  rightLayout->addWidget(showLogButton);
   
   QWidget* rightWidget = new QWidget;
   rightWidget->setLayout(rightLayout);
@@ -254,6 +284,9 @@ void Window::createActions()
   restoreAction = new QAction(tr("&Restore"), this);
   connect(restoreAction, &QAction::triggered, this, &QWidget::showNormal);
 
+  showLogAction = new QAction(tr("Show &Log"), this);
+  connect(showLogAction, &QAction::triggered, this, &Window::showLogWindow);
+
   quitAction = new QAction(tr("&Quit"), this);
   connect(quitAction, &QAction::triggered, qApp, &QCoreApplication::quit);
 }
@@ -263,6 +296,8 @@ void Window::createTrayIcon()
   trayIconMenu = new QMenu(this);
   trayIconMenu->addAction(minimizeAction);
   trayIconMenu->addAction(restoreAction);
+  trayIconMenu->addSeparator();
+  trayIconMenu->addAction(showLogAction);
   trayIconMenu->addSeparator();
   trayIconMenu->addAction(quitAction);
 
@@ -336,4 +371,19 @@ void Window::onEditConfigToggled(bool enabled)
 void Window::dispose()
 {
   proxy_.reset();
+}
+
+void Window::showLogWindow()
+{
+  spdlog::info("Opening log window");
+  logWindow_->show();
+  logWindow_->raise();
+  logWindow_->activateWindow();
+  // Disable the button while log window is open
+  showLogButton->setEnabled(false);
+}
+
+void Window::onLogWindowHidden()
+{
+  showLogButton->setEnabled(true);
 }

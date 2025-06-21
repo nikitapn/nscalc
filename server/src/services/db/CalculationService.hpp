@@ -43,7 +43,7 @@ public:
     sqlite3_bind_int(delete_stmt_, 1, id);
     sqlite3_bind_int(delete_stmt_, 2, userId);
     if (sqlite3_step(delete_stmt_) != SQLITE_DONE) {
-      std::cerr << "Failed to execute DELETE: " << sqlite3_errmsg(db_->getConnection()) << std::endl;
+      spdlog::warn("[CalculatorService] Failed to execute DELETE: {}", sqlite3_errmsg(db_->getConnection()));
     }
     sqlite3_reset(delete_stmt_);
   }
@@ -63,7 +63,7 @@ public:
     sqlite3_bind_double(insert_stmt_, 5, calculation.volume);
     sqlite3_bind_int(insert_stmt_, 6, calculation.mode);
     if (sqlite3_step(insert_stmt_) != SQLITE_DONE) {
-      std::cerr << "Failed to execute INSERT: " << sqlite3_errmsg(db_->getConnection()) << std::endl;
+      spdlog::warn("[CalculatorService] Failed to execute INSERT: {}", sqlite3_errmsg(db_->getConnection()));
     }
     auto insertedId = sqlite3_last_insert_rowid(db_->getConnection());
     sqlite3_reset(insert_stmt_);
@@ -79,7 +79,7 @@ public:
     sqlite3_bind_int(update_stmt_, 6, calculation.id);
     sqlite3_bind_int(update_stmt_, 7, userId);
     if (sqlite3_step(update_stmt_) != SQLITE_DONE) {
-      std::cerr << "Failed to execute UPDATE: " << sqlite3_errmsg(db_->getConnection()) << std::endl;
+      spdlog::warn("[CalculatorService] Failed to execute UPDATE: {}", sqlite3_errmsg(db_->getConnection()));
     }
     sqlite3_reset(update_stmt_);
   }

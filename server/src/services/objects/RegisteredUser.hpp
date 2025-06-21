@@ -1,6 +1,6 @@
 #pragma once
 
-#include <iostream>
+#include <spdlog/spdlog.h>
 
 #include "nscalc_stub/nscalc.hpp"
 #include "services/client/DataObserver.hpp"
@@ -127,6 +127,6 @@ public:
   }
 
   ~RegisteredUser() {
-    std::cout << "Registered user \"" << user_.user_name << "\" disconnected\n";
+    spdlog::info("Registered user \"{}\" disconnected.", user_.user_name);
   }
 };

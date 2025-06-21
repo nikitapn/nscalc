@@ -9,6 +9,7 @@ cmake --build .build_local --target=proxy_client
 
 CMD=".build_local/debug/nscalc \
     --hostname archvm.lan \
+    --port 8443 \
     --http-dir ./client/public \
     --data-dir ./sample_data \
     --use-ssl 1 \
