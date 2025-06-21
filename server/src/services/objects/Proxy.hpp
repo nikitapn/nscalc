@@ -99,21 +99,80 @@ private:
   }
 };
 
+class ConnectionManager {
+  std::mutex mutex_;
+  std::map<uint32_t, std::shared_ptr<ProxyConnection>> connections_;
+  std::atomic<uint32_t> next_connection_id_ = 1;
+public:
+
+  uint32_t getNextConnectionId() {
+    return next_connection_id_.fetch_add(1, std::memory_order_relaxed);
+  }
+
+  std::shared_ptr<ProxyConnection> createConnection(boost::asio::io_context& ioc, uint32_t id) {
+    auto connection = std::make_shared<ProxyConnection>(ioc);
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      connections_[id] = connection;
+    }
+    return connection;
+  }
+
+  std::shared_ptr<ProxyConnection> getConnection(uint32_t id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = connections_.find(id);
+    if (it != connections_.end()) {
+      return it->second;
+    }
+    return nullptr;
+  }
+
+  void remove_connection(uint32_t id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = connections_.find(id);
+    if (it != connections_.end()) {
+      boost::system::error_code ec;
+      it->second->socket().close(ec);
+      if (ec) {
+        spdlog::warn("[Proxy] Error closing connection {}: {}", id, ec.message());
+      }
+      connections_.erase(it);
+    }
+  }
+
+  void clear() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (auto& [id, connection] : connections_) {
+      boost::system::error_code ec;
+      connection->socket().close(ec);
+      if (ec) {
+        spdlog::warn("[Proxy] Error closing connection {}: {}", id, ec.message());
+      }
+    }
+    connections_.clear();
+  }
+};
+
 class ProxyUser : public proxy::IUser_Servant {
 private:
   boost::asio::io_context& ioc_;
-  std::map<uint32_t, std::shared_ptr<ProxyConnection>> connections_;
-  uint32_t next_connection_id_ = 1;
+  ConnectionManager connection_manager_;
   proxy::SessionCallbacks* session_callbacks_ = nullptr;
 
 public:
   ProxyUser(boost::asio::io_context& ioc) : ioc_(ioc) {}
   ~ProxyUser() {
     spdlog::info("[Proxy] ProxyUser destructor called");
+    if (session_callbacks_) {
+      session_callbacks_->release(); // Decrease reference count when ProxyUser is destroyed
+      session_callbacks_ = nullptr;
+    }
+    connection_manager_.clear();
   }
 
   virtual void RegisterCallbacks(nprpc::Object* callbacks) override {
     session_callbacks_ = nprpc::narrow<proxy::SessionCallbacks>(callbacks);
+    session_callbacks_->add_ref(); // Increase reference count to keep callbacks alive
   }
 
   virtual uint32_t EstablishTunnel(::nprpc::flat::Span<char> target_host, uint16_t target_port) override {
@@ -123,7 +182,7 @@ public:
     try {
       // Create new connection
       // Don't need strand for now as there is only one thread handling connections
-      uint32_t connection_id = next_connection_id_++;
+      uint32_t connection_id = connection_manager_.getNextConnectionId();
 
       // Set up connection resolver and connect
       auto resolver = std::make_unique<boost::asio::ip::tcp::resolver>(ioc_);
@@ -137,9 +196,9 @@ public:
             this_->release(); // Decrease reference count
             return;
           }
-          auto connection = std::make_shared<ProxyConnection>(this_->ioc_);
-          // Store connection immediately
-          this_->connections_[connection_id] = connection;
+
+          auto connection = this_->connection_manager_.createConnection(this_->ioc_, connection_id);
+
           boost::asio::async_connect(connection->socket(), endpoints,
             [this_, connection_ptr = connection, connection_id](
               boost::system::error_code ec,
@@ -161,7 +220,7 @@ public:
                   this_->session_callbacks_->OnDataReceived(std::nullopt, connection_id, data);
                 }
               });
-          
+
               if (this_->session_callbacks_) {
                 this_->session_callbacks_->OnTunnelEstablished(std::nullopt, connection_id);
               }
@@ -181,14 +240,14 @@ public:
   }
 
   virtual bool SendData(uint32_t session_id, ::nprpc::flat::Span<uint8_t> data) override {
-    auto it = connections_.find(session_id);
-    if (it == connections_.end()) {
+    auto con = connection_manager_.getConnection(session_id);
+    if (!con) {
       spdlog::warn("[Proxy] Connection {} not found", session_id);
       return false;
     }
 
     try {
-      it->second->send_data(data);
+      con->send_data(data);
       return true;
     } catch (const std::exception& e) {
       spdlog::warn("[Proxy] Error sending data to connection {}: {}",session_id, e.what());
@@ -197,15 +256,10 @@ public:
   }
 
   virtual void CloseTunnel(uint32_t session_id) override {
-    auto it = connections_.find(session_id);
-    if (it != connections_.end()) {
-      it->second->socket().close();
-      connections_.erase(it);
-      
-      // Notify client that session is closed
-      if (session_callbacks_) {
-        session_callbacks_->OnSessionClosed(std::nullopt, session_id, proxy::CloseReason::Normal);
-      }
+    connection_manager_.remove_connection(session_id);
+    // Notify client that session is closed
+    if (session_callbacks_) {
+      session_callbacks_->OnSessionClosed(std::nullopt, session_id, proxy::CloseReason::Normal);
     }
   }
 };
