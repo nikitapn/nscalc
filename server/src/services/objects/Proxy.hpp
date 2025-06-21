@@ -123,13 +123,12 @@ public:
     try {
       // Create new connection
       // Don't need strand for now as there is only one thread handling connections
-      auto connection = std::make_shared<ProxyConnection>(ioc_);
       uint32_t connection_id = next_connection_id_++;
 
       // Set up connection resolver and connect
-      auto resolver = std::make_shared<boost::asio::ip::tcp::resolver>(ioc_);
+      auto resolver = std::make_unique<boost::asio::ip::tcp::resolver>(ioc_);
       this->add_ref(); // Increase reference count to keep ProxyUser alive during async operations
-      resolver->async_resolve(host, port, [connection, connection_id, this_] (
+      resolver->async_resolve(host, port, [resolver = std::move(resolver), connection_id, this_] (
         boost::system::error_code ec, 
         const boost::asio::ip::tcp::resolver::results_type& endpoints)
         {
@@ -138,8 +137,11 @@ public:
             this_->release(); // Decrease reference count
             return;
           }
+          auto connection = std::make_shared<ProxyConnection>(this_->ioc_);
+          // Store connection immediately
+          this_->connections_[connection_id] = connection;
           boost::asio::async_connect(connection->socket(), endpoints,
-            [this_, connection, connection_id](
+            [this_, connection_ptr = connection, connection_id](
               boost::system::error_code ec,
               const boost::asio::ip::tcp::endpoint&)
             {
@@ -154,7 +156,7 @@ public:
               }
 
               // Connection successful - set up data forwarding and start reading
-              connection->set_data_callback([this_, connection_id](const proxy::bytestream& data) {
+              connection_ptr->set_data_callback([this_, connection_id](const proxy::bytestream& data) {
                 if (this_->session_callbacks_) {
                   this_->session_callbacks_->OnDataReceived(std::nullopt, connection_id, data);
                 }
@@ -164,14 +166,13 @@ public:
                 this_->session_callbacks_->OnTunnelEstablished(std::nullopt, connection_id);
               }
 
-              connection->start_reading();
+              connection_ptr->start_reading();
               this_->release(); // Decrease reference count
             });
       });
 
-      spdlog::info("[Proxy] Establishing tunnel to {}:{}", host, port);
-      // Store connection immediately and return ID
-      connections_[connection_id] = connection;
+      spdlog::info("[Proxy] Begin establishing tunnel to {}:{}", host, port);
+
       return connection_id;
     } catch (const std::exception& e) {
       spdlog::warn("[Proxy] Exception during EstablishTunnel: {}", e.what());
