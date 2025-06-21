@@ -371,6 +371,7 @@ void Window::onEditConfigToggled(bool enabled)
 void Window::dispose()
 {
   proxy_.reset();
+  logWindow_.reset();
 }
 
 void Window::showLogWindow()

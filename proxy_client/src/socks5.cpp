@@ -486,9 +486,7 @@ public:
     SessionManager::getInstance().unregisterSession(session_id);
   }
 
-  ~ProxySessionCallbacks() override {
-    spdlog::info("[PCS] ProxySessionCallbacks destroyed");
-  }
+  ~ProxySessionCallbacks() override = default;
 };
 
 // SessionManager implementation should be placed after the SOCKS5Session class

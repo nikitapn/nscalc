@@ -40,7 +40,10 @@ LogWindow::LogWindow(QWidget* parent)
     setAttribute(Qt::WA_DeleteOnClose, false);
 }
 
-LogWindow::~LogWindow() = default;
+LogWindow::~LogWindow()
+{
+  spdlog::drop(logger_->name()); // Remove logger from registry
+}
 
 std::shared_ptr<spdlog::logger> LogWindow::getLogger() const
 {
