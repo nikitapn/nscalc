@@ -9,6 +9,8 @@
 #include <memory>
 #include <map>
 #include <iostream>
+#include <chrono>
+#include <unordered_map>
 
 #include "util/util.hpp"
 
@@ -46,6 +48,92 @@ namespace socks5 {
     ADDRESS_TYPE_NOT_SUPPORTED = 0x08
   };
 }
+
+// DNS Cache for TTL-aware caching of resolved endpoints
+class DnsCache {
+private:
+  struct CacheEntry {
+    boost::asio::ip::tcp::resolver::results_type endpoints;
+    std::chrono::steady_clock::time_point expiry_time;
+    
+    CacheEntry(const boost::asio::ip::tcp::resolver::results_type& eps, std::chrono::seconds ttl)
+      : endpoints(eps), expiry_time(std::chrono::steady_clock::now() + ttl) {}
+    
+    bool is_expired() const {
+      return std::chrono::steady_clock::now() > expiry_time;
+    }
+  };
+  
+  mutable std::mutex cache_mutex_;
+  std::unordered_map<std::string, CacheEntry> cache_;
+  
+  // Default TTL for cached entries (can be made configurable)
+  static constexpr std::chrono::seconds DEFAULT_TTL{300}; // 5 minutes
+  
+  std::string make_key(const std::string& host, const std::string& port) const {
+    return host + ":" + port;
+  }
+  
+public:
+  // Try to get cached result, returns empty optional if not found or expired
+  std::optional<boost::asio::ip::tcp::resolver::results_type> get(const std::string& host, const std::string& port) {
+    std::lock_guard<std::mutex> lock(cache_mutex_);
+    const std::string key = make_key(host, port);
+    
+    auto it = cache_.find(key);
+    if (it != cache_.end()) {
+      if (!it->second.is_expired()) {
+        spdlog::debug("[Proxy] DNS cache hit for {}:{}", host, port);
+        return it->second.endpoints;
+      } else {
+        // Remove expired entry
+        spdlog::debug("[Proxy] DNS cache entry expired for {}:{}", host, port);
+        cache_.erase(it);
+      }
+    }
+    
+    spdlog::debug("[Proxy] DNS cache miss for {}:{}", host, port);
+    return std::nullopt;
+  }
+  
+  // Store result in cache
+  void put(const std::string& host, const std::string& port, 
+           const boost::asio::ip::tcp::resolver::results_type& endpoints,
+           std::chrono::seconds ttl = DEFAULT_TTL) {
+    std::lock_guard<std::mutex> lock(cache_mutex_);
+    const std::string key = make_key(host, port);
+    
+    cache_.emplace(key, CacheEntry(endpoints, ttl));
+    spdlog::debug("[Proxy] DNS result cached for {}:{} with TTL {}s", host, port, ttl.count());
+  }
+  
+  // Clear expired entries (could be called periodically)
+  void cleanup_expired() {
+    std::lock_guard<std::mutex> lock(cache_mutex_);
+    auto it = cache_.begin();
+    while (it != cache_.end()) {
+      if (it->second.is_expired()) {
+        spdlog::debug("[Proxy] Removing expired DNS cache entry for {}", it->first);
+        it = cache_.erase(it);
+      } else {
+        ++it;
+      }
+    }
+  }
+  
+  // Clear all cache entries
+  void clear() {
+    std::lock_guard<std::mutex> lock(cache_mutex_);
+    cache_.clear();
+    spdlog::debug("[Proxy] DNS cache cleared");
+  }
+  
+  // Get cache statistics
+  size_t size() const {
+    std::lock_guard<std::mutex> lock(cache_mutex_);
+    return cache_.size();
+  }
+};
 
 // TCP Connection management for SOCKS5 tunnels
 class ProxyConnection : public std::enable_shared_from_this<ProxyConnection> {
@@ -158,6 +246,7 @@ private:
   boost::asio::io_context& ioc_;
   ConnectionManager connection_manager_;
   proxy::SessionCallbacks* session_callbacks_ = nullptr;
+  static DnsCache dns_cache_; // Shared DNS cache across all ProxyUser instances
 
 public:
   ProxyUser(boost::asio::io_context& ioc) : ioc_(ioc) {}
@@ -175,6 +264,7 @@ public:
     session_callbacks_->add_ref(); // Increase reference count to keep callbacks alive
   }
 
+  // TODO: Remove code duplication
   virtual uint32_t EstablishTunnel(::nprpc::flat::Span<char> target_host, uint16_t target_port) override {
     std::string host = target_host;
     std::string port = std::to_string(target_port);
@@ -184,51 +274,94 @@ public:
       // Don't need strand for now as there is only one thread handling connections
       uint32_t connection_id = connection_manager_.getNextConnectionId();
 
-      // Set up connection resolver and connect
-      auto resolver = std::make_unique<boost::asio::ip::tcp::resolver>(ioc_);
-      this->add_ref(); // Increase reference count to keep ProxyUser alive during async operations
-      resolver->async_resolve(host, port, [resolver = std::move(resolver), connection_id, this_] (
-        boost::system::error_code ec, 
-        const boost::asio::ip::tcp::resolver::results_type& endpoints)
-        {
-          if (ec) {
-            spdlog::warn("[Proxy] Resolver error: {}", ec.message());
-            this_->release(); // Decrease reference count
-            return;
-          }
-
-          auto connection = this_->connection_manager_.createConnection(this_->ioc_, connection_id);
-
-          boost::asio::async_connect(connection->socket(), endpoints,
-            [this_, connection_ptr = connection, connection_id](
-              boost::system::error_code ec,
-              const boost::asio::ip::tcp::endpoint&)
-            {
-              if (ec) {
-                spdlog::warn("[Proxy] Failed to connect: {}", ec.message());
-                // Handle connection failure
-                if (this_->session_callbacks_) {
-                  this_->session_callbacks_->OnSessionClosed(std::nullopt, connection_id, proxy::CloseReason::ConnectionRefused);
-                }
-                this_->release(); // Decrease reference count
-                return;
-              }
-
-              // Connection successful - set up data forwarding and start reading
-              connection_ptr->set_data_callback([this_, connection_id](const proxy::bytestream& data) {
-                if (this_->session_callbacks_) {
-                  this_->session_callbacks_->OnDataReceived(std::nullopt, connection_id, data);
-                }
-              });
-
+      // Check DNS cache first
+      if (auto cached_endpoints = dns_cache_.get(host, port)) {
+        spdlog::debug("[Proxy] Using cached DNS result for {}:{}", host, port);
+        
+        auto connection = connection_manager_.createConnection(ioc_, connection_id);
+        this->add_ref(); // Increase reference count to keep ProxyUser alive during async operations
+        
+        boost::asio::async_connect(connection->socket(), *cached_endpoints,
+          [this_, connection_ptr = connection, connection_id](
+            boost::system::error_code ec,
+            const boost::asio::ip::tcp::endpoint&)
+          {
+            if (ec) {
+              spdlog::warn("[Proxy] Failed to connect using cached DNS: {}", ec.message());
+              // Handle connection failure
               if (this_->session_callbacks_) {
-                this_->session_callbacks_->OnTunnelEstablished(std::nullopt, connection_id);
+                this_->session_callbacks_->OnSessionClosed(std::nullopt, connection_id, proxy::CloseReason::ConnectionRefused);
               }
-
-              connection_ptr->start_reading();
               this_->release(); // Decrease reference count
+              return;
+            }
+
+            // Connection successful - set up data forwarding and start reading
+            connection_ptr->set_data_callback([this_, connection_id](const proxy::bytestream& data) {
+              if (this_->session_callbacks_) {
+                this_->session_callbacks_->OnDataReceived(std::nullopt, connection_id, data);
+              }
             });
-      });
+
+            if (this_->session_callbacks_) {
+              this_->session_callbacks_->OnTunnelEstablished(std::nullopt, connection_id);
+            }
+
+            connection_ptr->start_reading();
+            this_->release(); // Decrease reference count
+          });
+      } else {
+        // Cache miss - perform DNS resolution
+        spdlog::debug("[Proxy] Performing DNS resolution for {}:{}", host, port);
+        
+        auto resolver = std::make_unique<boost::asio::ip::tcp::resolver>(ioc_);
+        this->add_ref(); // Increase reference count to keep ProxyUser alive during async operations
+        resolver->async_resolve(host, port, [resolver = std::move(resolver), connection_id, this_, host, port] (
+          boost::system::error_code ec, 
+          const boost::asio::ip::tcp::resolver::results_type& endpoints)
+          {
+            if (ec) {
+              spdlog::warn("[Proxy] Resolver error: {}", ec.message());
+              this_->release(); // Decrease reference count
+              return;
+            }
+
+            // Cache the DNS result
+            dns_cache_.put(host, port, endpoints);
+
+            auto connection = this_->connection_manager_.createConnection(this_->ioc_, connection_id);
+
+            boost::asio::async_connect(connection->socket(), endpoints,
+              [this_, connection_ptr = connection, connection_id](
+                boost::system::error_code ec,
+                const boost::asio::ip::tcp::endpoint&)
+              {
+                if (ec) {
+                  spdlog::warn("[Proxy] Failed to connect: {}", ec.message());
+                  // Handle connection failure
+                  if (this_->session_callbacks_) {
+                    this_->session_callbacks_->OnSessionClosed(std::nullopt, connection_id, proxy::CloseReason::ConnectionRefused);
+                  }
+                  this_->release(); // Decrease reference count
+                  return;
+                }
+
+                // Connection successful - set up data forwarding and start reading
+                connection_ptr->set_data_callback([this_, connection_id](const proxy::bytestream& data) {
+                  if (this_->session_callbacks_) {
+                    this_->session_callbacks_->OnDataReceived(std::nullopt, connection_id, data);
+                  }
+                });
+
+                if (this_->session_callbacks_) {
+                  this_->session_callbacks_->OnTunnelEstablished(std::nullopt, connection_id);
+                }
+
+                connection_ptr->start_reading();
+                this_->release(); // Decrease reference count
+              });
+        });
+      }
 
       spdlog::info("[Proxy] Begin establishing tunnel to {}:{}", host, port);
 
@@ -262,7 +395,13 @@ public:
       session_callbacks_->OnSessionClosed(std::nullopt, session_id, proxy::CloseReason::Normal);
     }
   }
+  
+  // Public access to DNS cache for management
+  static DnsCache& get_dns_cache() { return dns_cache_; }
 };
+
+// Static member definition for DNS cache
+DnsCache ProxyUser::dns_cache_;
 
 class ProxyImpl : public proxy::IServer_Servant {
   nprpc::Rpc& rpc_;
@@ -327,6 +466,31 @@ public:
           spdlog::error("[Proxy] Unknown error in IO context thread.");
           break; // Exit on unknown errors
         }
+      }
+    });
+    
+    // Schedule periodic DNS cache cleanup (every 10 minutes)
+    schedule_dns_cache_cleanup();
+  }
+  
+  ~ProxyImpl() {
+    // Clean shutdown
+    work_guard_.reset();
+    if (ioc_thread_.joinable()) {
+      ioc_thread_.join();
+    }
+  }
+
+private:
+  void schedule_dns_cache_cleanup() {
+    auto timer = std::make_shared<boost::asio::steady_timer>(ioc_, std::chrono::minutes(10));
+    timer->async_wait([this, timer](boost::system::error_code ec) {
+      if (!ec) {
+        ProxyUser::get_dns_cache().cleanup_expired();
+        spdlog::debug("[Proxy] DNS cache cleanup completed. Current cache size: {}", 
+                     ProxyUser::get_dns_cache().size());
+        // Schedule next cleanup
+        schedule_dns_cache_cleanup();
       }
     });
   }
