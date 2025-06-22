@@ -304,7 +304,7 @@ void Window::createTrayIcon()
   trayIcon = new QSystemTrayIcon(this);
   trayIcon->setContextMenu(trayIconMenu);
 
-  auto icon = QIcon(":/images/trayicon.png");
+  auto icon = QIcon(":/images/app_icon.png");
   trayIcon->setIcon(icon);
   setWindowIcon(icon);
 }

@@ -14,6 +14,12 @@ set(SOURCES
   src/socks5.cpp
 )
 
+if(WIN32)
+  set(app_icon_resource_windows "${CMAKE_CURRENT_SOURCE_DIR}/src/images/app_icon.rc")
+  set(SOURCES ${SOURCES} ${app_icon_resource_windows})
+endif()
+
+
 qt_add_resources(SOURCES src/systray.qrc)
 qt_add_executable(proxy_client ${SOURCES})
 

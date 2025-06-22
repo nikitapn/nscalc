@@ -1,0 +1,34 @@
+#include <windows.h>
+
+// Main application icon
+IDI_ICON1 ICON "app_icon.ico"
+
+// Version information
+1 VERSIONINFO
+FILEVERSION     1,0,0,0
+PRODUCTVERSION  1,0,0,0
+FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
+FILEFLAGS       0
+FILEOS          VOS_NT_WINDOWS32
+FILETYPE        VFT_APP
+FILESUBTYPE     VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904E4"
+        BEGIN
+            VALUE "CompanyName",      "NSCalc Project"
+            VALUE "FileDescription", "NSCalc Proxy Client - SOCKS5 Proxy Client"
+            VALUE "FileVersion",     "1.0.0.0"
+            VALUE "InternalName",    "proxy_client"
+            VALUE "LegalCopyright",  "Copyright (C) 2025 NSCalc Project"
+            VALUE "OriginalFilename","proxy_client.exe"
+            VALUE "ProductName",     "NSCalc Proxy Client"
+            VALUE "ProductVersion",  "1.0.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1252
+    END
+END

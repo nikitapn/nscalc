@@ -49,12 +49,12 @@ if(WIN32)
 
   include_directories(
     "${BOOST_DIR}"
-    "${OPT_OPENSSL_DIR}/include"
+    "${OPENSSL_DIR}/include"
   )
 
   link_directories(
     "${BOOST_DIR}/stage_x64/lib"
-    "${OPT_OPENSSL_DIR}/lib"
+    "${OPENSSL_DIR}/lib"
   )
 
   add_definitions(
