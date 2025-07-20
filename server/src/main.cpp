@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
   HostJson host_json;
   std::string hostname, http_dir, data_dir, public_key, private_key, dh_params;
   unsigned short port;
-  bool use_ssl;
+  bool use_ssl, log_trace = false;
 
   po::options_description desc("Allowed options");
   desc.add_options()
@@ -70,7 +70,8 @@ int main(int argc, char *argv[]) {
     ("public-key", po::value<std::string>(&public_key)->default_value(""), "Path to public key")
     ("private-key", po::value<std::string>(&private_key)->default_value(""), "Path to private key")
     ("dh-params", po::value<std::string>(&dh_params)->default_value(""), "Path to Diffie-Hellman parameters")
-    ("get-sha256", po::value<std::string>(), "Return SHA256 of the password");
+    ("get-sha256", po::value<std::string>(), "Return SHA256 of the password")
+    ("trace", po::bool_switch(&log_trace)->default_value(false), "Enable log trace");
 
   try {
     po::variables_map vm;
@@ -88,6 +89,12 @@ int main(int argc, char *argv[]) {
   } catch (std::exception& e) {
     std::cerr << "Exception during command line parsing: " << e.what() << std::endl;
     return -1;
+  }
+
+  if (log_trace) {
+    spdlog::set_level(spdlog::level::trace);
+  } else {
+    spdlog::set_level(spdlog::level::info);
   }
 
   try {

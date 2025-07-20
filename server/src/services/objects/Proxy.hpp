@@ -336,8 +336,10 @@ public:
     std::string port = std::to_string(target_port);
     auto this_ = this;
 
-    if (block_list_.isBlocked(host))
+    if (block_list_.isBlocked(host)) {
+      spdlog::trace("[Proxy] Attempt to connect to blocked host: {}:{}", host, port);
       return 0; // Blocked by block list
+    }
 
     try {
       // Create new connection
@@ -382,7 +384,7 @@ public:
           });
       } else {
         // Cache miss - perform DNS resolution
-        spdlog::debug("[Proxy] Performing DNS resolution for {}:{}", host, port);
+        spdlog::trace("[Proxy] Performing DNS resolution for {}:{}", host, port);
         
         auto resolver = std::make_unique<boost::asio::ip::tcp::resolver>(ioc_);
         this->add_ref(); // Increase reference count to keep ProxyUser alive during async operations
@@ -395,6 +397,8 @@ public:
               this_->release(); // Decrease reference count
               return;
             }
+
+            spdlog::trace("[Proxy] DNS resolution completed for {}:{}", host, port);
 
             // Cache the DNS result
             dns_cache_.put(host, port, endpoints);

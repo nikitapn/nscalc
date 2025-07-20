@@ -15,7 +15,8 @@ CMD=".build_local/release/nscalc \
     --use-ssl 1 \
     --public-key certs/archvm.lan.crt \
     --private-key certs/archvm.lan.key \
-    --dh-params certs/dhparam.pem"
+    --dh-params certs/dhparam.pem \
+    --trace"
 
 if [ "$1" == "debug" ]; then
     CMD="gdb --args $CMD"
