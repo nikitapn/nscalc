@@ -7,7 +7,7 @@ cmake -B .build_local -S . -DOPT_NPRPC_SKIP_TESTS=ON -DCMAKE_BUILD_TYPE=Release
 cmake --build .build_local --target=nscalc
 cmake --build .build_local --target=proxy_client
 
-CMD=".build_local/debug/nscalc \
+CMD=".build_local/release/nscalc \
     --hostname archvm.lan \
     --port 8443 \
     --http-dir ./client/public \

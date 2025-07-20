@@ -85,6 +85,7 @@ endif()
 
 include_directories(
   "${CMAKE_SOURCE_DIR}/external/npsystem/nprpc/include"
+  "${CMAKE_SOURCE_DIR}/external/npsystem/nplib/include"
 )
 
 add_subdirectory(external/npsystem/nplib)

@@ -3,17 +3,23 @@
 #include "proxy_stub/proxy.hpp"
 #include <boost/asio.hpp>
 #include <boost/asio/ip/tcp.hpp>
+// header only boost/json library
+// library is not required to be linked
+#include <boost/json/src.hpp>
+#include <boost/exception/exception.hpp>
 #include <spdlog/spdlog.h>
 #include <spdlog/spdlog.h>
 
 #include <memory>
 #include <map>
+#include <set>
 #include <iostream>
 #include <chrono>
 #include <unordered_map>
 
 #include "util/util.hpp"
 
+#include <nplib/utils/trie.hpp>
 
 // SOCKS5 Protocol Constants
 namespace socks5 {
@@ -135,6 +141,66 @@ public:
   }
 };
 
+class BlockList {
+  std::filesystem::path config_path_;
+  // TrieSet for blocked wildcarded hosts and exact matches
+  nplib::trie::TrieSet blocked_hosts_;
+  // TrieSet for allowed wildcarded hosts and exact matches
+  nplib::trie::TrieSet allowed_hosts_;
+
+  void loadFromConfig() {
+    std::ifstream config(config_path_);
+    if (!config.is_open()) {
+      spdlog::warn("[BlockList] Failed to open blocklist configuration file");
+      return;
+    }
+    try {
+      auto json = boost::json::parse(config);
+      auto blocked_hosts = json.at("blocked_hosts").as_array();
+      auto allowed_hosts = json.at("allowed_hosts").as_array();
+
+      for (const auto& item : blocked_hosts) {
+        if (item.is_string()) {
+          blocked_hosts_.insert(item.as_string().c_str());
+        }
+      }
+
+      for (const auto& item : allowed_hosts) {
+        if (item.is_string()) {
+          allowed_hosts_.insert(item.as_string().c_str());
+        }
+      }
+
+      spdlog::info("[BlockList] Loaded {} blocked hosts, {} allowed hosts",
+                  blocked_hosts.size(), allowed_hosts.size());
+    } catch (const boost::system::system_error& ex) {
+      spdlog::error("[BlockList] JSON parsing error: {}", ex.what());
+    } catch (const std::exception& e) {
+      spdlog::error("[BlockList] Error loading blocklist configuration: {}", e.what());
+    }
+  }
+
+public:
+  // Check if the given host is blocked
+  bool isBlocked(const std::string& host) const noexcept {
+    if (allowed_hosts_.search(host)) {
+      return false; // Host is allowed
+    }
+
+    if (blocked_hosts_.search(host)) {
+      return true; // Host is explicitly blocked
+    }
+
+    return false; // Placeholder implementation
+  }
+
+  BlockList(const std::filesystem::path& config_path)
+    : config_path_(config_path)
+  {
+    loadFromConfig();
+  }
+};
+
 // TCP Connection management for SOCKS5 tunnels
 class ProxyConnection : public std::enable_shared_from_this<ProxyConnection> {
 private:
@@ -247,9 +313,9 @@ private:
   ConnectionManager connection_manager_;
   proxy::SessionCallbacks* session_callbacks_ = nullptr;
   static DnsCache dns_cache_; // Shared DNS cache across all ProxyUser instances
-
+  const BlockList& block_list_; // Shared block list across all ProxyUser instances
 public:
-  ProxyUser(boost::asio::io_context& ioc) : ioc_(ioc) {}
+  ProxyUser(boost::asio::io_context& ioc, const BlockList& block_list) : ioc_{ioc}, block_list_{block_list} {}
   ~ProxyUser() {
     spdlog::info("[Proxy] ProxyUser destructor called");
     if (session_callbacks_) {
@@ -269,6 +335,10 @@ public:
     std::string host = target_host;
     std::string port = std::to_string(target_port);
     auto this_ = this;
+
+    if (block_list_.isBlocked(host))
+      return 0; // Blocked by block list
+
     try {
       // Create new connection
       // Don't need strand for now as there is only one thread handling connections
@@ -411,6 +481,7 @@ class ProxyImpl : public proxy::IServer_Servant {
   boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard_ = 
     boost::asio::make_work_guard(ioc_);
   std::thread ioc_thread_;
+  std::shared_ptr<BlockList> block_list_;
 public:
   void LogIn (::nprpc::flat::Span<char> login, ::nprpc::flat::Span<char> password, nprpc::detail::flat::ObjectId_Direct user) override
   {
@@ -432,16 +503,18 @@ public:
 
     // Create a new ProxyUser object and activate it in the POA
     auto oid = poa_->activate_object(
-      new ProxyUser(ioc_), // create a new ProxyUser object
+      new ProxyUser(ioc_, *block_list_.get()), // create a new ProxyUser object
       nprpc::ObjectActivationFlags::SESSION_SPECIFIC, // activation_flags
       &nprpc::get_context() // session context
     );
     nprpc::Object::assign_to_direct(oid, user);
   }
 
-  ProxyImpl(nprpc::Rpc& rpc, std::shared_ptr<UserService> userService)
+  ProxyImpl(nprpc::Rpc& rpc, std::shared_ptr<UserService> userService,
+            std::shared_ptr<BlockList> block_list)
     : rpc_(rpc)
     , userService_{userService}
+    , block_list_{block_list}
   {
     poa_ = nprpc::PoaBuilder(&rpc_)
       .with_lifespan(nprpc::PoaPolicy::Lifespan::Transient)

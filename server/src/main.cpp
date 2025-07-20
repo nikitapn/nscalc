@@ -113,13 +113,17 @@ int main(int argc, char *argv[]) {
     }
 
     auto rpc = builder.build(thread_pool::get_instance().ctx());
+    auto data_path = fs::canonical(fs::path(data_dir));
 
     auto firstInjector = [&] () { return di::make_injector(
       di::bind<>().to(*rpc),
       di::bind<Database>().in(di::singleton).to<Database>(
-        (fs::canonical(fs::path(data_dir)) / "nscalc.db").generic_string()
+        (data_path / "nscalc.db").generic_string()
       ),
-      di::bind<DataObservers>().in(di::singleton).to<DataObservers>()
+      di::bind<DataObservers>().in(di::singleton).to<DataObservers>(),
+      di::bind<BlockList>().in(di::singleton).to<BlockList>(
+        data_path / "blocklist.json"
+      )
     );};
 
     auto injector = firstInjector();
