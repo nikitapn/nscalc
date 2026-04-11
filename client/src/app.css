@@ -20,6 +20,55 @@
 	--color-sand-700: #8b5822;
 }
 
+/* -------------------------------------------------------------------------
+ * Seasonal theme overrides
+ * Setting data-season on <html> replaces the ocean/sand palette and the
+ * body background.  All Tailwind utilities (ocean-*, sand-*) repaint for
+ * free because they reference these custom properties.
+ * ------------------------------------------------------------------------- */
+
+[data-season="spring"] {
+	/* ocean axis → soft forest green */
+	--color-ocean-50:  #f0faf2;
+	--color-ocean-100: #d8f3de;
+	--color-ocean-200: #a8e4b4;
+	--color-ocean-300: #6ccd84;
+	--color-ocean-400: #3ab05a;
+	--color-ocean-500: #2a8f46;
+	--color-ocean-600: #1f6e34;
+	--color-ocean-700: #185229;
+	--color-ocean-800: #123c1e;
+	--color-ocean-900: #0d2c16;
+	--color-ocean-950: #071709;
+	/* sand axis → sakura blush */
+	--color-sand-50:  #fff5f7;
+	--color-sand-100: #ffe0e6;
+	--color-sand-200: #ffb7c5;
+	--color-sand-500: #e0607a;
+	--color-sand-700: #a03050;
+}
+
+[data-season="winter"] {
+	/* ocean axis → icy steel blue */
+	--color-ocean-50:  #f0f8ff;
+	--color-ocean-100: #dcefff;
+	--color-ocean-200: #b0d8f8;
+	--color-ocean-300: #74bbf0;
+	--color-ocean-400: #3a9de0;
+	--color-ocean-500: #1478be;
+	--color-ocean-600: #0d5a94;
+	--color-ocean-700: #0a4270;
+	--color-ocean-800: #082e50;
+	--color-ocean-900: #061e38;
+	--color-ocean-950: #040f22;
+	/* sand axis → frosted silver */
+	--color-sand-50:  #f8fafc;
+	--color-sand-100: #e8eef5;
+	--color-sand-200: #c8d8ea;
+	--color-sand-500: #7898b8;
+	--color-sand-700: #4a6880;
+}
+
 @layer base {
 	:root {
 		color-scheme: dark;
@@ -39,6 +88,20 @@
 			radial-gradient(circle at 20% 20%, rgb(201 138 53 / 0.14), transparent 25%),
 			linear-gradient(180deg, #0c1730 0%, #08111f 38%, #08111f 100%);
 		color: var(--color-ocean-50);
+	}
+
+	[data-season="spring"] body {
+		background:
+			radial-gradient(circle at top, rgb(58 176 90 / 0.18), transparent 30%),
+			radial-gradient(circle at 20% 20%, rgb(255 183 197 / 0.14), transparent 25%),
+			linear-gradient(180deg, #0c1f10 0%, #071709 38%, #071709 100%);
+	}
+
+	[data-season="winter"] body {
+		background:
+			radial-gradient(circle at top, rgb(20 120 190 / 0.22), transparent 30%),
+			radial-gradient(circle at 20% 20%, rgb(200 216 234 / 0.10), transparent 25%),
+			linear-gradient(180deg, #08182c 0%, #040f22 38%, #040f22 100%);
 	}
 
 	select {
@@ -70,8 +133,10 @@
 
 @layer utilities {
 	.panel-surface {
-		background: linear-gradient(180deg, rgb(16 59 89 / 0.82), rgb(13 42 64 / 0.92));
-		border: 1px solid rgb(125 198 255 / 0.14);
+		background: linear-gradient(180deg,
+			color-mix(in srgb, var(--color-ocean-800) 82%, transparent),
+			color-mix(in srgb, var(--color-ocean-900) 92%, transparent));
+		border: 1px solid color-mix(in srgb, var(--color-ocean-300) 14%, transparent);
 		box-shadow: 0 24px 80px rgb(0 0 0 / 0.25);
 		backdrop-filter: blur(14px);
 	}

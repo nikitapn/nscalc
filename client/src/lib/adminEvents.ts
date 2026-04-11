@@ -1,4 +1,4 @@
-export type SiteEventVariant = "fireworks" | "snow";
+export type SiteEventVariant = "fireworks" | "snow" | "petals";
 
 export type SiteEventIntensity = "gentle" | "showtime";
 
@@ -32,7 +32,7 @@ export function normalizeSiteEventConfig(value: Partial<SiteEventConfig> | null 
   const defaults = createDefaultSiteEventConfig();
   const durationSeconds = Number(value?.durationSeconds);
   const intensity = value?.intensity === "gentle" || value?.intensity === "showtime" ? value.intensity : defaults.intensity;
-  const variant = value?.variant === "snow" || value?.variant === "fireworks" ? value.variant : defaults.variant;
+  const variant = value?.variant === "snow" || value?.variant === "fireworks" || value?.variant === "petals" ? value.variant : defaults.variant;
 
   return {
     variant,
@@ -110,13 +110,15 @@ export function getSiteEventSessionSignature(config: SiteEventConfig): string {
 }
 
 export function getSiteEventVariantLabel(config: SiteEventConfig): string {
-  return config.variant === "snow" ? "Winter snowfall" : "New Year fireworks";
+  if (config.variant === "snow") return "Winter snowfall";
+  if (config.variant === "petals") return "Spring blossom";
+  return "New Year fireworks";
 }
 
 export function getSiteEventVariantDescription(variant: SiteEventVariant): string {
-  return variant === "snow"
-    ? "Slow drifting snow with a light atmospheric overlay."
-    : "A short celebratory burst of fireworks when the page opens.";
+  if (variant === "snow") return "Slow drifting snow with a light atmospheric overlay.";
+  if (variant === "petals") return "Soft sakura petals drifting down — a gentle spring welcome.";
+  return "A short celebratory burst of fireworks when the page opens.";
 }
 
 function parseLocalDateTime(value: string): Date | null {

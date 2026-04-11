@@ -89,7 +89,7 @@ private struct SiteEventConfigStore: Sendable {
 
     private func normalize(_ document: SiteEventConfigDocument, updatedBy: String? = nil) -> SiteEventConfigDocument {
         var normalized = document
-        normalized.variant = ["fireworks", "snow"].contains(document.variant) ? document.variant : "fireworks"
+        normalized.variant = ["fireworks", "snow", "petals"].contains(document.variant) ? document.variant : "fireworks"
         normalized.intensity = ["gentle", "showtime"].contains(document.intensity) ? document.intensity : "showtime"
         normalized.durationSeconds = min(30, max(8, document.durationSeconds))
         normalized.startAt = normalizeDateString(document.startAt)

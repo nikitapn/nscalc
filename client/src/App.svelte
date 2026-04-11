@@ -18,6 +18,7 @@
   } from "./lib/adminEvents";
   import { getCookie, setCookie } from "./lib/cookies";
   import { getNscalcRpc } from "./lib/nscalcRpc";
+  import { applySeasonalTheme, seasonForVariant } from "./lib/seasonalTheme";
   import * as nscalc from "@rpc/nscalc";
 
   type AuthState = {
@@ -365,6 +366,12 @@
             intensity: config.intensity,
             onFinish: handleFinish,
           })
+        : config.variant === "petals"
+        ? (await import("./lib/eventEffects/petalsRuntime")).launchPetalsOverlay({
+            durationSeconds: config.durationSeconds,
+            intensity: config.intensity,
+            onFinish: handleFinish,
+          })
         : (await import("./lib/eventEffects/fireworksRuntime")).launchFireworksOverlay({
             durationSeconds: config.durationSeconds,
             intensity: config.intensity,
@@ -400,6 +407,9 @@
       if (!authState?.isAdmin || !eventDraftDirty) {
         eventDraft = { ...config };
       }
+      if (config.enabled && isSiteEventActive(config)) {
+        applySeasonalTheme(seasonForVariant(config.variant));
+      }
       await maybeAutoplayEvent(config);
     } catch (error) {
       if (showLoadingState) {
@@ -427,6 +437,7 @@
       eventConfig = savedConfig;
       eventDraft = { ...savedConfig };
       eventMessage = `Saved ${getSiteEventVariantLabel(savedConfig)} for all visitors.`;
+      applySeasonalTheme(savedConfig.enabled && isSiteEventActive(savedConfig) ? seasonForVariant(savedConfig.variant) : "default");
       await maybeAutoplayEvent(savedConfig);
     } catch (error) {
       if (error instanceof nscalc.AuthorizationFailed) {
@@ -642,6 +653,7 @@
                     <select bind:value={eventDraft.variant} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-ocean-300 focus:bg-black/30">
                       <option value="fireworks">New Year fireworks</option>
                       <option value="snow">Winter snowfall</option>
+                      <option value="petals">Spring blossom</option>
                     </select>
                   </label>
 
@@ -704,7 +716,7 @@
                       onclick={() => void startEventPlayback("preview", eventDraft)}
                       disabled={eventRuntimeBusy}
                     >
-                      {eventRuntimeBusy ? "Loading..." : `Preview ${eventDraft.variant === "snow" ? "snow" : "fireworks"}`}
+                      {eventRuntimeBusy ? "Loading..." : `Preview ${eventDraft.variant === "snow" ? "snow" : eventDraft.variant === "petals" ? "petals" : "fireworks"}`}
                     </button>
                     <button
                       type="button"
