@@ -1,7 +1,7 @@
 # ============================================================================
 # Stage 1: Build sqlite3 with snapshot support
 # ============================================================================
-FROM swift:6.2.4 AS sqlite3-builder
+FROM swift:6.3.0 AS sqlite3-builder
 
 # Build SQLite from the amalgamation with SQLITE_ENABLE_SNAPSHOT enabled.
 # The Ubuntu package omits this flag, which causes GRDB's WALSnapshot to fail

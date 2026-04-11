@@ -11,6 +11,9 @@ const swiftProxyTarget = process.env.NSCALC_SWIFT_PROXY_TARGET ?? 'http://localh
 
 // https://vite.dev/config/
 export default defineConfig({
+  build: {
+    emptyOutDir: false,
+  },
   plugins: [tailwindcss(), svelte()],
   server: {
     host: '0.0.0.0',

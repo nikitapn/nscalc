@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { type StreamWriter } from "nprpc";
+  import { type binary } from "@rpc/grow_journal";
   import { onDestroy, onMount } from "svelte";
   import JournalVideoPlayer from "../lib/JournalVideoPlayer.svelte";
   import { getJournalRpc } from "../lib/journalRpc";
@@ -138,6 +140,9 @@
   let composerBodyInput = $state<HTMLTextAreaElement | null>(null);
   let composerFileInput = $state<HTMLInputElement | null>(null);
   const uploadRetryLimit = 6;
+  // Buffers media-state events that arrive before the asset has been attached
+  // (i.e. before applyStoryUpdate adds it to selectedUpdates).  Flushed on attach.
+  let pendingMediaEvents = $state<Record<string, JournalMediaAsset>>({});
 
   const filteredStories = $derived.by(() => {
     const query = search.trim().toLowerCase();
@@ -343,6 +348,7 @@
     selectedStorySlug = null;
     selectedUpdates = [];
     localUploads = [];
+    pendingMediaEvents = {};
     loadingStory = false;
     activeImageViewer = null;
     activeGalleryIndex = null;
@@ -597,21 +603,20 @@
     let attempt = 0;
 
     while (attempt < uploadRetryLimit) {
-      let writer: { write(value: Uint8Array): void; close(): void; abort(error_code?: number): void } | null = null;
+      let writer: StreamWriter<binary> | null = null;
       try {
         const { uploads } = await getJournalRpc();
         writer = await uploads.UploadAsset(target.asset_id, target.upload_token);
-
         for (; offset < file.size; offset += uploadChunkSize) {
           const chunk = new Uint8Array(await file.slice(offset, offset + uploadChunkSize).arrayBuffer());
-          writer.write(chunk);
+          await writer.write(chunk);
           updateLocalUpload(target.asset_id, {
             bytesSent: BigInt(Math.min(offset + chunk.byteLength, file.size)),
             status: "Uploading",
           });
         }
 
-        writer.close();
+        await writer.close();
         return;
       } catch (error) {
         if (writer) {
@@ -799,6 +804,25 @@
       ? sortUpdatesByCreatedAt([...selectedUpdates.filter((item) => item.id !== update.id), update])
       : selectedUpdates;
 
+    // Flush any media-state events that arrived before this update was attached.
+    let nextPending = pendingMediaEvents;
+    for (const media of update.media) {
+      const key = media.id.toString();
+      if (nextPending[key]) {
+        const buffered = nextPending[key];
+        selectedUpdates = selectedUpdates.map((u) => {
+          const idx = u.media.findIndex((e) => e.id === buffered.id);
+          if (idx === -1) return u;
+          const m = [...u.media];
+          m[idx] = buffered;
+          return { ...u, media: m };
+        });
+        if (nextPending === pendingMediaEvents) nextPending = { ...pendingMediaEvents };
+        delete nextPending[key];
+      }
+    }
+    if (nextPending !== pendingMediaEvents) pendingMediaEvents = nextPending;
+
     const coverImage = update.media.find((media) => media.kind === MediaKind.Image)?.image_url;
     if (selectedStory?.id === update.story_id) {
       selectedStory = {
@@ -817,16 +841,23 @@
       return;
     }
 
+    let found = false;
     selectedUpdates = selectedUpdates.map((update) => {
       const mediaIndex = update.media.findIndex((entry) => entry.id === media.id);
       if (mediaIndex === -1) {
         return update;
       }
-
+      found = true;
       const nextMedia = [...update.media];
       nextMedia[mediaIndex] = media;
       return { ...update, media: nextMedia };
     });
+
+    if (!found) {
+      // Asset not yet in selectedUpdates (AttachAsset response not yet processed);
+      // buffer so applyStoryUpdate can replay it once the asset is attached.
+      pendingMediaEvents = { ...pendingMediaEvents, [media.id.toString()]: media };
+    }
   }
 
   function registerLocalUpload(target: UploadTarget, file: File, mimeType: string): void {

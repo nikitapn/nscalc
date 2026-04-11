@@ -10,11 +10,6 @@ import fs from 'fs';
 import path from 'path';
 import { createHash, X509Certificate } from 'crypto';
 
-function getServerCertificateHash(certPath: string): number[] {
-  const certificate = new X509Certificate(fs.readFileSync(certPath));
-  return Array.from(createHash('sha256').update(certificate.raw).digest());
-}
-
 function getServerCertificateSpki(certPath: string): string {
   const certificate = new X509Certificate(fs.readFileSync(certPath));
   const spki = certificate.publicKey.export({
@@ -37,7 +32,9 @@ CMD=(
   --enable-quic
   --ignore-certificate-errors
   --ignore-certificate-errors-spki-list=${CERTIFICATE_SPKI}
-  # --origin-to-force-quic-on=$HOST
+  # This is needed not to force Chromium to use h3 as name suggests
+  # but to overcome WebTransport certificate errors
+  --origin-to-force-quic-on=$HOST
 )
 
 # Run Chromium with the specified command-line arguments

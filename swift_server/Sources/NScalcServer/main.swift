@@ -282,12 +282,14 @@ do {
     print("Database opened: \(config.dbPath)")
 
     let httpBuilder = RpcBuilder()
-        .setLogLevel(.info)
+        .setLogLevel(.trace)
         .withHostname(config.hostname)
         .withHttp(config.httpPort)
-        .maxRequestBodySize(6 * 1024 * 1024)
-        .maxWebSocketMessageSize(6 * 1024 * 1024)
-        .maxWebTransportMessageSize(6 * 1024 * 1024)
+            .maxRequestBodySize(6 * 1024 * 1024)
+            .maxWebSocketMessageSize(6 * 1024 * 1024)
+            .maxWebTransportMessageSize(6 * 1024 * 1024)
+            .allowOrigins(["http://localhost:5173", "http://127.0.0.1:5173"]) // Vite dev server
+            .watchFiles()
 
     if config.useSsl {
         httpBuilder.ssl(
@@ -373,7 +375,7 @@ do {
     signal(SIGINT, SIG_IGN)
     signalSource.resume()
 
-    try rpc.startThreadPool(4)
+    try rpc.startThreadPool(1)
 
     // Block forever waiting for RPC calls
     dispatchMain()

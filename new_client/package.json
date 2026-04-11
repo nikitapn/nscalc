@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "jspdf": "^4.2.1",
-    "nprpc": "file:../external/nprpc/nprpc_js"
+    "nprpc": "file:../external/nprpc/nprpc_js",
+    "shaka-player": "^5.0.10"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4.0.0",

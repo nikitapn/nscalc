@@ -1,4 +1,4 @@
-FROM swift:6.2.4-slim
+FROM swift:6.3.0-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \

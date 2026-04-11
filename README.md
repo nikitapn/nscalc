@@ -215,7 +215,7 @@ The active web stack is the Swift server plus the built `new_client` frontend. F
 	--port 443
 ```
 
-The production image is based on `swift:6.2.4-slim`. The deploy flow mounts persistent state from `/opt/nscalc/data` on the VPS and mounts the certificate directory read-only at `/certs` inside the container. The Swift server now accepts runtime flags and matching env vars for:
+The production image is based on `swift:6.3.0-slim`. The deploy flow mounts persistent state from `/opt/nscalc/data` on the VPS and mounts the certificate directory read-only at `/certs` inside the container. The Swift server now accepts runtime flags and matching env vars for:
 
 ```bash
 --hostname <value>

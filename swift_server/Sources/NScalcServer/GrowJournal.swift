@@ -3,6 +3,13 @@ import NPRPC
 import NScalc
 import GRDB
 
+@inline(__always)
+private func gjlog(_ level: String = "I", _ message: String) {
+    nplog(level, message, component: "GrowJournal")
+}
+
+// MARK: -
+
 private final class GrowJournalPublicAssetPublisher {
     private let fileManager = FileManager.default
     private let mediaRootURL: URL
@@ -77,7 +84,7 @@ private final class GrowJournalPublicAssetPublisher {
         do {
             try fileManager.removeItem(at: assetDirectoryURL)
         } catch {
-            print("[GrowJournalPublicAssetPublisher] failed to remove public asset \(assetId): \(error)")
+            gjlog("E", "failed to remove public asset \(assetId): \(error)")
         }
     }
 
@@ -159,12 +166,18 @@ final class GrowJournalStore: @unchecked Sendable {
     private var uploads: [UInt64: UploadSession] = [:]
     private var mediaPayloads: [UInt64: [UInt8]] = [:]
     private var watchers: [UInt64: [UUID: NPRPCStreamWriter<StoryStreamServerEvent>]] = [:]
+    /// Set of asset IDs whose upload stream is still actively draining.
+    private var uploadStreamActive: Set<UInt64> = []
+    /// finishUpload arrived before the stream drained; commit deferred until drain.
+    private var pendingFinishes: [UInt64: String] = [:]
     private let db: AppDatabase
     private let sessionService: SessionService
     private let videoProcessor: GrowJournalVideoProcessor
     private let publicAssetPublisher: GrowJournalPublicAssetPublisher
     private let mediaRootURL: URL
     private let uploadSpoolRootURL: URL
+    /// Serial queue — ensures at most one ffmpeg process runs at a time.
+    private let videoProcessingQueue = DispatchQueue(label: "grow-journal.video-processing", qos: .utility)
 
     init(db: AppDatabase, videoRootPath: String = "/app/sample_data/grow_journal_media", publicRootPath: String = "/app/runtime/www") {
         self.db = db
@@ -182,12 +195,12 @@ final class GrowJournalStore: @unchecked Sendable {
             }
             try restoreUploadSessionsFromDatabase()
         } catch {
-            print("[GrowJournal] failed to load journal state from DB: \(error)")
+            gjlog("E", "failed to load journal state from DB: \(error)")
             seedData()
             do {
                 try persistCurrentStateToDatabase()
             } catch {
-                print("[GrowJournal] failed to persist seeded journal state: \(error)")
+                gjlog("E", "failed to persist seeded journal state: \(error)")
             }
         }
         reconcilePersistedVideoAssets()
@@ -338,7 +351,7 @@ final class GrowJournalStore: @unchecked Sendable {
                     .deleteAll(db)
             }
         } catch {
-            print("[GrowJournal] failed to delete story \(storyId) from DB: \(error)")
+            gjlog("E", "failed to delete story \(storyId) from DB: \(error)")
             throw error
         }
 
@@ -445,12 +458,64 @@ final class GrowJournalStore: @unchecked Sendable {
             asset.status = .Uploading
             asset.error_message = nil
             assets[assetId] = asset
+            uploadStreamActive.insert(assetId)
             return true
         }
         if accepted {
             persistAsset(assetId)
         }
         return accepted
+    }
+
+    func signalUploadStreamDone(assetId: UInt64) {
+        lock.lock()
+        uploadStreamActive.remove(assetId)
+        let pendingToken = pendingFinishes.removeValue(forKey: assetId)
+        lock.unlock()
+        guard let token = pendingToken else { return }
+        do {
+            let (progress, storyId, asset, videoJob) = try finishUpload(assetId: assetId, token: token)
+            // Re-persist the update so the DB reflects the finalized asset state
+            // (AttachAsset may have persisted a stale snapshot before commit).
+            if let updateId = withLock({ assetUpdateIds[assetId] }),
+               let update = withLock({ stories[storyId]?.updates.first(where: { $0.id == updateId }) }) {
+                persistUpdate(update)
+            }
+            // Broadcast .Queued BEFORE queuing video so the client sees the correct ordering.
+            publish(storyId: storyId, event: StoryStreamServerEvent(story_id: storyId, update: nil, media: asset, progress: progress))
+            if let videoJob {
+                gjlog("I", "queued video processing for asset \(assetId)")
+                queueVideoProcessing(videoJob)
+            }
+            gjlog("D", "committed upload for asset \(assetId) after stream drained")
+        } catch {
+            gjlog("E", "deferred commit failed for asset \(assetId): \(error)")
+        }
+    }
+
+    func requestFinish(assetId: UInt64, token: String) throws -> UploadProgress {
+        let (streamDone, pendingProgress) = withLock { () -> (Bool, UploadProgress?) in
+            let streamDone = !uploadStreamActive.contains(assetId)
+            if !streamDone {
+                pendingFinishes[assetId] = token
+            }
+            let p = uploads[assetId].map { UploadProgress(asset_id: assetId, bytes_received: $0.bytesReceived) }
+                ?? assets[assetId].map { UploadProgress(asset_id: assetId, bytes_received: $0.byte_size) }
+            return (streamDone, p)
+        }
+        if streamDone {
+            let (progress, storyId, asset, videoJob) = try finishUpload(assetId: assetId, token: token)
+            // Broadcast .Queued BEFORE queuing video so the client sees the correct ordering.
+            publish(storyId: storyId, event: StoryStreamServerEvent(story_id: storyId, update: nil, media: asset, progress: progress))
+            if let videoJob {
+                gjlog("I", "queued video processing for asset \(assetId)")
+                queueVideoProcessing(videoJob)
+            }
+            gjlog("D", "committed upload for asset \(assetId) (stream already done)")
+            return progress
+        }
+        gjlog("D", "finish requested for asset \(assetId); will commit when stream drains")
+        return pendingProgress ?? UploadProgress(asset_id: assetId, bytes_received: 0)
     }
 
     func appendUploadChunk(assetId: UInt64, token: String, chunk: [UInt8]) -> (UploadProgress, UInt64)? {
@@ -475,7 +540,7 @@ final class GrowJournalStore: @unchecked Sendable {
         return progress
     }
 
-    func finishUpload(assetId: UInt64, token: String) throws -> (UploadProgress, UInt64, MediaAsset) {
+    private func finishUpload(assetId: UInt64, token: String) throws -> (UploadProgress, UInt64, MediaAsset, VideoProcessingJob?) {
         struct ImagePublicationJob {
             let assetId: UInt64
             let originalFilename: String
@@ -504,6 +569,17 @@ final class GrowJournalStore: @unchecked Sendable {
             assets[assetId] = asset
             uploads.removeValue(forKey: assetId)
 
+            // If the asset was already attached (AttachAsset arrived before the
+            // deferred commit), update the embedded snapshot in the update so that
+            // ListUpdates never returns a stale status / missing image_url.
+            if var record = stories[upload.storyId],
+               let updateId = assetUpdateIds[assetId],
+               let updateIdx = record.updates.firstIndex(where: { $0.id == updateId }),
+               let mediaIdx = record.updates[updateIdx].media.firstIndex(where: { $0.id == assetId }) {
+                record.updates[updateIdx].media[mediaIdx] = asset
+                stories[upload.storyId] = record
+            }
+
             let videoJob = upload.kind == .Video
                 ? VideoProcessingJob(assetId: assetId, storyId: upload.storyId, originalFilename: asset.original_filename)
                 : nil
@@ -530,7 +606,7 @@ final class GrowJournalStore: @unchecked Sendable {
                 deleteUploadSession(assetId: imageJob.assetId)
                 persistAsset(imageJob.assetId)
             } catch {
-                print("[GrowJournal] failed to publish image asset \(imageJob.assetId): \(error)")
+                gjlog("E", "failed to publish image asset \(imageJob.assetId): \(error)")
                 let failedAsset = withLock { () -> MediaAsset in
                     var asset = assets[imageJob.assetId] ?? result.2
                     asset.status = .Failed
@@ -539,7 +615,7 @@ final class GrowJournalStore: @unchecked Sendable {
                     return asset
                 }
                 persistAsset(imageJob.assetId)
-                return (result.0, result.1, failedAsset)
+                return (result.0, result.1, failedAsset, nil)
             }
         }
 
@@ -550,10 +626,12 @@ final class GrowJournalStore: @unchecked Sendable {
                     mediaPayloads.removeValue(forKey: videoJob.assetId)
                 }
                 deleteUploadSession(assetId: videoJob.assetId)
-                print("[GrowJournal] queued video processing for asset \(videoJob.assetId)")
-                queueVideoProcessing(videoJob)
+                persistAsset(assetId)
+                // Return the job to the caller so it can broadcast .Queued BEFORE
+                // dispatching the video thread (which would immediately broadcast .Processing).
+                return (result.0, result.1, result.2, videoJob)
             } catch {
-                print("[GrowJournal] failed to stage video asset \(videoJob.assetId): \(error)")
+                gjlog("E", "failed to stage video asset \(videoJob.assetId): \(error)")
                 let failedAsset = withLock { () -> MediaAsset in
                     var asset = assets[videoJob.assetId] ?? result.2
                     asset.status = .Failed
@@ -562,13 +640,13 @@ final class GrowJournalStore: @unchecked Sendable {
                     return asset
                 }
                 persistAsset(videoJob.assetId)
-                return (result.0, result.1, failedAsset)
+                return (result.0, result.1, failedAsset, nil)
             }
         }
 
         persistAsset(assetId)
 
-        return (result.0, result.1, result.2)
+        return (result.0, result.1, result.2, nil)
     }
 
     func abortUpload(assetId: UInt64, token: String) -> Bool {
@@ -578,6 +656,8 @@ final class GrowJournalStore: @unchecked Sendable {
             }
             uploads.removeValue(forKey: assetId)
             mediaPayloads.removeValue(forKey: assetId)
+            uploadStreamActive.remove(assetId)
+            pendingFinishes.removeValue(forKey: assetId)
             asset.status = .Failed
             asset.error_message = "Upload aborted"
             assets[assetId] = asset
@@ -843,7 +923,7 @@ final class GrowJournalStore: @unchecked Sendable {
                 try record.save(db)
             }
         } catch {
-            print("[GrowJournal] failed to persist story \(detail.id): \(error)")
+            gjlog("E", "failed to persist story \(detail.id): \(error)")
         }
     }
 
@@ -854,7 +934,7 @@ final class GrowJournalStore: @unchecked Sendable {
                 try record.save(db)
             }
         } catch {
-            print("[GrowJournal] failed to persist update \(update.id): \(error)")
+            gjlog("E", "failed to persist update \(update.id): \(error)")
         }
     }
 
@@ -869,7 +949,7 @@ final class GrowJournalStore: @unchecked Sendable {
                 try record.save(db)
             }
         } catch {
-            print("[GrowJournal] failed to persist asset \(assetId): \(error)")
+            gjlog("E", "failed to persist asset \(assetId): \(error)")
         }
     }
 
@@ -890,7 +970,7 @@ final class GrowJournalStore: @unchecked Sendable {
                 try record.save(db)
             }
         } catch {
-            print("[GrowJournal] failed to persist upload session \(assetId): \(error)")
+            gjlog("E", "failed to persist upload session \(assetId): \(error)")
         }
     }
 
@@ -902,7 +982,7 @@ final class GrowJournalStore: @unchecked Sendable {
                     .deleteAll(db)
             }
         } catch {
-            print("[GrowJournal] failed to delete upload session \(assetId): \(error)")
+            gjlog("E", "failed to delete upload session \(assetId): \(error)")
         }
     }
 
@@ -1095,13 +1175,13 @@ final class GrowJournalStore: @unchecked Sendable {
                 do {
                     try publicAssetPublisher.publishImageAsset(assetId: asset.id)
                 } catch {
-                    print("[GrowJournal] failed to publish image asset \(asset.id): \(error)")
+                    gjlog("E", "failed to publish image asset \(asset.id): \(error)")
                 }
             case .Video:
                 do {
                     try publicAssetPublisher.publishVideoAsset(assetId: asset.id)
                 } catch {
-                    print("[GrowJournal] failed to publish video asset \(asset.id): \(error)")
+                    gjlog("E", "failed to publish video asset \(asset.id): \(error)")
                 }
             }
         }
@@ -1149,7 +1229,7 @@ final class GrowJournalStore: @unchecked Sendable {
                             event: StoryStreamServerEvent(story_id: storyId, update: nil, media: requeuedAsset, progress: nil)
                         )
                     }
-                    print("[GrowJournal] requeueing video asset \(asset.id) because processed files are missing")
+                    gjlog("I", "requeueing video asset \(asset.id) because processed files are missing")
                     queueVideoProcessing(VideoProcessingJob(assetId: asset.id, storyId: storyId, originalFilename: asset.original_filename))
                 } else {
                     markRecoveredUploadFailed(assetId: asset.id, message: "Processed video files are missing and the original upload is no longer available.", storyId: storyId)
@@ -1186,7 +1266,7 @@ final class GrowJournalStore: @unchecked Sendable {
                 markRecoveredUploadFailed(assetId: job.assetId, message: "Queued video source is missing after restart.", storyId: job.storyId)
                 continue
             }
-            print("[GrowJournal] recovering queued video job for asset \(job.assetId)")
+            gjlog("I", "recovering queued video job for asset \(job.assetId)")
             queueVideoProcessing(job)
         }
     }
@@ -1257,13 +1337,13 @@ final class GrowJournalStore: @unchecked Sendable {
     }
 
     private func queueVideoProcessing(_ job: VideoProcessingJob) {
-        DispatchQueue.global(qos: .utility).async { [self] in
+        videoProcessingQueue.async { [self] in
             processVideo(job)
         }
     }
 
     private func processVideo(_ job: VideoProcessingJob) {
-        print("[GrowJournal] processing video asset \(job.assetId) started")
+        gjlog("I", "processing video asset \(job.assetId) started")
         let processingAsset = withLock { () -> MediaAsset? in
             guard var asset = assets[job.assetId] else {
                 return nil
@@ -1271,11 +1351,19 @@ final class GrowJournalStore: @unchecked Sendable {
             asset.status = .Processing
             asset.error_message = nil
             assets[job.assetId] = asset
+            if var record = stories[job.storyId],
+               let updateId = assetUpdateIds[job.assetId],
+               let updateIdx = record.updates.firstIndex(where: { $0.id == updateId }),
+               let mediaIdx = record.updates[updateIdx].media.firstIndex(where: { $0.id == job.assetId }) {
+                record.updates[updateIdx].media[mediaIdx] = asset
+                stories[job.storyId] = record
+            }
             return asset
         }
         persistAsset(job.assetId)
 
         if let processingAsset {
+            gjlog("I", "processing video asset \(job.assetId) status updated to Processing")
             broadcast(
                 storyId: job.storyId,
                 event: StoryStreamServerEvent(story_id: job.storyId, update: nil, media: processingAsset, progress: nil)
@@ -1287,7 +1375,7 @@ final class GrowJournalStore: @unchecked Sendable {
             do {
                 try publicAssetPublisher.publishVideoAsset(assetId: job.assetId)
             } catch {
-                print("[GrowJournal] failed to publish video asset \(job.assetId): \(error)")
+                gjlog("E", "failed to publish video asset \(job.assetId): \(error)")
             }
             let processedSize = try videoProcessor.outputSize(assetId: job.assetId, originalFilename: job.originalFilename)
             let hasPoster = videoProcessor.hasPoster(assetId: job.assetId, originalFilename: job.originalFilename)
@@ -1303,19 +1391,26 @@ final class GrowJournalStore: @unchecked Sendable {
                 asset.dash_manifest_url = "/mock/journal/assets/\(job.assetId)/manifest.mpd"
                 assets[job.assetId] = asset
                 mediaPayloads.removeValue(forKey: job.assetId)
+                if var record = stories[job.storyId],
+                   let updateId = assetUpdateIds[job.assetId],
+                   let updateIdx = record.updates.firstIndex(where: { $0.id == updateId }),
+                   let mediaIdx = record.updates[updateIdx].media.firstIndex(where: { $0.id == job.assetId }) {
+                    record.updates[updateIdx].media[mediaIdx] = asset
+                    stories[job.storyId] = record
+                }
                 return asset
             }
             persistAsset(job.assetId)
 
             if let readyAsset {
-                print("[GrowJournal] processing video asset \(job.assetId) finished size=\(readyAsset.byte_size) poster=\(hasPoster)")
+                gjlog("I", "processing video asset \(job.assetId) finished size=\(readyAsset.byte_size) poster=\(hasPoster)")
                 broadcast(
                     storyId: job.storyId,
                     event: StoryStreamServerEvent(story_id: job.storyId, update: nil, media: readyAsset, progress: nil)
                 )
             }
         } catch {
-            print("[GrowJournal] processing video asset \(job.assetId) failed: \(error)")
+            gjlog("E", "processing video asset \(job.assetId) failed: \(error)")
             let failedAsset = withLock { () -> MediaAsset? in
                 guard var asset = assets[job.assetId] else {
                     return nil
@@ -1323,6 +1418,13 @@ final class GrowJournalStore: @unchecked Sendable {
                 asset.status = .Failed
                 asset.error_message = "Video processing failed: \(error.localizedDescription)"
                 assets[job.assetId] = asset
+                if var record = stories[job.storyId],
+                   let updateId = assetUpdateIds[job.assetId],
+                   let updateIdx = record.updates.firstIndex(where: { $0.id == updateId }),
+                   let mediaIdx = record.updates[updateIdx].media.firstIndex(where: { $0.id == job.assetId }) {
+                    record.updates[updateIdx].media[mediaIdx] = asset
+                    stories[job.storyId] = record
+                }
                 return asset
             }
             persistAsset(job.assetId)
@@ -1369,7 +1471,7 @@ final class GrowJournalStore: @unchecked Sendable {
             try handle.seekToEnd()
             try handle.write(contentsOf: Data(chunk))
         } catch {
-            print("[GrowJournal] failed to append upload spool for asset \(assetId): \(error)")
+            gjlog("E", "failed to append upload spool for asset \(assetId): \(error)")
         }
     }
 
@@ -1381,7 +1483,7 @@ final class GrowJournalStore: @unchecked Sendable {
         do {
             try fileManager.removeItem(at: url)
         } catch {
-            print("[GrowJournal] failed to remove upload spool for asset \(assetId): \(error)")
+            gjlog("E", "failed to remove upload spool for asset \(assetId): \(error)")
         }
     }
 
@@ -1472,9 +1574,11 @@ final class UploadServiceServantImpl: UploadServiceServant, @unchecked Sendable 
 
     override func uploadAsset(asset_id: UInt64, upload_token: String, data: NPRPCStreamReader<binary>) async {
         guard store.beginUpload(assetId: asset_id, token: upload_token) else {
-            print("[GrowJournal] upload rejected for asset \(asset_id): invalid session")
+            gjlog("E", "upload rejected for asset \(asset_id): invalid session")
             return
         }
+        // Always signal when exiting so finishUpload is never stuck waiting.
+        defer { store.signalUploadStreamDone(assetId: asset_id) }
 
         do {
             for try await chunk in data {
@@ -1487,17 +1591,17 @@ final class UploadServiceServantImpl: UploadServiceServant, @unchecked Sendable 
                 )
             }
         } catch {
-            print("[GrowJournal] upload stream failed for asset \(asset_id): \(error)")
+            gjlog("E", "upload stream failed for asset \(asset_id): \(error)")
         }
+        gjlog("D", "upload stream finished for asset \(asset_id)")
     }
 
     override func finishUpload(asset_id: UInt64, upload_token: String) throws -> UploadProgress {
-        let (progress, storyId, asset) = try store.finishUpload(assetId: asset_id, token: upload_token)
-        store.publish(
-            storyId: storyId,
-            event: StoryStreamServerEvent(story_id: storyId, update: nil, media: asset, progress: progress)
-        )
-        return progress
+        gjlog("D", "finish requested for asset \(asset_id)")
+        // If the upload stream is still draining, requestFinish registers the intent
+        // and returns immediately; the actual commit and story-stream notification
+        // happen inside signalUploadStreamDone once the last chunk is processed.
+        return try store.requestFinish(assetId: asset_id, token: upload_token)
     }
 
     override func abortUpload(asset_id: UInt64, upload_token: String) -> Bool {
@@ -1526,7 +1630,7 @@ final class StoryStreamServiceServantImpl: StoryStreamServiceServant, @unchecked
             for try await _ in stream.reader {
             }
         } catch {
-            print("[GrowJournal] story stream failed for \(story_id): \(error)")
+            gjlog("E", "story stream failed for \(story_id): \(error)")
         }
 
         store.removeWatcher(storyId: story_id, watcherId: watcherId)
