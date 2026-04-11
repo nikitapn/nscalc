@@ -1,315 +1,170 @@
 # NSCalc - Hydroponics Nutrient Solution Calculator
 
-A comprehensive hydroponics nutrient solution calculator with an integrated SOCKS5 proxy over TLS WebSockets for secure remote access.
-
-## Overview
-
-NSCalc is a dual-purpose application that serves as:
-
-1. **Hydroponics Calculator**: A web-based tool for calculating nutrient solutions, EC/TDS values, and managing hydroponic growing parameters
-2. **Secure Proxy**: A SOCKS5 proxy server tunneled over TLS WebSockets for secure remote access and traffic routing
+A web-based hydroponics nutrient solution calculator with integrated grow-journal
+(story timeline, media uploads, live watch stream).
 
 ## Architecture
 
-- **Backend**: C++ server using Boost.Beast for HTTP/WebSocket handling and NPRPC for RPC communication
-- **Frontend**: Modern web client built with React and Svelte
-- **Proxy Client**: Cross-platform Qt application for SOCKS5 proxy functionality
-- **Database**: SQLite for data persistence
-- **Security**: TLS encryption with self-signed certificate support for development
+| Layer | Technology |
+|-------|-----------|
+| **Server** | Swift — `server/` |
+| **Client** | Svelte + TypeScript — `client/` |
+| **RPC** | NPRPC (binary WebSocket/HTTP3 protocol/WebTransport) — `external/nprpc/` |
+| **IDL** | `idl/` — compiled to TS/Swift stubs by `scripts/gen_stubs.py` |
+| **Database** | SQLite |
+| **Transport** | TLS 1.3, HTTP/3 (QUIC), WebTransport |
 
 ## Features
 
-### Hydroponics Calculator
-- ✅ Nutrient solution calculations
-- ✅ EC/TDS value management
-- ✅ Multi-user support with authentication
-- ✅ Real-time chat functionality
-- ✅ Solution history and data persistence
-- ✅ Web-based responsive UI
-
-### SOCKS5 Proxy
-- ✅ SOCKS5 proxy over TLS WebSockets
-- ✅ Cross-platform Qt client (Windows/Linux/macOS)
-- ✅ Secure tunnel establishment
-- ✅ Session management and callbacks
-- ✅ Bidirectional data forwarding
+- Nutrient solution calculations with EC/TDS management
+- Multi-user authentication
+- Grow journal: stories, timeline updates, media uploads (images + video)
+- Live story watch stream (bidirectional NPRPC stream)
+- Responsive web UI
 
 ## Quick Start
 
-### Prerequisites
-- CMake 3.20+
-- C++20 compatible compiler (GCC 11+, Clang 13+, MSVC 2022)
-- Node.js 16+ (for client build)
-- Qt 6+ (for proxy client)
-- OpenSSL
-- Boost 1.83+
-
-### Building the Project
+### 1. Build the Docker dev image
 
 ```bash
-# Clone and build
-git clone <repository-url>
-cd nscalc
-
-# Configure and build
-cmake -B .build_local -S . -DCMAKE_BUILD_TYPE=Debug
-cmake --build .build_local
-
-# Or use the convenience script
-./01_build_app.sh
+./scripts/build-dev-image.sh
 ```
 
-### Running the Server
+### 2. Generate RPC stubs (TypeScript + Swift)
 
 ```bash
-# Start the hydroponics calculator server
-./run.sh
-
-# For debugging
-./run.sh debug
+python3 scripts/gen_stubs.py
 ```
 
-The server will start on `https://archvm:8080` (or your configured hostname).
-
-### Building and Running Proxy Client
+### 3. Build the Swift server
 
 ```bash
-# Build proxy client
-cmake --build .build_local --target=proxy_client
-
-# Run proxy client (connects to server and starts SOCKS5 on port 1080)
-./.build_local/debug/proxy_client
+./scripts/build-swift-server.sh           # release
+./scripts/build-swift-server.sh --debug   # debug
+./scripts/build-swift-server.sh --no-gen  # skip stub generation
 ```
+
+### 4. Run locally
+
+```bash
+./scripts/run-swift-server.sh
+```
+
+The default URL is `https://localhost:8443`. Use `./scripts/run_chrome.sh` to
+open Chromium with the self-signed cert already bypassed.
 
 ## Project Structure
 
 ```
 nscalc/
-├── server/               # C++ backend server
-│   ├── src/
-│   │   ├── main.cpp     # Main server entry point
-│   │   ├── services/    # Business logic and services
-│   │   └── util/        # Utilities and thread pool
-├── client/              # React/Svelte frontend
-│   ├── src/
-│   │   ├── App.svelte   # Main application component
-│   │   ├── calculation/ # Calculation logic
-│   │   ├── gui/         # UI components
-│   │   └── rpc/         # RPC client code
-├── proxy_client/        # Qt SOCKS5 proxy client
+├── server/               # Swift server (NScalcServer)
+│   └── Sources/
+│       ├── NScalc/       # Generated NPRPC stubs
+│       └── NScalcServer/ # Business logic, HTTP handlers, grow-journal
+├── client/               # Svelte frontend
 │   └── src/
-│       ├── main.cpp     # Proxy client entry
-│       ├── socks5.cpp   # SOCKS5 implementation
-│       └── MainWindow.* # Qt GUI (if applicable)
-├── external/nprpc/   # NPRPC framework
-├── idl/                 # Interface definitions
-├── docs/                # Documentation
-├── certs/               # SSL certificates
-└── sample_data/         # Sample database
+│       ├── rpc/          # Generated NPRPC TypeScript stubs
+│       ├── lib/          # Shared components and RPC helpers
+│       └── view/         # Page-level Svelte components
+├── idl/                  # NPRPC interface definitions
+│   ├── nscalc.npidl      # Calculator interfaces
+│   └── grow_journal.npidl# Grow journal (stories, uploads, watch stream)
+├── external/nprpc/       # NPRPC framework (compiler + runtime)
+├── scripts/              # Dev and deployment scripts
+├── docker/               # Production Dockerfile and entrypoint
+├── certs/                # Development TLS certificates
+├── sample_data/          # Seed database and sample media
+└── docs/                 # Documentation
 ```
 
 ## Configuration
 
-### Server Configuration
+The server accepts command-line flags (and matching `NSCALC_*` env vars):
 
-The server accepts several command-line options:
-
-```bash
---hostname <host>        # Server hostname (default: localhost)
---port <port>           # Server port (default: 8080)
---http-dir <path>       # Static files directory
---data-dir <path>       # Database directory
---use-ssl <0|1>         # Enable SSL/TLS
---public-key <path>     # SSL certificate file
---private-key <path>    # SSL private key file
---dh-params <path>      # Diffie-Hellman parameters
+```
+--hostname <value>     Public hostname
+--port <value>         Port (default: 8443)
+--http-dir <path>      Static files root
+--data-dir <path>      SQLite database directory
+--use-ssl <0|1>        Enable TLS
+--enable-http3         Enable HTTP/3 (QUIC)
+--public-key <path>    TLS certificate file
+--private-key <path>   TLS private key file
+--dh-params <path>     Diffie-Hellman parameters
 ```
 
-### SSL Certificate Setup
+## Scripts
 
-For development with self-signed certificates:
+All dev and deployment scripts live in `scripts/`:
 
-1. **Linux/macOS**: Certificates are in `certs/` directory
-2. **Windows Testing**: See [Windows Certificate Setup Guide](docs/WINDOWS_CERTIFICATE_SETUP.md)
+| Script | Purpose |
+|--------|---------|
+| `build-dev-image.sh` | Build `nscalc-builder:latest` Docker image |
+| `build-swift-server.sh` | Generate stubs + build Swift server |
+| `run-swift-server.sh` | Run Swift server in Docker for local dev |
+| `run_chrome.sh` | Launch Chromium with self-signed cert bypass |
+| `gen_stubs.py` | Generate TS + Swift NPRPC stubs from IDL |
+| `package_prod.sh` | Build a production bundle tarball |
+| `deploy.sh` | Package + upload + restart container on VPS |
+| `smoke_prod.sh` | Smoke-test the production Docker image locally |
+| `collect_prod_diagnostics.sh` | Gather logs/coredumps from the production server |
+| `republish-journal-assets.sh` | Copy sample media into the client `dist/` |
+| `reset-dev-auth.sh` | Reset dev credentials in the local SQLite DB |
+| `docker-sourcekit-lsp.sh` | SourceKit-LSP bridge for VS Code Swift support |
 
-### Proxy Client Configuration
-
-The proxy client connects to the NSCalc server and establishes a SOCKS5 proxy on local port 1080. Configure your applications to use:
-- **Proxy Type**: SOCKS5
-- **Host**: 127.0.0.1
-- **Port**: 1080
-
-## API and RPC
-
-The application uses NPRPC (Nikita's Protocol RPC) for communication between client and server. Interface definitions are in the `idl/` directory:
-
-- `nscalc.npidl`: Main calculator interfaces
-- `proxy.npidl`: Proxy service interfaces
-- `grow_journal.npidl`: Draft grow-journal/story interfaces for uploads and processed media playback
-
-## Development
-
-### Building for Development
-
-```bash
-# Configure with debug symbols
-cmake -B .build_local -S . -DCMAKE_BUILD_TYPE=Debug -DOPT_NPRPC_SKIP_TESTS=ON
-
-# Build specific targets
-cmake --build .build_local --target=nscalc
-cmake --build .build_local --target=proxy_client
-```
-
-### Frontend Development
-
-```bash
-cd client
-npm install
-npm run dev    # Development server
-npm run build  # Production build
-```
-
-### Testing
-
-```bash
-# Test SOCKS5 functionality
-python test_socks5.py
-
-# HTTP stress testing
-cd server
-python http_stress_test.py
-```
-
-## Docker Support
-
-The project includes Docker support for containerized deployment:
-
-```bash
-# Build development image
-./00_build_docker_dev.sh
-
-# Build application
-./01_build_app.sh
-
-# Package runtime
-./02_pack_runtime.sh
-
-# Deploy
-./03_deploy.sh
-```
-
-### Swift Production Deployment
-
-The active web stack is the Swift server plus the built `client` frontend. For a VPS deployment, use the production bundle flow instead of the older C++ tarball scripts:
+## Production Deployment
 
 ```bash
 # Build a release bundle locally
-./package_prod.sh
+./scripts/package_prod.sh
 
-# Upload, build the official Swift slim runtime image on the server, and restart the container
-./deploy.sh \
-	--ssh debian@your-vps \
-	--hostname calc.example.com \
-	--cert-dir /etc/letsencrypt/live/calc.example.com \
-	--dh-params /certs/ssl-dhparams.pem \
-	--port 443
+# Upload, build the production image on the server, and restart the container
+./scripts/deploy.sh \
+    --ssh debian@your-vps \
+    --hostname calc.example.com \
+    --cert-dir /etc/letsencrypt/live/calc.example.com \
+    --dh-params /certs/ssl-dhparams.pem \
+    --port 443
 ```
 
-The production image is based on `swift:6.3.0-slim`. The deploy flow mounts persistent state from `/opt/nscalc/data` on the VPS and mounts the certificate directory read-only at `/certs` inside the container. The Swift server now accepts runtime flags and matching env vars for:
+The production image is based on `swift:6.3.0-slim`. State (SQLite database) is
+persisted from `/opt/nscalc/data` on the VPS; TLS certificates are mounted
+read-only from `--cert-dir`.
+
+## Development Tips
+
+### Reset local login credentials
 
 ```bash
---hostname <value>
---port <value>
---http-dir <path>
---data-dir <path>
---use-ssl <0|1>
---enable-http3
---public-key <path>
---private-key <path>
---dh-params <path>
+./scripts/reset-dev-auth.sh
 ```
 
-## Security Features
+Known dev logins after reset:
+- `superuser@nscalc.com` / `1234`
+- `guest@nscalc.com` / `3c2G4sc*vs2#1zf`
 
-- **TLS Encryption**: All communications encrypted with TLS 1.2+
-- **Authentication**: User authentication for calculator access
-- **Proxy Security**: SOCKS5 proxy tunneled over secure WebSockets
-- **Session Management**: Secure session handling and timeouts
+### VS Code Swift support
+
+SourceKit-LSP runs inside the `nscalc-builder` container so the host Swift
+toolchain version doesn't matter.  The path is already configured in
+`.vscode/settings.json` via `scripts/docker-sourcekit-lsp.sh`.
+
+### Regenerate NPRPC stubs after IDL changes
+
+```bash
+python3 scripts/gen_stubs.py          # both TS and Swift
+python3 scripts/gen_stubs.py --ts     # TypeScript only
+python3 scripts/gen_stubs.py --swift  # Swift only
+```
 
 ## Browser Compatibility
 
-- Chrome/Chromium 90+
-- Firefox 88+
-- Safari 14+
-- Edge 90+
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Certificate Warnings**: Install self-signed certificate in browser (see [Windows setup guide](docs/WINDOWS_CERTIFICATE_SETUP.md))
-2. **Build Failures**: Ensure all dependencies are installed and C++20 support is available
-3. **Local login stopped working**: Run `./reset-dev-auth.sh` to restore the seeded dev passwords in `sample_data/nscalc.db`.
-3. **Proxy Connection Issues**: Check firewall settings and ensure server is running with SSL enabled
-
-### Debug Mode
-
-Run the server in debug mode for detailed logging:
-
-```bash
-./run.sh debug
-```
-
-### Logs and Diagnostics
-
-- Server logs are output to console
-- Client logs available in browser developer tools
-- Proxy client logs to console/system tray
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+Chrome/Chromium 90+, Firefox 88+, Safari 14+, Edge 90+
 
 ## License
 
-This project is licensed under the terms specified in the [LICENSE](LICENSE) file.
-
-## Architecture Details
-
-### NPRPC Framework
-
-The project uses a custom RPC framework (NPRPC) that provides:
-- High-performance binary protocol
-- WebSocket transport
-- Automatic client/server stub generation
-- Thread-safe operations
-
-### Networking Stack
-
-- **HTTP/HTTPS**: Boost.Beast for web server functionality
-- **WebSockets**: Secure WebSocket connections for RPC
-- **SOCKS5**: RFC 1928 compliant SOCKS5 implementation
-- **SSL/TLS**: OpenSSL for encryption
-
-### Database
-
-- **Engine**: SQLite 3
-- **Schema**: See `database/create.sql`
-- **Sample Data**: Provided in `sample_data/`
-
-## Performance
-
-- **Concurrent Users**: Supports multiple simultaneous users
-- **Memory Usage**: Optimized for low memory footprint
-- **CPU Usage**: Multi-threaded design for efficient CPU utilization
-- **Network**: Optimized binary protocol reduces bandwidth usage
+See [LICENSE](LICENSE).
 
 ---
 
-**Project Status**: Active Development  
-**Last Updated**: June 2025  
-**Author**: Nikita (nikitapnn1@gmail.com)
+**Author:** Nikita (nikitapnn1@gmail.com)

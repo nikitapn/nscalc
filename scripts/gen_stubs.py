@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
 Generate NPRPC stubs for TypeScript and Swift from IDL files.
-Uses the nprpc-dev:latest Docker image which contains the npidl compiler.
+Uses the nscalc-builder:latest Docker image which contains the npidl compiler.
 
 Usage:
-    python3 gen_stubs.py          # generate both TS and Swift
-    python3 gen_stubs.py --ts     # generate TypeScript only
-    python3 gen_stubs.py --swift  # generate Swift only
+    python3 scripts/gen_stubs.py          # generate both TS and Swift
+    python3 scripts/gen_stubs.py --ts     # generate TypeScript only
+    python3 scripts/gen_stubs.py --swift  # generate Swift only
 """
 
 import subprocess
@@ -15,22 +15,19 @@ import os
 import argparse
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).parent.resolve()
-DOCKER_IMAGE = "nprpc-dev:latest"
+ROOT_DIR = Path(__file__).parent.parent.resolve()
+DOCKER_IMAGE = "nscalc-builder:latest"
 
-# IDL files for TypeScript (both modules are used by the TS client)
+# IDL files for TypeScript client
 TS_IDL_FILES = [
     "idl/nscalc.npidl",
-    # "idl/proxy.npidl",
-    "idl/grow_journal.npidl",  # draft contract, not wired into clients yet
+    "idl/grow_journal.npidl",
 ]
 
-# IDL files for Swift (server only implements the nscalc interface;
-#  proxy.npidl is for the Windows SOCKS5 relay client — add it if/when needed;
-#  grow_journal.npidl is still a draft contract)
+# IDL files for Swift server
 SWIFT_IDL_FILES = [
     "idl/nscalc.npidl",
-    "idl/grow_journal.npidl",  # draft contract, not wired into clients yet
+    "idl/grow_journal.npidl",
 ]
 
 # Output directories (relative to ROOT_DIR, mirrored as /app/... inside container)

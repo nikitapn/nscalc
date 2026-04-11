@@ -1,9 +1,10 @@
 #!/bin/bash
 
-SCRIPT_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")")
+SCRIPTS_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") 
+ROOT_DIR=$(dirname "$SCRIPTS_DIR")
 CHROMIUM_BIN="/usr/bin/chromium"
 HOST="localhost:8443"
-CERTIFICATE_PATH="$SCRIPT_DIR/certs/out/localhost.crt"
+CERTIFICATE_PATH="$ROOT_DIR/certs/out/localhost.crt"
 
 CERTIFICATE_SPKI=$(node <<EOF
 import fs from 'fs';
@@ -28,7 +29,7 @@ EOF
 echo "Certificate SPKI: $CERTIFICATE_SPKI"
 
 CMD=(
-  --user-data-dir=$SCRIPT_DIR/.chromium-data
+  --user-data-dir=$ROOT_DIR/.chromium-data
   --enable-quic
   --ignore-certificate-errors
   --ignore-certificate-errors-spki-list=${CERTIFICATE_SPKI}

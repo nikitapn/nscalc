@@ -8,7 +8,8 @@
 
 set -e
 
-ROOT_DIR=$(dirname $(readlink -e ${BASH_SOURCE[0]}))
+SCRIPTS_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") 
+ROOT_DIR=$(dirname "$SCRIPTS_DIR")
 DOCKER_IMAGE="nscalc-builder:latest"
 BUILD_CONFIG="release"
 HOSTNAME_ARG="localhost"
@@ -19,7 +20,7 @@ PUBLIC_KEY_ARG="/app/certs/out/localhost.crt"
 PRIVATE_KEY_ARG="/app/certs/out/localhost.key"
 DH_PARAMS_ARG=""
 
-HOST_JSON="$ROOT_DIR/client/public/host.json"
+HOST_JSON="$ROOT_DIR/client/dist/host.json"
 if [ -f "$HOST_JSON" ]; then
     _host=$(python3 -c "import json,sys; d=json.load(open('$HOST_JSON')); print(d.get('hostname','localhost'))" 2>/dev/null || true)
     _port=$(python3 -c "import json,sys; d=json.load(open('$HOST_JSON')); print(d.get('port',8443))" 2>/dev/null || true)
@@ -90,7 +91,7 @@ if [ ! -f "$ROOT_DIR/server/.build/$BUILD_CONFIG/NScalcServer" ]; then
 fi
 
 echo "Republishing journal assets into the HTTP root..."
-"$ROOT_DIR/republish-journal-assets.sh" "$ROOT_DIR/client/dist"
+"$SCRIPTS_DIR/republish-journal-assets.sh" "$ROOT_DIR/client/dist"
 
 echo "Starting NScalc Swift server ($BUILD_CONFIG) inside Docker..."
 echo "  Image   : $DOCKER_IMAGE"

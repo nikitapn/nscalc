@@ -2,7 +2,8 @@
 
 set -euo pipefail
 
-ROOT_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")")
+SCRIPTS_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") 
+ROOT_DIR=$(dirname "$SCRIPTS_DIR")
 BUNDLE_ROOT="$ROOT_DIR/runtime/prod_bundle"
 SYSTEM_LIB_ROOT="$BUNDLE_ROOT/bundle/runtime-libs/system/x86_64-linux-gnu"
 
@@ -13,7 +14,7 @@ mkdir -p \
     "$SYSTEM_LIB_ROOT" \
     "$BUNDLE_ROOT/docker"
 
-python3 "$ROOT_DIR/gen_stubs.py"
+python3 "$SCRIPTS_DIR/gen_stubs.py"
 
 docker run --rm \
   --user "$(id -u):$(id -g)" \
@@ -24,7 +25,7 @@ docker run --rm \
   swift build -c release
 
 (cd "$ROOT_DIR/client" && npm run build)
-"$ROOT_DIR/republish-journal-assets.sh" "$ROOT_DIR/client/dist"
+"$SCRIPTS_DIR/republish-journal-assets.sh" "$ROOT_DIR/client/dist"
 
 cp "$ROOT_DIR/server/.build/release/NScalcServer" "$BUNDLE_ROOT/bundle/app/NScalcServer"
 cp -a "$ROOT_DIR/client/dist" "$BUNDLE_ROOT/bundle/app/www"

@@ -18,7 +18,8 @@
 
 set -e
 
-ROOT_DIR=$(dirname $(readlink -e ${BASH_SOURCE[0]}))
+SCRIPTS_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") 
+ROOT_DIR=$(dirname "$SCRIPTS_DIR")
 DOCKER_IMAGE="nscalc-builder:latest"
 BUILD_CONFIG="release"
 SKIP_GEN=0
@@ -42,7 +43,7 @@ cd "$ROOT_DIR"
 # ---------------------------------------------------------------------------
 if [ "$SKIP_GEN" -eq 0 ]; then
   echo "=== Step 1: Generating stubs ==="
-  python3 gen_stubs.py
+  python3 "$SCRIPTS_DIR/gen_stubs.py"
   echo
 else
   echo "=== Step 1: Skipping stub generation (--no-gen) ==="

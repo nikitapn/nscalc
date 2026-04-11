@@ -2,7 +2,8 @@
 
 set -euo pipefail
 
-ROOT_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")")
+SCRIPTS_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") 
+ROOT_DIR=$(dirname "$SCRIPTS_DIR")
 DB_PATH="${1:-$ROOT_DIR/sample_data/nscalc.db}"
 
 if ! command -v sqlite3 >/dev/null 2>&1; then

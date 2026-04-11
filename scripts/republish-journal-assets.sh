@@ -2,7 +2,8 @@
 
 set -euo pipefail
 
-ROOT_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")")
+SCRIPTS_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") 
+ROOT_DIR=$(dirname "$SCRIPTS_DIR")
 MEDIA_ROOT="$ROOT_DIR/sample_data/grow_journal_media"
 PUBLIC_ROOT="${1:-$ROOT_DIR/client/dist}"
 ASSET_ROOT="$PUBLIC_ROOT/mock/journal/assets"

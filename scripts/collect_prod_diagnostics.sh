@@ -2,7 +2,8 @@
 
 set -euo pipefail
 
-ROOT_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")")
+SCRIPTS_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") 
+ROOT_DIR=$(dirname "$SCRIPTS_DIR")
 SSH_TARGET=""
 CONTAINER_NAME="nscalc-swift"
 OUTPUT_DIR=""

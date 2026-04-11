@@ -14,8 +14,8 @@
 #    we do NOT mount them from the host (the host copy may be the build-time
 #    variant that still has .target / nprpc_bridge.cpp).
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$SCRIPT_DIR"          # this script lives at the repo root
+SCRIPTS_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") 
+PROJECT_ROOT=$(dirname "$SCRIPTS_DIR")
 HOME_DIR="$HOME"
 IMAGE="nscalc-builder:latest"
 
