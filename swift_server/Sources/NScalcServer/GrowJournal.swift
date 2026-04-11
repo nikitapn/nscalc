@@ -303,7 +303,7 @@ final class GrowJournalStore: @unchecked Sendable {
         }
         broadcast(
             storyId: req.story_id,
-            event: StoryStreamServerEvent(story_id: req.story_id, update: update, media: nil, progress: nil)
+            event: StoryStreamServerEvent(story_id: req.story_id, payload: .update(update))
         )
         persistUpdate(update)
         if let detail = withLock({ stories[req.story_id]?.detail }) {
@@ -474,7 +474,7 @@ final class GrowJournalStore: @unchecked Sendable {
         lock.unlock()
         guard let token = pendingToken else { return }
         do {
-            let (progress, storyId, asset, videoJob) = try finishUpload(assetId: assetId, token: token)
+            let (_, storyId, asset, videoJob) = try finishUpload(assetId: assetId, token: token)
             // Re-persist the update so the DB reflects the finalized asset state
             // (AttachAsset may have persisted a stale snapshot before commit).
             if let updateId = withLock({ assetUpdateIds[assetId] }),
@@ -482,7 +482,7 @@ final class GrowJournalStore: @unchecked Sendable {
                 persistUpdate(update)
             }
             // Broadcast .Queued BEFORE queuing video so the client sees the correct ordering.
-            publish(storyId: storyId, event: StoryStreamServerEvent(story_id: storyId, update: nil, media: asset, progress: progress))
+            publish(storyId: storyId, event: StoryStreamServerEvent(story_id: storyId, payload: .media(asset)))
             if let videoJob {
                 gjlog("I", "queued video processing for asset \(assetId)")
                 queueVideoProcessing(videoJob)
@@ -506,7 +506,7 @@ final class GrowJournalStore: @unchecked Sendable {
         if streamDone {
             let (progress, storyId, asset, videoJob) = try finishUpload(assetId: assetId, token: token)
             // Broadcast .Queued BEFORE queuing video so the client sees the correct ordering.
-            publish(storyId: storyId, event: StoryStreamServerEvent(story_id: storyId, update: nil, media: asset, progress: progress))
+            publish(storyId: storyId, event: StoryStreamServerEvent(story_id: storyId, payload: .media(asset)))
             if let videoJob {
                 gjlog("I", "queued video processing for asset \(assetId)")
                 queueVideoProcessing(videoJob)
@@ -695,8 +695,10 @@ final class GrowJournalStore: @unchecked Sendable {
 
         broadcast(
             storyId: result.1,
-            event: StoryStreamServerEvent(story_id: result.1, update: result.0, media: result.2, progress: nil)
-        )
+            event: StoryStreamServerEvent(story_id: result.1, payload: .update(result.0)))
+        broadcast(
+            storyId: result.1,
+            event: StoryStreamServerEvent(story_id: result.1, payload: .media(result.2)))
         _ = withLock {
             attachedAssetIds.insert(assetId)
         }
@@ -1226,7 +1228,7 @@ final class GrowJournalStore: @unchecked Sendable {
                     if let requeuedAsset {
                         broadcast(
                             storyId: storyId,
-                            event: StoryStreamServerEvent(story_id: storyId, update: nil, media: requeuedAsset, progress: nil)
+                            event: StoryStreamServerEvent(story_id: storyId, payload: .media(requeuedAsset))
                         )
                     }
                     gjlog("I", "requeueing video asset \(asset.id) because processed files are missing")
@@ -1366,7 +1368,7 @@ final class GrowJournalStore: @unchecked Sendable {
             gjlog("I", "processing video asset \(job.assetId) status updated to Processing")
             broadcast(
                 storyId: job.storyId,
-                event: StoryStreamServerEvent(story_id: job.storyId, update: nil, media: processingAsset, progress: nil)
+                event: StoryStreamServerEvent(story_id: job.storyId, payload: .media(processingAsset))
             )
         }
 
@@ -1406,7 +1408,7 @@ final class GrowJournalStore: @unchecked Sendable {
                 gjlog("I", "processing video asset \(job.assetId) finished size=\(readyAsset.byte_size) poster=\(hasPoster)")
                 broadcast(
                     storyId: job.storyId,
-                    event: StoryStreamServerEvent(story_id: job.storyId, update: nil, media: readyAsset, progress: nil)
+                    event: StoryStreamServerEvent(story_id: job.storyId, payload: .media(readyAsset))
                 )
             }
         } catch {
@@ -1432,7 +1434,7 @@ final class GrowJournalStore: @unchecked Sendable {
             if let failedAsset {
                 broadcast(
                     storyId: job.storyId,
-                    event: StoryStreamServerEvent(story_id: job.storyId, update: nil, media: failedAsset, progress: nil)
+                    event: StoryStreamServerEvent(story_id: job.storyId, payload: .media(failedAsset))
                 )
             }
         }
@@ -1508,7 +1510,7 @@ final class GrowJournalStore: @unchecked Sendable {
         }
         broadcast(
             storyId: resolvedStoryId,
-            event: StoryStreamServerEvent(story_id: resolvedStoryId, update: nil, media: failedAsset, progress: nil)
+            event: StoryStreamServerEvent(story_id: resolvedStoryId, payload: .media(failedAsset))
         )
     }
 
@@ -1587,7 +1589,7 @@ final class UploadServiceServantImpl: UploadServiceServant, @unchecked Sendable 
                 }
                 store.publish(
                     storyId: storyId,
-                    event: StoryStreamServerEvent(story_id: storyId, update: nil, media: nil, progress: progress)
+                    event: StoryStreamServerEvent(story_id: storyId, payload: .progress(progress))
                 )
             }
         } catch {
@@ -1624,7 +1626,6 @@ final class StoryStreamServiceServantImpl: StoryStreamServiceServant, @unchecked
         }
 
         let watcherId = store.addWatcher(storyId: story_id, writer: stream.writer)
-        await stream.writer.write(StoryStreamServerEvent(story_id: story_id, update: nil, media: nil, progress: nil))
 
         do {
             for try await _ in stream.reader {

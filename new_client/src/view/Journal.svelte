@@ -768,34 +768,34 @@
   function applyStoryStreamEvent(expectedStoryId: bigint, event: StoryStreamServerEvent): void {
     const storyId = event.story_id ?? expectedStoryId;
 
-    if (event.progress) {
-      updateLocalUpload(event.progress.asset_id, {
-        bytesSent: event.progress.bytes_received,
-        status: "Uploading",
-      });
-    }
-
-    if (event.media) {
-      const localStatus = localUploadStatusFromMediaStatus(event.media.status);
-      if (localStatus) {
-        updateLocalUpload(event.media.id, { status: localStatus, bytesSent: event.media.byte_size });
-        if (localStatus === "Ready" || localStatus === "Failed") {
-          clearLocalUpload(event.media.id);
+    switch (event.payload.kind) {
+      case 'progress': {
+        const progress = event.payload.value;
+        updateLocalUpload(progress.asset_id, {
+          bytesSent: progress.bytes_received,
+          status: "Uploading",
+        });
+        break;
+      }
+      case 'media': {
+        const media = event.payload.value;
+        const localStatus = localUploadStatusFromMediaStatus(media.status);
+        if (localStatus) {
+          updateLocalUpload(media.id, { status: localStatus, bytesSent: media.byte_size });
+          if (localStatus === "Ready" || localStatus === "Failed") {
+            clearLocalUpload(media.id);
+          }
         }
+        applyMediaAsset(storyId, media);
+        if (selectedStory?.id === storyId && !selectedStory.cover_image_url && media.kind === MediaKind.Image) {
+          selectedStory = { ...selectedStory, cover_image_url: media.image_url };
+        }
+        break;
       }
-      applyMediaAsset(storyId, event.media);
-      if (selectedStory?.id === storyId && !selectedStory.cover_image_url && event.media.kind === MediaKind.Image) {
-        selectedStory = { ...selectedStory, cover_image_url: event.media.image_url };
+      case 'update': {
+        applyStoryUpdate(event.payload.value);
+        break;
       }
-    }
-
-    if (event.update) {
-      applyStoryUpdate(event.update);
-      return;
-    }
-
-    if (selectedStory?.id === storyId && event.media?.kind === MediaKind.Image && !selectedStory.cover_image_url) {
-      selectedStory = { ...selectedStory, cover_image_url: event.media.image_url };
     }
   }
 

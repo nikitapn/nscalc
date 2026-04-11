@@ -160,11 +160,15 @@ message StoryStreamClientEvent {
   typing_update_id?: u64;
 }
 
+alias StoryStreamPayload = one of {
+  update: StoryUpdate;
+  media: MediaAsset;
+  progress: UploadProgress;
+};
+
 message StoryStreamServerEvent {
   story_id?: u64;
-  update?: StoryUpdate;
-  media?: MediaAsset;
-  progress?: UploadProgress;
+  payload: StoryStreamPayload;
 }
 
 exception NotFound {
