@@ -37,8 +37,8 @@ exec docker run --rm -i \
   `# Tell Swift where to find the nprpc-swift pkg-config file` \
   -e PKG_CONFIG_PATH=/opt/nprpc/lib/pkgconfig \
   \
-  `# Work inside the swift_server sub-package so SPM resolution just works` \
-  -w "$PROJECT_ROOT/swift_server" \
+  `# Work inside the server sub-package so SPM resolution just works` \
+  -w "$PROJECT_ROOT/server" \
   \
   "$IMAGE" \
   /usr/bin/sourcekit-lsp

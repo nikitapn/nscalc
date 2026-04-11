@@ -48,21 +48,21 @@
       "type": "swift",
       "request": "launch",
       "args": [],
-      "cwd": "${workspaceFolder:nscalc}/swift_server",
-      "name": "Debug NScalcServer (swift_server)",
+      "cwd": "${workspaceFolder:nscalc}/server",
+      "name": "Debug NScalcServer (server)",
       "target": "NScalcServer",
       "configuration": "debug",
-      "preLaunchTask": "swift: Build Debug NScalcServer (swift_server)"
+      "preLaunchTask": "swift: Build Debug NScalcServer (server)"
     },
     {
       "type": "swift",
       "request": "launch",
       "args": [],
-      "cwd": "${workspaceFolder:nscalc}/swift_server",
-      "name": "Release NScalcServer (swift_server)",
+      "cwd": "${workspaceFolder:nscalc}/server",
+      "name": "Release NScalcServer (server)",
       "target": "NScalcServer",
       "configuration": "release",
-      "preLaunchTask": "swift: Build Release NScalcServer (swift_server)"
+      "preLaunchTask": "swift: Build Release NScalcServer (server)"
     }
   ],
   "inputs": [

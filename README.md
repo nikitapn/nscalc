@@ -200,7 +200,7 @@ The project includes Docker support for containerized deployment:
 
 ### Swift Production Deployment
 
-The active web stack is the Swift server plus the built `new_client` frontend. For a VPS deployment, use the production bundle flow instead of the older C++ tarball scripts:
+The active web stack is the Swift server plus the built `client` frontend. For a VPS deployment, use the production bundle flow instead of the older C++ tarball scripts:
 
 ```bash
 # Build a release bundle locally

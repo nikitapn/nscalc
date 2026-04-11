@@ -17,17 +17,17 @@ python3 "$ROOT_DIR/gen_stubs.py"
 
 docker run --rm \
   --user "$(id -u):$(id -g)" \
-  -v "$ROOT_DIR/swift_server":/app \
+  -v "$ROOT_DIR/server":/app \
   -v "$ROOT_DIR/certs":/app/certs:ro \
   -w /app \
   nscalc-builder:latest \
   swift build -c release
 
-(cd "$ROOT_DIR/new_client" && npm run build)
-"$ROOT_DIR/republish-journal-assets.sh" "$ROOT_DIR/new_client/dist"
+(cd "$ROOT_DIR/client" && npm run build)
+"$ROOT_DIR/republish-journal-assets.sh" "$ROOT_DIR/client/dist"
 
-cp "$ROOT_DIR/swift_server/.build/release/NScalcServer" "$BUNDLE_ROOT/bundle/app/NScalcServer"
-cp -a "$ROOT_DIR/new_client/dist" "$BUNDLE_ROOT/bundle/app/www"
+cp "$ROOT_DIR/server/.build/release/NScalcServer" "$BUNDLE_ROOT/bundle/app/NScalcServer"
+cp -a "$ROOT_DIR/client/dist" "$BUNDLE_ROOT/bundle/app/www"
 cp -a "$ROOT_DIR/sample_data" "$BUNDLE_ROOT/bundle/seed"
 cp "$ROOT_DIR/docker/Dockerfile.prod" "$BUNDLE_ROOT/docker/Dockerfile.prod"
 cp "$ROOT_DIR/docker/entrypoint.prod.sh" "$BUNDLE_ROOT/docker/entrypoint.prod.sh"

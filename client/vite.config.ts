@@ -5,7 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const srcDir = fileURLToPath(new URL('./src', import.meta.url))
-const rpcDir = fileURLToPath(new URL('../client/src/rpc', import.meta.url))
+const rpcDir = fileURLToPath(new URL('./src/rpc', import.meta.url))
 const nprpcEsm = fileURLToPath(new URL('../external/nprpc/nprpc_js/dist/index.esm.js', import.meta.url))
 const swiftProxyTarget = process.env.NSCALC_SWIFT_PROXY_TARGET ?? 'http://localhost:8443'
 

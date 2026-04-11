@@ -1,29 +1,28 @@
 {
-	"$schema": "https://json.schemastore.org/tsconfig",
-	"display": "Svelte",
-  "_version": "2.0.0",
-
-	"compilerOptions": {
-    "baseUrl": "src",
-		"moduleResolution": "node",
-		"target": "esnext",
-		"module": "esnext",
-		"types": ["node", "svelte"],
-		"esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-		"resolveJsonModule": true,
-		"isolatedModules": false,
-		"experimentalDecorators": true,
-		"outDir": "build",
-		"sourceMap": true,
-		//"noImplicitAny": true,
-		"jsx": "react",
-		"typeRoots": [
-			"node_modules/@types",
-			"./types/*"
-		]
-	},
-	"include": ["src/**/*"],
-	"exclude": ["node_modules/*", "__sapper__/*", "public/*"]
+  "extends": "@tsconfig/svelte/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "../client",
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "resolveJsonModule": true,
+    /**
+     * Typecheck JS in `.svelte` and `.js` files by default.
+     * Disable checkJs if you'd like to use dynamic types in JS.
+     * Note that setting allowJs false does not prevent the use
+     * of JS in `.svelte` files.
+     */
+    "allowJs": true,
+    "checkJs": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "paths": {
+      "@/*": ["../client/src/*"],
+      "@rpc/*": ["../client/src/rpc/*"],
+      "nprpc": ["../external/nprpc/nprpc_js/dist/index.d.ts"]
+    },
+    "typeRoots": ["../client/src"]
+  },
+  "include": ["../client/src/**/*.ts", "../client/src/**/*.d.ts", "../client/src/**/*.js", "../client/src/**/*.svelte"],
+  "references": [{ "path": "./tsconfig.node.json" }]
 }

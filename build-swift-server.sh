@@ -56,7 +56,7 @@ echo "=== Step 2: Building Swift server ($BUILD_CONFIG) ==="
 
 docker run --rm \
   --user "$(id -u):$(id -g)" \
-  -v "$ROOT_DIR/swift_server":/app \
+  -v "$ROOT_DIR/server":/app \
   -v "$ROOT_DIR/certs":/app/certs:ro \
   -w /app \
   "$DOCKER_IMAGE" \
@@ -64,4 +64,4 @@ docker run --rm \
 
 echo
 echo "Build complete."
-echo "Binary: swift_server/.build/$BUILD_CONFIG/NScalcServer"
+echo "Binary: server/.build/$BUILD_CONFIG/NScalcServer"

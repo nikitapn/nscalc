@@ -1,5 +1,3 @@
-#
-.cache
-.build
-src/idl
-external
+.build/
+.swiftpm/
+Sources/NScalc/*.swift

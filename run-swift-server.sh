@@ -81,16 +81,16 @@ EOF
     shift
 done
 
-BINARY="/app/swift_server/.build/$BUILD_CONFIG/NScalcServer"
+BINARY="/app/server/.build/$BUILD_CONFIG/NScalcServer"
 
-if [ ! -f "$ROOT_DIR/swift_server/.build/$BUILD_CONFIG/NScalcServer" ]; then
-    echo "Binary not found: swift_server/.build/$BUILD_CONFIG/NScalcServer"
+if [ ! -f "$ROOT_DIR/server/.build/$BUILD_CONFIG/NScalcServer" ]; then
+    echo "Binary not found: server/.build/$BUILD_CONFIG/NScalcServer"
     echo "Run ./build_swift_server.sh first."
     exit 1
 fi
 
 echo "Republishing journal assets into the HTTP root..."
-"$ROOT_DIR/republish-journal-assets.sh" "$ROOT_DIR/new_client/dist"
+"$ROOT_DIR/republish-journal-assets.sh" "$ROOT_DIR/client/dist"
 
 echo "Starting NScalc Swift server ($BUILD_CONFIG) inside Docker..."
 echo "  Image   : $DOCKER_IMAGE"
@@ -105,9 +105,9 @@ DOCKER_CMD=(
     --cap-add=BPF
 
     # Mount project sub-trees the server needs at runtime
-    -v "$ROOT_DIR/swift_server":/app/swift_server:ro
+    -v "$ROOT_DIR/server":/app/server:ro
     -v "$ROOT_DIR/certs":/app/certs:ro
-    -v "$ROOT_DIR/new_client/dist":/app/runtime/www  # rw — host.json lives here
+    -v "$ROOT_DIR/client/dist":/app/runtime/www  # rw — host.json lives here
     -v "$ROOT_DIR/sample_data":/app/sample_data      # rw — SQLite DB lives here
 
     # Expose the RPC/HTTP port
