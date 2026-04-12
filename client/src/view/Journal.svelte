@@ -3,6 +3,7 @@
   import { type binary } from "@rpc/grow_journal";
   import { onDestroy, onMount } from "svelte";
   import JournalVideoPlayer from "../lib/JournalVideoPlayer.svelte";
+  import type { JournalCopy, Locale } from "../lib/i18n";
   import { getJournalRpc } from "../lib/journalRpc";
   import {
     MediaKind,
@@ -26,10 +27,14 @@
     moderatorSessionId = null,
     canModerate = false,
     moderatorName = null,
+    locale = "en",
+    uiText,
   }: {
     moderatorSessionId?: string | null;
     canModerate?: boolean;
     moderatorName?: string | null;
+    locale?: Locale;
+    uiText: JournalCopy;
   } = $props();
 
   type StageFilter = "all" | keyof typeof StoryStage;
@@ -79,20 +84,20 @@
     reader: AsyncIterable<StoryStreamServerEvent> & { cancel(): void };
   };
 
-  const stageOptions: Array<{ label: string; value: StageFilter }> = [
-    { label: "All stages", value: "all" },
-    { label: "Planning", value: "Planning" },
-    { label: "Germination", value: "Germination" },
-    { label: "Vegetative", value: "Vegetative" },
-    { label: "Flowering", value: "Flowering" },
-    { label: "Harvest", value: "Harvest" },
-    { label: "Archived", value: "Archived" },
-  ];
-  const visibilityOptions: Array<{ label: string; value: VisibilityOption }> = [
-    { label: "Private", value: "Private" },
-    { label: "Unlisted", value: "Unlisted" },
-    { label: "Public", value: "Public" },
-  ];
+  const stageOptions = $derived.by<Array<{ label: string; value: StageFilter }>>(() => [
+    { label: uiText.labels.allStages, value: "all" },
+    { label: uiText.labels.stages.Planning, value: "Planning" },
+    { label: uiText.labels.stages.Germination, value: "Germination" },
+    { label: uiText.labels.stages.Vegetative, value: "Vegetative" },
+    { label: uiText.labels.stages.Flowering, value: "Flowering" },
+    { label: uiText.labels.stages.Harvest, value: "Harvest" },
+    { label: uiText.labels.stages.Archived, value: "Archived" },
+  ]);
+  const visibilityOptions = $derived.by<Array<{ label: string; value: VisibilityOption }>>(() => [
+    { label: uiText.labels.visibilities.Private, value: "Private" },
+    { label: uiText.labels.visibilities.Unlisted, value: "Unlisted" },
+    { label: uiText.labels.visibilities.Public, value: "Public" },
+  ]);
   const composerKinds: ComposerKind[] = ["Note", "Measurement", "PhotoSet", "Video"];
   const stageGradients = [
     "linear-gradient(135deg, rgba(24, 91, 136, 0.94), rgba(89, 168, 212, 0.72), rgba(223, 198, 126, 0.26))",
@@ -147,7 +152,7 @@
   const filteredStories = $derived.by(() => {
     const query = search.trim().toLowerCase();
     return stories.filter((story) => {
-      const matchesStage = stageFilter === "all" || stageName(story.stage) === stageFilter;
+      const matchesStage = stageFilter === "all" || stageKey(story.stage) === stageFilter;
       const haystack = `${story.title} ${story.crop_name} ${story.author_name} ${story.solution_name ?? ""}`.toLowerCase();
       return matchesStage && (query.length === 0 || haystack.includes(query));
     });
@@ -161,7 +166,7 @@
       .map(({ media, update }) => {
         attachedAssetIds.add(media.id);
         const localUpload = localUploads.find((upload) => upload.assetId === media.id);
-        const status = mediaStatusName(media.status);
+        const status = mediaStatusLabel(media.status);
         const progressPct = statusProgress(media.status);
         const detail = media.byte_size > 0
           ? `${formatBytes(media.byte_size)} • ${relativeTime(media.created_at)}`
@@ -171,7 +176,7 @@
         return {
           id: `${update.id}-${media.id}`,
           label: media.original_filename,
-          kind: mediaKindName(media.kind),
+          kind: mediaKindLabel(media.kind),
           status,
           progressPct,
           detail,
@@ -184,8 +189,8 @@
       .map((upload) => ({
         id: `local-${upload.assetId.toString()}`,
         label: upload.filename,
-        kind: mediaKindName(upload.kind),
-        status: upload.status,
+        kind: mediaKindLabel(upload.kind),
+        status: uiText.labels.mediaStatuses[upload.status],
         progressPct: localUploadProgressPct(upload),
         detail: upload.errorMessage ? upload.errorMessage : `${formatBytes(upload.totalBytes)} • ${upload.mimeType}`,
       }));
@@ -194,7 +199,7 @@
   });
 
   const summary = $derived.by(() => {
-    const pendingUploads = selectedUploads.filter((upload) => upload.status !== "Ready").length;
+    const pendingUploads = selectedUploads.filter((upload) => upload.status !== uiText.labels.mediaStatuses.Ready).length;
     return {
       stories: stories.length,
       updates: selectedUpdates.length,
@@ -209,11 +214,11 @@
 
     const latestMeasurement = selectedUpdates.find((update) => update.measurements);
     const stats = [
-      `${stageName(selectedStory.stage)} stage`,
+      stageLabel(selectedStory.stage),
       selectedStory.solution_name ? selectedStory.solution_name : null,
       latestMeasurement?.measurements?.ec !== undefined ? `EC ${latestMeasurement.measurements.ec.toFixed(2)}` : null,
       latestMeasurement?.measurements?.ph !== undefined ? `pH ${latestMeasurement.measurements.ph.toFixed(2)}` : null,
-      `${selectedUpdates.length} timeline entries`,
+      `${selectedUpdates.length} ${uiText.entries}`,
     ];
 
     return stats.filter((value): value is string => value !== null).slice(0, 4);
@@ -295,7 +300,7 @@
         clearSelectedStory();
       }
     } catch (error) {
-      loadingError = formatError(error, "Could not load journal stories.");
+      loadingError = formatError(error, uiText.couldNotLoadStories);
       storiesLoaded = true;
     }
   }
@@ -332,7 +337,7 @@
       if (requestId !== activeStoryRequest) {
         return;
       }
-      loadingError = formatError(error, "Could not load story details.");
+      loadingError = formatError(error, uiText.couldNotLoadStoryDetails);
       selectedStory = null;
       selectedUpdates = [];
       localUploads = [];
@@ -423,9 +428,9 @@
 
     openImageViewer({
       url: story.cover_image_url,
-      title: `${story.title} cover`,
+      title: `${story.title} ${uiText.cover.toLowerCase()}`,
       detail: `${story.crop_name} • ${story.author_name}`,
-      alt: `${story.title} cover`,
+      alt: `${story.title} ${uiText.cover.toLowerCase()}`,
     });
   }
 
@@ -472,11 +477,11 @@
       createStoryCrop = "";
       createStoryDescription = "";
       createStorySolutionId = "";
-      lastActionMessage = "Story created through the journal RPC service.";
+      lastActionMessage = uiText.storyCreated;
       await restartStoryWatch(createdStory.id);
       void refreshStoriesOnly();
     } catch (error) {
-      loadingError = formatError(error, "Could not create the story.");
+      loadingError = formatError(error, uiText.couldNotCreateStory);
     } finally {
       creatingStory = false;
     }
@@ -537,18 +542,18 @@
 
       if (uploadErrors.length === 0) {
         lastActionMessage = uploadBatches.length > 1
-          ? "Mixed media split into separate photo and video updates."
+          ? uiText.mixedMediaSplitMessage
           : uploadBatches.length === 1
-            ? "Update posted and media uploaded through the RPC stream path."
-            : "Update posted to the server mock.";
+            ? uiText.updatePostedUploaded
+            : uiText.updatePosted;
       } else {
         loadingError = uploadErrors.join(" ");
-        lastActionMessage = "Update posted, but one or more uploads failed.";
+        lastActionMessage = uiText.updatePostedFailedUploads;
       }
 
       void refreshStoriesOnly();
     } catch (error) {
-      loadingError = formatError(error, "Could not create the update.");
+      loadingError = formatError(error, uiText.couldNotCreateUpdate);
     } finally {
       submittingUpdate = false;
     }
@@ -561,7 +566,7 @@
     for (const file of files) {
       const descriptor = describeUploadFile(file);
       if (!descriptor) {
-        uploadErrors.push(`${file.name}: only image and video uploads are supported.`);
+        uploadErrors.push(`${file.name}: ${uiText.attachMedia.toLowerCase()} supports only image and video files.`);
         continue;
       }
 
@@ -583,7 +588,7 @@
         if (target) {
           updateLocalUpload(target.asset_id, {
             status: "Failed",
-            errorMessage: formatError(error, `${file.name}: upload failed.`),
+            errorMessage: formatError(error, `${file.name}: ${uiText.uploadFailed}.`),
           });
           try {
             const { uploads } = await getJournalRpc();
@@ -591,7 +596,7 @@
           } catch {
           }
         }
-        uploadErrors.push(`${file.name}: ${formatError(error, "upload failed")}`);
+        uploadErrors.push(`${file.name}: ${formatError(error, uiText.uploadFailed)}`);
       }
     }
 
@@ -633,7 +638,7 @@
 
         updateLocalUpload(target.asset_id, {
           status: "Uploading",
-          errorMessage: `Stream interrupted. Retrying upload (${attempt}/${uploadRetryLimit - 1})...`,
+          errorMessage: `${uiText.uploadRetrying} (${attempt}/${uploadRetryLimit - 1})...`,
         });
         await delay(Math.min(1000 * attempt, 4000));
       }
@@ -647,7 +652,7 @@
     }
 
     const confirmed = typeof window !== "undefined"
-      ? window.confirm(`Delete story \"${activeStory.title}\"? This removes its updates and media metadata.`)
+      ? window.confirm(`${uiText.confirmDeleteStory} "${activeStory.title}"?`)
       : true;
     if (!confirmed) {
       return;
@@ -665,22 +670,22 @@
       clearSelectedStory();
       stories = stories.filter((story) => story.id !== deletedId);
       await refreshStoriesOnly();
-      lastActionMessage = `${deletedTitle} was deleted by ${moderatorName ?? "the moderator"}.`;
+      lastActionMessage = `${deletedTitle} ${uiText.deletedByModeratorSuffix} ${moderatorName ?? uiText.moderatorFallback}.`;
     } catch (error) {
-      loadingError = formatError(error, "Could not delete the story.");
+      loadingError = formatError(error, uiText.couldNotDeleteStory);
     } finally {
       deletingStory = false;
     }
   }
 
   function prepareFollowUp(update: StoryUpdate): void {
-    const updateTitle = update.title?.trim() || "latest update";
+    const updateTitle = update.title?.trim() || uiText.latestUpdate;
 
     composerKind = "Note";
-    composerTitle = `Follow-up: ${updateTitle}`;
-    composerBody = `Follow-up to: ${updateTitle}\n\n`;
+    composerTitle = `${uiText.followUpPrefix} ${updateTitle}`;
+    composerBody = `${uiText.followUpBodyPrefix} ${updateTitle}\n\n`;
     loadingError = null;
-    lastActionMessage = `Drafted a follow-up note for ${updateTitle}.`;
+    lastActionMessage = `${uiText.draftedFollowUpFor} ${updateTitle}.`;
 
     composerPanel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     requestAnimationFrame(() => {
@@ -723,7 +728,7 @@
         return;
       }
       storyWatchState = "error";
-      storyWatchError = formatError(error, "Could not connect the story watch stream.");
+      storyWatchError = formatError(error, uiText.couldNotConnectLiveUpdates);
     }
   }
 
@@ -744,7 +749,7 @@
         return;
       }
       storyWatchState = "error";
-      storyWatchError = formatError(error, "Story watch stream disconnected.");
+      storyWatchError = formatError(error, uiText.liveUpdatesDisconnected);
     }
   }
 
@@ -1033,7 +1038,7 @@
     if (totalBatches <= 1) {
       return trimmedTitle;
     }
-    return `${trimmedTitle} (${kind === "Video" ? "Video" : "Photos"})`;
+    return `${trimmedTitle} (${kind === "Video" ? uiText.labels.mediaKinds.Video : uiText.labels.photos})`;
   }
 
   function buildSplitUpdateBody(body: string, title: string, kind: ComposerKind, batchIndex: number, totalBatches: number): string {
@@ -1043,7 +1048,7 @@
     }
 
     const trimmedTitle = title.trim();
-    const assetLabel = kind === "Video" ? "video" : "photo";
+    const assetLabel = kind === "Video" ? uiText.labels.video : uiText.labels.photo;
     if (trimmedTitle.length > 0) {
       return `Companion ${assetLabel} upload for "${trimmedTitle}".`;
     }
@@ -1053,38 +1058,58 @@
   function storyWatchLabel(): string {
     switch (storyWatchState) {
       case "live":
-        return "Watch stream live";
+        return uiText.liveUpdatesOn;
       case "connecting":
-        return "Connecting watch stream";
+        return uiText.liveUpdatesConnecting;
       case "error":
-        return "Watch stream error";
+        return uiText.liveUpdatesUnavailable;
       default:
-        return "Watch stream idle";
+        return uiText.liveUpdatesOff;
     }
   }
 
-  function stageName(stage: StoryStage): keyof typeof StoryStage {
+  function stageKey(stage: StoryStage): keyof typeof StoryStage {
     return StoryStage[stage] as keyof typeof StoryStage;
   }
 
-  function visibilityName(visibility: StoryVisibility): keyof typeof StoryVisibility {
+  function visibilityKey(visibility: StoryVisibility): keyof typeof StoryVisibility {
     return StoryVisibility[visibility] as keyof typeof StoryVisibility;
   }
 
-  function updateKindName(kind: UpdateKind): keyof typeof UpdateKind {
+  function updateKindKey(kind: UpdateKind): keyof typeof UpdateKind {
     return UpdateKind[kind] as keyof typeof UpdateKind;
   }
 
-  function mediaKindName(kind: MediaKind): keyof typeof MediaKind {
+  function mediaKindKey(kind: MediaKind): keyof typeof MediaKind {
     return MediaKind[kind] as keyof typeof MediaKind;
   }
 
-  function mediaStatusName(status: MediaStatus): keyof typeof MediaStatus {
+  function mediaStatusKey(status: MediaStatus): keyof typeof MediaStatus {
     return MediaStatus[status] as keyof typeof MediaStatus;
   }
 
+  function stageLabel(stage: StoryStage): string {
+    return uiText.labels.stages[stageKey(stage) as keyof typeof uiText.labels.stages];
+  }
+
+  function visibilityLabel(visibility: StoryVisibility): string {
+    return uiText.labels.visibilities[visibilityKey(visibility) as keyof typeof uiText.labels.visibilities];
+  }
+
+  function updateKindLabel(kind: UpdateKind): string {
+    return uiText.labels.updateKinds[updateKindKey(kind) as keyof typeof uiText.labels.updateKinds];
+  }
+
+  function mediaKindLabel(kind: MediaKind): string {
+    return uiText.labels.mediaKinds[mediaKindKey(kind) as keyof typeof uiText.labels.mediaKinds];
+  }
+
+  function mediaStatusLabel(status: MediaStatus): string {
+    return uiText.labels.mediaStatuses[mediaStatusKey(status) as keyof typeof uiText.labels.mediaStatuses];
+  }
+
   function stageBadge(stage: StoryStage): string {
-    switch (stageName(stage)) {
+    switch (stageKey(stage)) {
       case "Vegetative":
         return "bg-emerald-400/15 text-emerald-100 border-emerald-300/20";
       case "Flowering":
@@ -1099,7 +1124,7 @@
   }
 
   function updateBadge(kind: UpdateKind): string {
-    switch (updateKindName(kind)) {
+    switch (updateKindKey(kind)) {
       case "Measurement":
         return "bg-ocean-400/15 text-ocean-100 border-ocean-300/25";
       case "PhotoSet":
@@ -1113,13 +1138,13 @@
 
   function uploadTone(status: string): string {
     switch (status) {
-      case "Ready":
+      case uiText.labels.mediaStatuses.Ready:
         return "text-emerald-200";
-      case "Uploading":
+      case uiText.labels.mediaStatuses.Uploading:
         return "text-ocean-200";
-      case "Processing":
+      case uiText.labels.mediaStatuses.Processing:
         return "text-sand-100";
-      case "Queued":
+      case uiText.labels.mediaStatuses.Queued:
         return "text-ocean-100/80";
       default:
         return "text-rose-200";
@@ -1149,7 +1174,7 @@
   }
 
   function mediaLabel(filename: string, kind: MediaKind): string {
-    return kind === MediaKind.Video ? `Video: ${filename}` : filename;
+    return kind === MediaKind.Video ? `${uiText.labels.mediaKinds.Video}: ${filename}` : filename;
   }
 
   function measurementEntries(update: StoryUpdate): string[] {
@@ -1184,7 +1209,7 @@
       air_temperature_c: 24.7,
       humidity_pct: 60,
       water_level_pct: 72,
-      note: "Logged from the Svelte journal screen through the Swift mock RPC backend.",
+      note: uiText.loggedFromJournal,
     };
   }
 
@@ -1210,7 +1235,7 @@
     if (Number.isNaN(parsed.getTime())) {
       return timestamp;
     }
-    return new Intl.DateTimeFormat(undefined, {
+    return new Intl.DateTimeFormat(locale, {
       month: "short",
       day: "numeric",
       hour: "numeric",
@@ -1225,7 +1250,7 @@
     }
 
     const deltaSeconds = Math.round((parsed.getTime() - Date.now()) / 1000);
-    const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+    const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
     const units: Array<[Intl.RelativeTimeFormatUnit, number]> = [
       ["day", 60 * 60 * 24],
       ["hour", 60 * 60],
@@ -1277,22 +1302,22 @@
 <section class="relative space-y-5">
   <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
     <div class="max-w-3xl">
-      <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">Grow journal</p>
-      <h2 class="mt-2 text-2xl font-semibold text-white sm:text-3xl">Track a crop like a living story, not a pile of detached uploads.</h2>
-      <p class="mt-3 text-sm leading-6 text-ocean-100/80">This screen now talks to the Swift mock journal services end to end: story creation, timeline updates, live watch events, and browser media uploads all move through the generated NPRPC contract.</p>
+      <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">{uiText.heroEyebrow}</p>
+      <h2 class="mt-2 text-2xl font-semibold text-white sm:text-3xl">{uiText.heroTitle}</h2>
+      <p class="mt-3 text-sm leading-6 text-ocean-100/80">{uiText.heroBody}</p>
     </div>
 
     <div class="grid gap-3 sm:grid-cols-3 2xl:min-w-68">
       <div class="rounded-3xl border border-white/10 bg-black/20 px-4 py-3">
-        <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">Stories</p>
+        <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">{uiText.summaryStories}</p>
         <p class="mt-2 text-2xl font-semibold text-white">{summary.stories}</p>
       </div>
       <div class="rounded-3xl border border-white/10 bg-black/20 px-4 py-3">
-        <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">Updates</p>
+        <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">{uiText.summaryUpdates}</p>
         <p class="mt-2 text-2xl font-semibold text-white">{summary.updates}</p>
       </div>
       <div class="rounded-3xl border border-white/10 bg-black/20 px-4 py-3">
-        <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">Pending uploads</p>
+        <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">{uiText.summaryPendingUploads}</p>
         <p class="mt-2 text-2xl font-semibold text-white">{summary.pendingUploads}</p>
       </div>
     </div>
@@ -1308,12 +1333,12 @@
 
   <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_15rem]">
     <label class="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-ocean-300/80">
-      Search stories
-      <input bind:value={search} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none transition focus:border-ocean-300 focus:bg-black/30" placeholder="Basil, tomato, reservoir..." />
+      {uiText.searchStories}
+      <input bind:value={search} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none transition focus:border-ocean-300 focus:bg-black/30" placeholder={uiText.searchPlaceholder} />
     </label>
 
     <label class="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-ocean-300/80">
-      Stage
+      {uiText.stage}
       <select bind:value={stageFilter} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none transition focus:border-ocean-300 focus:bg-black/30">
         {#each stageOptions as stage}
           <option value={stage.value}>{stage.label}</option>
@@ -1325,24 +1350,24 @@
   <section class="rounded-[1.75rem] border border-white/10 bg-black/12 p-5 sm:p-6">
     <div class="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
       <div class="max-w-2xl">
-        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">Create story</p>
-        <p class="mt-2 text-sm leading-6 text-ocean-100/78">Start a new grow log directly against the server mock, then let the watch stream keep the selected story warm while updates and media arrive.</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">{uiText.createEyebrow}</p>
+        <p class="mt-2 text-sm leading-6 text-ocean-100/78">{uiText.createBody}</p>
       </div>
-      <button type="button" class="touch-target rounded-2xl bg-sand-200 px-4 text-sm font-semibold text-ocean-950 transition hover:bg-sand-100 disabled:cursor-not-allowed disabled:opacity-60" onclick={() => void submitStory()} disabled={creatingStory || !createStoryTitle.trim() || !createStoryCrop.trim() || !createStoryDescription.trim()}>{creatingStory ? "Creating..." : "Create RPC story"}</button>
+      <button type="button" class="touch-target rounded-2xl bg-sand-200 px-4 text-sm font-semibold text-ocean-950 transition hover:bg-sand-100 disabled:cursor-not-allowed disabled:opacity-60" onclick={() => void submitStory()} disabled={creatingStory || !createStoryTitle.trim() || !createStoryCrop.trim() || !createStoryDescription.trim()}>{creatingStory ? uiText.creatingAction : uiText.createAction}</button>
     </div>
 
     <div class="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
       <div class="grid gap-3 sm:grid-cols-2">
         <label class="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ocean-200/75">
-          Title
-          <input bind:value={createStoryTitle} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300" placeholder="Reservoir reset week 1" />
+          {uiText.title}
+          <input bind:value={createStoryTitle} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300" placeholder={uiText.titlePlaceholder} />
         </label>
         <label class="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ocean-200/75">
-          Crop
-          <input bind:value={createStoryCrop} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300" placeholder="Tomato, basil, lettuce..." />
+          {uiText.crop}
+          <input bind:value={createStoryCrop} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300" placeholder={uiText.cropPlaceholder} />
         </label>
         <label class="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ocean-200/75">
-          Visibility
+          {uiText.visibility}
           <select bind:value={createStoryVisibility} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300">
             {#each visibilityOptions as visibility}
               <option value={visibility.value}>{visibility.label}</option>
@@ -1350,13 +1375,13 @@
           </select>
         </label>
         <label class="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ocean-200/75">
-          Solution ID
-          <input bind:value={createStorySolutionId} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300" placeholder="Optional" />
+          {uiText.solutionId}
+          <input bind:value={createStorySolutionId} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300" placeholder={uiText.optional} />
         </label>
       </div>
 
       <label class="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ocean-200/75">
-        Description
+        {uiText.description}
         <textarea bind:value={createStoryDescription} class="min-h-32 rounded-3xl border border-white/10 bg-black/20 px-4 py-3 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300"></textarea>
       </label>
     </div>
@@ -1365,14 +1390,14 @@
   <div class="space-y-4">
     <aside class="rounded-[1.75rem] border border-white/10 bg-black/12 p-3 sm:p-4">
       <div class="mb-3 flex items-center justify-between text-sm text-ocean-100/70">
-        <span>{filteredStories.length} visible stories</span>
-        <span>{stories.length} total</span>
+        <span>{filteredStories.length} {uiText.visibleStories}</span>
+        <span>{stories.length} {uiText.total}</span>
       </div>
 
       {#if !storiesLoaded}
-        <div class="rounded-3xl border border-white/10 bg-black/18 px-4 py-5 text-sm text-ocean-100/75">Connecting to the Swift journal service...</div>
+        <div class="rounded-3xl border border-white/10 bg-black/18 px-4 py-5 text-sm text-ocean-100/75">{uiText.loadingStories}</div>
       {:else if filteredStories.length === 0}
-        <div class="rounded-3xl border border-white/10 bg-black/18 px-4 py-5 text-sm text-ocean-100/75">No stories match the current filter.</div>
+        <div class="rounded-3xl border border-white/10 bg-black/18 px-4 py-5 text-sm text-ocean-100/75">{uiText.noStoriesMatch}</div>
       {:else}
         <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
         {#each filteredStories as story}
@@ -1383,8 +1408,8 @@
           >
             <div class="h-28 px-4 py-4" style={`background:${storyGradient(story)}`}>
               <div class="flex items-start justify-between gap-3">
-                <span class={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] ${stageBadge(story.stage)}`}>{stageName(story.stage)}</span>
-                <span class="rounded-full bg-black/30 px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-white/80">{visibilityName(story.visibility)}</span>
+                <span class={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] ${stageBadge(story.stage)}`}>{stageLabel(story.stage)}</span>
+                <span class="rounded-full bg-black/30 px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-white/80">{visibilityLabel(story.visibility)}</span>
               </div>
             </div>
             <div class="space-y-3 px-4 py-4">
@@ -1393,7 +1418,7 @@
                 <p class="mt-1 text-sm text-ocean-100/75">{story.crop_name}</p>
               </div>
               <div class="flex flex-wrap gap-2 text-xs text-ocean-100/70">
-                <span class="rounded-full bg-white/6 px-2.5 py-1">{story.solution_name ?? "No solution linked"}</span>
+                <span class="rounded-full bg-white/6 px-2.5 py-1">{story.solution_name ?? uiText.noSolutionLinked}</span>
                 <span class="rounded-full bg-white/6 px-2.5 py-1">{relativeTime(story.updated_at)}</span>
               </div>
               <div class="flex items-center justify-between text-xs uppercase tracking-[0.18em] text-ocean-200/60">
@@ -1408,7 +1433,7 @@
     </aside>
     {#if storiesLoaded}
       <div class="rounded-[1.75rem] border border-dashed border-white/10 bg-black/8 p-6 text-sm text-ocean-100/72">
-        Tap any story card to open it in a focused modal view, similar to a gallery post. The inline story pane has been removed so the feed stays compact.
+        {uiText.storyCardHint}
       </div>
     {/if}
   </div>
@@ -1416,19 +1441,19 @@
   {#if selectedStory}
     <div use:portalToBody class="fixed inset-0 z-120 overflow-y-auto bg-black/72 px-3 py-3 backdrop-blur-sm sm:px-6 sm:py-6" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) clearSelectedStory(); }}>
       <div class="flex min-h-full items-stretch justify-center">
-      <div class="flex max-h-[calc(100vh-1.5rem)] w-full max-w-[min(96rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-4xl border border-white/12 bg-ocean-950/98 shadow-[0_28px_90px_rgba(0,0,0,0.5)] sm:max-h-[calc(100vh-3rem)] sm:max-w-[min(96rem,calc(100vw-3rem))]" role="dialog" aria-modal="true" aria-label={`Story details for ${selectedStory.title}`}>
+      <div class="flex max-h-[calc(100vh-1.5rem)] w-full max-w-[min(96rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-4xl border border-white/12 bg-ocean-950/98 shadow-[0_28px_90px_rgba(0,0,0,0.5)] sm:max-h-[calc(100vh-3rem)] sm:max-w-[min(96rem,calc(100vw-3rem))]" role="dialog" aria-modal="true" aria-label={`${uiText.storyModal}: ${selectedStory.title}`}>
         <div class="z-10 flex items-center justify-between gap-4 border-b border-white/10 bg-ocean-950 px-5 py-4 backdrop-blur xl:px-6">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-ocean-300">Story modal</p>
-            <p class="mt-1 text-sm text-ocean-100/75">{selectedStory.title} • {selectedUpdates.length} timeline entries</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-ocean-300">{uiText.storyModal}</p>
+            <p class="mt-1 text-sm text-ocean-100/75">{selectedStory.title} • {selectedUpdates.length} {uiText.entries}</p>
           </div>
           <div class="flex items-center gap-2">
             {#if canModerate && moderatorSessionId}
               <button type="button" class="touch-target rounded-2xl border border-rose-300/30 bg-rose-400/10 px-4 text-sm font-semibold text-rose-100 transition hover:bg-rose-400/18 disabled:cursor-not-allowed disabled:opacity-60" onclick={() => void deleteSelectedStory()} disabled={deletingStory}>
-                {deletingStory ? "Deleting..." : "Delete story"}
+                {deletingStory ? uiText.deletingStory : uiText.deleteStory}
               </button>
             {/if}
-            <button type="button" class="touch-target rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10" onclick={clearSelectedStory}>Close</button>
+            <button type="button" class="touch-target rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10" onclick={clearSelectedStory}>{uiText.close}</button>
           </div>
         </div>
 
@@ -1438,8 +1463,8 @@
               <div class="flex flex-wrap items-start justify-between gap-4">
                 <div class="max-w-3xl">
                   <div class="flex flex-wrap gap-2">
-                    <span class={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] ${stageBadge(selectedStory.stage)}`}>{stageName(selectedStory.stage)}</span>
-                    <span class="rounded-full bg-black/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/85">{visibilityName(selectedStory.visibility)}</span>
+                    <span class={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] ${stageBadge(selectedStory.stage)}`}>{stageLabel(selectedStory.stage)}</span>
+                    <span class="rounded-full bg-black/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/85">{visibilityLabel(selectedStory.visibility)}</span>
                     {#if selectedStory.solution_name}
                       <span class="rounded-full bg-black/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/85">{selectedStory.solution_name}</span>
                     {/if}
@@ -1451,36 +1476,36 @@
 
                 <div class="space-y-3">
                   <div class="rounded-3xl border border-white/15 bg-black/34 p-4 text-sm text-white/85">
-                    <p class="text-xs uppercase tracking-[0.22em] text-white/65">Cover</p>
+                    <p class="text-xs uppercase tracking-[0.22em] text-white/65">{uiText.cover}</p>
                     {#if selectedStory.cover_image_url}
                       <div class="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
                         <button type="button" class="group relative block w-full text-left" onclick={() => { const story = selectedStory; if (story) openCoverImage(story); }}>
-                          <img src={selectedStory.cover_image_url} alt={`${selectedStory.title} cover`} class="aspect-video w-full object-cover transition duration-200 group-hover:scale-[1.02]" />
+                          <img src={selectedStory.cover_image_url} alt={`${selectedStory.title} ${uiText.cover.toLowerCase()}`} class="aspect-video w-full object-cover transition duration-200 group-hover:scale-[1.02]" />
                           <div class="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(3,9,18,0.08),rgba(3,9,18,0.52))] opacity-0 transition group-hover:opacity-100"></div>
                           <div class="pointer-events-none absolute inset-x-3 bottom-3 flex items-center justify-between gap-3 rounded-2xl border border-white/12 bg-black/35 px-3 py-2 opacity-0 backdrop-blur-sm transition group-hover:opacity-100">
-                            <span class="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/82">Open full screen</span>
-                            <span class="text-[11px] uppercase tracking-[0.18em] text-ocean-200/72">Image</span>
+                            <span class="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/82">{uiText.openFullScreen}</span>
+                            <span class="text-[11px] uppercase tracking-[0.18em] text-ocean-200/72">{uiText.image}</span>
                           </div>
                         </button>
                       </div>
-                      <p class="mt-3 max-w-52 text-xs leading-5 text-white/68">The story cover updates from attached image assets and video posters.</p>
+                      <p class="mt-3 max-w-52 text-xs leading-5 text-white/68">{uiText.coverHelp}</p>
                     {:else}
-                      <p class="mt-2 max-w-52 leading-6">No cover image yet. Attach one through the upload service and it will surface here.</p>
+                      <p class="mt-2 max-w-52 leading-6">{uiText.noCoverImage}</p>
                     {/if}
                   </div>
                   <div class="rounded-3xl border border-white/15 bg-black/34 p-4 text-sm text-white/85">
-                    <p class="text-xs uppercase tracking-[0.22em] text-white/65">Live watch</p>
+                    <p class="text-xs uppercase tracking-[0.22em] text-white/65">{uiText.liveWatch}</p>
                     <p class="mt-2 font-semibold">{storyWatchLabel()}</p>
-                    <p class="mt-1 text-xs leading-5 text-white/70">The selected story keeps an open bidi stream so update creation, upload progress, and asset attachment can surface without a manual reload.</p>
+                    <p class="mt-1 text-xs leading-5 text-white/70">{uiText.liveWatchHelp}</p>
                     {#if storyWatchError}
                       <p class="mt-2 text-xs text-rose-200">{storyWatchError}</p>
                     {/if}
                   </div>
                   {#if canModerate}
                     <div class="rounded-3xl border border-white/15 bg-black/34 p-4 text-sm text-white/85">
-                      <p class="text-xs uppercase tracking-[0.22em] text-white/65">Moderator</p>
-                      <p class="mt-2 font-semibold">{moderatorName ?? "Moderator"}</p>
-                      <p class="mt-1 text-xs leading-5 text-white/70">Delete removes the story, its timeline entries, and journal media metadata. Published files are cleaned up on the server.</p>
+                      <p class="text-xs uppercase tracking-[0.22em] text-white/65">{uiText.moderator}</p>
+                      <p class="mt-2 font-semibold">{moderatorName ?? uiText.moderatorFallback}</p>
+                      <p class="mt-1 text-xs leading-5 text-white/70">{uiText.moderatorHelp}</p>
                     </div>
                   {/if}
                 </div>
@@ -1489,16 +1514,16 @@
 
             <div class="grid gap-3 border-t border-white/10 bg-black/26 px-5 py-4 sm:grid-cols-3 sm:px-6">
               <div class="rounded-3xl bg-black/34 px-4 py-3">
-                <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">Created</p>
+                <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">{uiText.created}</p>
                 <p class="mt-2 text-lg font-semibold text-white">{formatTimestamp(selectedStory.created_at)}</p>
               </div>
               <div class="rounded-3xl bg-black/34 px-4 py-3">
-                <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">Last update</p>
+                <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">{uiText.lastUpdate}</p>
                 <p class="mt-2 text-lg font-semibold text-white">{relativeTime(selectedStory.updated_at)}</p>
               </div>
               <div class="rounded-3xl bg-black/34 px-4 py-3">
-                <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">Timeline depth</p>
-                <p class="mt-2 text-lg font-semibold text-white">{selectedUpdates.length} entries</p>
+                <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">{uiText.timelineDepth}</p>
+                <p class="mt-2 text-lg font-semibold text-white">{selectedUpdates.length} {uiText.entries}</p>
               </div>
             </div>
           </section>
@@ -1506,7 +1531,7 @@
           <div class="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_20rem]">
             <section class="space-y-4">
               {#if loadingStory}
-                <div class="rounded-[1.75rem] border border-white/10 bg-black/12 px-5 py-6 text-sm text-ocean-100/75">Loading story timeline...</div>
+                <div class="rounded-[1.75rem] border border-white/10 bg-black/12 px-5 py-6 text-sm text-ocean-100/75">{uiText.loadingStoryTimeline}</div>
               {/if}
 
               {#each selectedUpdates as update}
@@ -1514,19 +1539,19 @@
                 <div class="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <div class="flex flex-wrap items-center gap-2">
-                      <span class={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] ${updateBadge(update.kind)}`}>{updateKindName(update.kind)}</span>
+                      <span class={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] ${updateBadge(update.kind)}`}>{updateKindLabel(update.kind)}</span>
                       <span class="text-xs uppercase tracking-[0.18em] text-ocean-200/60">{relativeTime(update.created_at)}</span>
                     </div>
-                    <h4 class="mt-3 text-xl font-semibold text-white">{update.title ?? "Untitled update"}</h4>
+                    <h4 class="mt-3 text-xl font-semibold text-white">{update.title ?? uiText.untitledUpdate}</h4>
                     <p class="mt-1 text-sm uppercase tracking-[0.18em] text-ocean-200/60">{update.author_name}</p>
                   </div>
-                  <button type="button" class="touch-target rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10" onclick={() => prepareFollowUp(update)}>Follow up</button>
+                  <button type="button" class="touch-target rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10" onclick={() => prepareFollowUp(update)}>{uiText.followUp}</button>
                 </div>
 
                 {#if update.body.trim().length > 0}
                   <p class="mt-4 text-sm leading-7 text-ocean-50/90">{update.body}</p>
                 {:else}
-                  <p class="mt-4 text-sm italic leading-7 text-ocean-100/55">Media-only entry.</p>
+                  <p class="mt-4 text-sm italic leading-7 text-ocean-100/55">{uiText.mediaOnlyEntry}</p>
                 {/if}
 
                 {#if measurementEntries(update).length > 0}
@@ -1562,26 +1587,26 @@
                           {/if}
                           <div class="flex h-full flex-col justify-between gap-3">
                             <div class="flex items-start justify-between gap-3">
-                              <span class="rounded-full bg-black/28 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/85">{mediaKindName(media.kind)}</span>
-                              <span class={`text-xs font-semibold uppercase tracking-[0.18em] ${uploadTone(mediaStatusName(media.status))}`}>{mediaStatusName(media.status)}</span>
+                              <span class="rounded-full bg-black/28 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/85">{mediaKindLabel(media.kind)}</span>
+                              <span class={`text-xs font-semibold uppercase tracking-[0.18em] ${uploadTone(mediaStatusLabel(media.status))}`}>{mediaStatusLabel(media.status)}</span>
                             </div>
 
                             {#if media.kind === MediaKind.Image && media.image_url}
                               <div class="flex items-end justify-between gap-3">
-                                <p class="max-w-48 text-sm font-medium text-white/82">Tap the preview to inspect the full image without leaving the story timeline.</p>
+                                <p class="max-w-48 text-sm font-medium text-white/82">{uiText.tapPreview}</p>
                                 <button type="button" class="rounded-full bg-white/14 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/20" onclick={() => openMediaGallery(media)}>
-                                  Open image
+                                  {uiText.openImage}
                                 </button>
                               </div>
                             {:else if canPlayVideo(media)}
                               <div class="flex items-end justify-between gap-3">
-                                <p class="max-w-48 text-sm font-medium text-white/82">Adaptive DASH is ready for playback.</p>
+                                <p class="max-w-48 text-sm font-medium text-white/82">{uiText.adaptiveReady}</p>
                                 <button type="button" class="rounded-full bg-white/14 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/20" onclick={() => openMediaGallery(media)}>
-                                  Play video
+                                  {uiText.playVideo}
                                 </button>
                               </div>
                             {:else if media.kind === MediaKind.Video}
-                              <p class="max-w-52 text-sm text-white/78">Video processing will unlock adaptive playback here as soon as the stream is ready.</p>
+                              <p class="max-w-52 text-sm text-white/78">{uiText.adaptivePending}</p>
                             {/if}
                           </div>
                         </div>
@@ -1606,7 +1631,7 @@
 
             <aside class="space-y-4">
               <section class="rounded-[1.75rem] border border-white/10 bg-black/12 p-5">
-                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">Upload queue</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">{uiText.uploadQueue}</p>
                 {#if selectedUploads.length > 0}
                   <div class="mt-4 space-y-3">
                   {#each selectedUploads as upload}
@@ -1621,17 +1646,17 @@
                       <div class="mt-3 h-2 rounded-full bg-white/8">
                         <div class="h-full rounded-full bg-ocean-300" style={`width:${upload.progressPct}%`}></div>
                       </div>
-                      <p class="mt-2 text-xs text-ocean-100/70">{upload.progressPct}% complete</p>
+                      <p class="mt-2 text-xs text-ocean-100/70">{upload.progressPct}% {uiText.percentComplete}</p>
                     </div>
                   {/each}
                   </div>
                 {:else}
-                  <p class="mt-4 text-sm text-ocean-100/75">No upload activity yet. Pick files in the composer below and they will stream through the upload RPC, report progress here, then attach back onto the selected story.</p>
+                  <p class="mt-4 text-sm text-ocean-100/75">{uiText.noUploadActivity}</p>
                 {/if}
               </section>
 
               <section class="rounded-[1.75rem] border border-white/10 bg-black/12 p-5">
-                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">Story direction</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">{uiText.storyDirection}</p>
                 <div class="mt-4 flex flex-wrap gap-2 text-sm text-ocean-100/80">
                   {#each storyDirection as stat}
                     <span class="rounded-full border border-white/10 bg-white/6 px-3 py-1.5">{stat}</span>
@@ -1644,14 +1669,14 @@
           <section bind:this={composerPanel} class="rounded-[1.75rem] border border-white/10 bg-black/12 p-5">
             <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div class="max-w-3xl">
-                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">Quick compose</p>
-                <p class="mt-3 text-sm leading-6 text-ocean-100/72">Posting creates the update first, then image and video files stream in chunks through the upload service and attach to that update. Text is optional when media is attached.</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">{uiText.quickCompose}</p>
+                <p class="mt-3 text-sm leading-6 text-ocean-100/72">{uiText.quickComposeHelp}</p>
               </div>
-              <p class="text-xs uppercase tracking-[0.18em] text-ocean-200/60">Click outside, press Esc, or use Close to dismiss the story.</p>
+              <p class="text-xs uppercase tracking-[0.18em] text-ocean-200/60">{uiText.dismissStoryHint}</p>
             </div>
             <div class="mt-4 grid gap-4 xl:grid-cols-[14rem_minmax(0,1fr)_minmax(18rem,0.9fr)]">
               <label class="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ocean-200/75">
-                Entry type
+                {uiText.entryType}
                 <select bind:value={composerKind} disabled={composerFiles.length > 0} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300 disabled:cursor-not-allowed disabled:opacity-60">
                   {#each composerKinds as kind}
                     <option value={kind}>{kind}</option>
@@ -1660,9 +1685,9 @@
                 {#if composerFiles.length > 0}
                   <p class="text-[11px] font-medium normal-case tracking-normal text-ocean-100/65">
                     {#if hasMixedComposerMedia}
-                      Mixed media will be split into separate PhotoSet and Video updates.
+                      {uiText.mixedMediaHint}
                     {:else}
-                      Auto-set to {effectiveComposerKind} from the attached media.
+                      {uiText.autoSetHintPrefix} {uiText.labels.updateKinds[effectiveComposerKind]}.
                     {/if}
                   </p>
                 {/if}
@@ -1670,18 +1695,18 @@
 
               <div class="space-y-3">
                 <label class="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ocean-200/75">
-                  Title
+                  {uiText.title}
                   <input bind:value={composerTitle} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300" />
                 </label>
                 <label class="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ocean-200/75">
-                  Body
-                  <textarea bind:this={composerBodyInput} bind:value={composerBody} class="min-h-36 rounded-3xl border border-white/10 bg-black/20 px-4 py-3 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300" placeholder="Optional if you are only attaching media."></textarea>
+                  {uiText.body}
+                  <textarea bind:this={composerBodyInput} bind:value={composerBody} class="min-h-36 rounded-3xl border border-white/10 bg-black/20 px-4 py-3 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300" placeholder={uiText.bodyPlaceholder}></textarea>
                 </label>
               </div>
 
               <div class="space-y-3">
                 <label class="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ocean-200/75">
-                  Attach media
+                  {uiText.attachMedia}
                   <input bind:this={composerFileInput} type="file" multiple accept="image/*,video/*" class="block w-full cursor-pointer rounded-2xl border border-dashed border-white/15 bg-black/20 px-4 py-3 text-sm font-normal normal-case tracking-normal text-ocean-100 file:mr-4 file:rounded-xl file:border-0 file:bg-sand-200 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-ocean-950" onchange={handleComposerFiles} />
                 </label>
                 {#if composerFiles.length > 0}
@@ -1690,14 +1715,14 @@
                       <div class="flex items-start justify-between gap-3 rounded-2xl border border-white/10 bg-black/18 px-4 py-3 text-sm text-ocean-100/82">
                         <div>
                           <p class="font-semibold text-white">{file.name}</p>
-                          <p class="mt-1 text-xs uppercase tracking-[0.16em] text-ocean-200/60">{describeUploadFile(file)?.kind === MediaKind.Video ? "Video" : "Image"} • {formatBytes(BigInt(file.size))}</p>
+                          <p class="mt-1 text-xs uppercase tracking-[0.16em] text-ocean-200/60">{describeUploadFile(file)?.kind === MediaKind.Video ? uiText.labels.mediaKinds.Video : uiText.labels.mediaKinds.Image} • {formatBytes(BigInt(file.size))}</p>
                         </div>
-                        <button type="button" class="rounded-xl border border-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white transition hover:bg-white/8" onclick={() => removeComposerFile(index)}>Remove</button>
+                        <button type="button" class="rounded-xl border border-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white transition hover:bg-white/8" onclick={() => removeComposerFile(index)}>{uiText.remove}</button>
                       </div>
                     {/each}
                   </div>
                 {/if}
-                <button type="button" class="touch-target w-full rounded-2xl bg-sand-200 px-4 text-sm font-semibold text-ocean-950 transition hover:bg-sand-100 disabled:cursor-not-allowed disabled:opacity-60" onclick={() => void submitUpdate()} disabled={submittingUpdate || !canSubmitUpdate}>{submittingUpdate ? "Posting..." : hasMixedComposerMedia ? "Post split media updates" : composerFiles.length > 0 ? `Post ${effectiveComposerKind} update and upload media` : `Post ${effectiveComposerKind} RPC update`}</button>
+                <button type="button" class="touch-target w-full rounded-2xl bg-sand-200 px-4 text-sm font-semibold text-ocean-950 transition hover:bg-sand-100 disabled:cursor-not-allowed disabled:opacity-60" onclick={() => void submitUpdate()} disabled={submittingUpdate || !canSubmitUpdate}>{submittingUpdate ? uiText.posting : hasMixedComposerMedia ? uiText.postSplitMediaUpdates : composerFiles.length > 0 ? `${uiText.labels.updateKinds[effectiveComposerKind]}: ${uiText.postUpdateAndUploadSuffix}` : `${uiText.labels.updateKinds[effectiveComposerKind]}: ${uiText.postUpdateSuffix}`}</button>
               </div>
             </div>
           </section>
@@ -1713,7 +1738,7 @@
         <div class="flex max-h-[calc(100vh-1.5rem)] w-full max-w-6xl flex-col overflow-hidden rounded-4xl border border-white/10 bg-ocean-950/96 shadow-[0_36px_120px_rgba(0,0,0,0.58)] sm:max-h-[calc(100vh-3rem)]">
           <div class="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.22em] text-ocean-300/75">Story media</p>
+              <p class="text-xs font-semibold uppercase tracking-[0.22em] text-ocean-300/75">{uiText.storyMedia}</p>
               <h4 class="mt-2 text-xl font-semibold text-white">{activeGalleryItem.title}</h4>
               <p class="mt-1 text-sm text-ocean-100/68">{activeGalleryItem.detail}</p>
             </div>
@@ -1722,24 +1747,24 @@
                 <span class="hidden rounded-full border border-white/10 bg-white/6 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-ocean-100/72 sm:inline-flex">{(activeGalleryIndex ?? 0) + 1} / {galleryMediaItems.length}</span>
               {/if}
               <button type="button" class="rounded-full border border-white/12 bg-white/8 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/12" onclick={() => activeGalleryIndex = null}>
-                Close
+                {uiText.close}
               </button>
             </div>
           </div>
 
           <div class="relative min-h-0 overflow-y-auto">
             {#if galleryMediaItems.length > 1}
-              <button type="button" class="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/14 bg-black/35 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-black/48 sm:left-5" onclick={() => stepGallery(-1)} aria-label="Previous media">
-                Prev
+              <button type="button" class="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/14 bg-black/35 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-black/48 sm:left-5" onclick={() => stepGallery(-1)} aria-label={uiText.previousMediaAria}>
+                {uiText.previous}
               </button>
-              <button type="button" class="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/14 bg-black/35 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-black/48 sm:right-5" onclick={() => stepGallery(1)} aria-label="Next media">
-                Next
+              <button type="button" class="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/14 bg-black/35 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-black/48 sm:right-5" onclick={() => stepGallery(1)} aria-label={uiText.nextMediaAria}>
+                {uiText.next}
               </button>
             {/if}
 
             {#if activeGalleryItem.media.kind === MediaKind.Video}
               <div class="min-h-0 overflow-y-auto p-4 sm:p-6">
-                <JournalVideoPlayer assetId={activeGalleryItem.media.id} title={activeGalleryItem.media.original_filename} posterUrl={activeGalleryItem.media.poster_url} />
+                <JournalVideoPlayer assetId={activeGalleryItem.media.id} title={activeGalleryItem.media.original_filename} posterUrl={activeGalleryItem.media.poster_url} strings={uiText.videoPlayer} />
               </div>
             {:else}
               <div class="flex max-h-[calc(100vh-9rem)] items-center justify-center bg-[radial-gradient(circle_at_top,rgba(60,168,244,0.12),transparent_36%),linear-gradient(180deg,rgba(4,10,20,0.88),rgba(4,10,20,0.96))] p-3 sm:p-6">
@@ -1758,12 +1783,12 @@
           <div class="flex w-full max-w-6xl flex-col overflow-hidden rounded-4xl border border-white/10 bg-ocean-950/96 shadow-[0_36px_120px_rgba(0,0,0,0.58)]">
             <div class="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6">
               <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-ocean-300/75">Image viewer</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-ocean-300/75">{uiText.imageViewer}</p>
                 <h4 class="mt-2 text-xl font-semibold text-white">{activeImageViewer.title}</h4>
                 <p class="mt-1 text-sm text-ocean-100/68">{activeImageViewer.detail}</p>
               </div>
               <button type="button" class="rounded-full border border-white/12 bg-white/8 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/12" onclick={() => activeImageViewer = null}>
-                Close
+                {uiText.close}
               </button>
             </div>
 

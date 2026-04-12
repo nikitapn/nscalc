@@ -3,17 +3,21 @@
   import { onMount } from "svelte";
   import Solution from "./Solution.svelte";
   import Virtual from "./Virtual.svelte";
+  import type { SolutionsCopy } from "../lib/i18n";
   import { elementOrder, type ElementKey } from "../lib/calculatorEngine";
   import { solutionCardFromRpc, type SolutionCardData } from "../lib/catalogData";
   import { invalidateSolutionsCatalogCache, listSolutionsPageCached } from "../lib/catalogRpcCache";
   import { getSolutionsViewState, setSolutionsViewState } from "../lib/catalogViewState";
 
-  type Props = {
+  let {
+    currentUserName = null,
+    currentUser = null,
+    uiText,
+  }: {
     currentUserName?: string | null;
     currentUser?: nscalc.RegisteredUser | null;
-  };
-
-  let { currentUserName = null, currentUser = null }: Props = $props();
+    uiText: SolutionsCopy;
+  } = $props();
 
   const initialState = getSolutionsViewState();
 
@@ -224,7 +228,7 @@
     if (!currentUser) {
       solutionErrorById = {
         ...solutionErrorById,
-        [solution.id]: "Log in again before editing solutions.",
+        [solution.id]: uiText.errors.loginBeforeEdit,
       };
       return;
     }
@@ -233,7 +237,7 @@
     if (!nextName) {
       solutionErrorById = {
         ...solutionErrorById,
-        [solution.id]: "Enter a solution name.",
+        [solution.id]: uiText.errors.enterName,
       };
       return;
     }
@@ -244,7 +248,7 @@
     } catch (error) {
       solutionErrorById = {
         ...solutionErrorById,
-        [solution.id]: error instanceof Error ? error.message : "Invalid solution elements.",
+        [solution.id]: error instanceof Error ? error.message : uiText.errors.invalidElements,
       };
       return;
     }
@@ -259,7 +263,7 @@
     };
     solutionMessageById = {
       ...solutionMessageById,
-      [solution.id]: "Saving solution...",
+      [solution.id]: uiText.messages.saving,
     };
 
     try {
@@ -281,19 +285,19 @@
       editingSolutionId = editingSolutionId === solution.id ? null : editingSolutionId;
       solutionMessageById = {
         ...solutionMessageById,
-        [solution.id]: "Solution saved.",
+        [solution.id]: uiText.messages.saved,
       };
       statusMessage = null;
     } catch (error) {
       if (error instanceof nscalc.PermissionViolation) {
         solutionErrorById = {
           ...solutionErrorById,
-          [solution.id]: error.msg || "You can only edit your own solutions.",
+          [solution.id]: error.msg || uiText.errors.ownOnlyEdit,
         };
       } else {
         solutionErrorById = {
           ...solutionErrorById,
-          [solution.id]: error instanceof Error ? error.message : "Failed to save solution.",
+          [solution.id]: error instanceof Error ? error.message : uiText.errors.failedSave,
         };
       }
       solutionMessageById = {
@@ -310,10 +314,10 @@
 
   async function deleteSolution(solution: SolutionCardData): Promise<void> {
     if (!currentUser) {
-      errorMessage = "Log in again before deleting solutions.";
+      errorMessage = uiText.errors.loginBeforeDelete;
       return;
     }
-    if (!window.confirm(`Delete solution \"${solution.name}\"?`)) {
+    if (!window.confirm(uiText.confirmDelete(solution.name))) {
       return;
     }
 
@@ -333,12 +337,12 @@
       invalidateSolutionsCatalogCache();
       await refreshVisibleSolutions();
       editingSolutionId = editingSolutionId === solution.id ? null : editingSolutionId;
-      statusMessage = "Solution deleted.";
+      statusMessage = uiText.messages.deleted;
     } catch (error) {
       if (error instanceof nscalc.PermissionViolation) {
-        errorMessage = error.msg || "You can only delete your own solutions.";
+        errorMessage = error.msg || uiText.errors.ownOnlyDelete;
       } else {
-        errorMessage = error instanceof Error ? error.message : "Failed to delete solution.";
+        errorMessage = error instanceof Error ? error.message : uiText.errors.failedDelete;
       }
     } finally {
       solutionBusyById = {
@@ -350,13 +354,13 @@
 
   async function createSolution(): Promise<void> {
     if (!currentUser) {
-      createError = "Log in before creating solutions.";
+      createError = uiText.errors.loginBeforeCreate;
       return;
     }
 
     const nextName = createName.trim();
     if (!nextName) {
-      createError = "Enter a solution name.";
+      createError = uiText.errors.enterName;
       return;
     }
 
@@ -364,13 +368,13 @@
     try {
       parsedElements = parseElementDraft(createElementDraft);
     } catch (error) {
-      createError = error instanceof Error ? error.message : "Invalid solution elements.";
+      createError = error instanceof Error ? error.message : uiText.errors.invalidElements;
       return;
     }
 
     createBusy = true;
     createError = null;
-    createMessage = "Creating solution...";
+    createMessage = uiText.messages.creating;
     statusMessage = null;
 
     try {
@@ -380,10 +384,10 @@
       createName = "";
       createElementDraft = makeElementDraft();
       createPanelOpen = false;
-      createMessage = "Solution created.";
+      createMessage = uiText.messages.created;
       statusMessage = null;
     } catch (error) {
-      createError = error instanceof Error ? error.message : "Failed to create solution.";
+      createError = error instanceof Error ? error.message : uiText.errors.failedCreate;
       createMessage = null;
     } finally {
       createBusy = false;
@@ -408,7 +412,7 @@
       }
       solutions = [];
       nextCursor = null;
-      errorMessage = error instanceof Error ? error.message : "Failed to load solutions.";
+      errorMessage = error instanceof Error ? error.message : uiText.errors.failedLoad;
     } finally {
       if (requestId === activeRequest) {
         loadingInitial = false;
@@ -435,7 +439,7 @@
       if (requestId !== activeRequest) {
         return;
       }
-      errorMessage = error instanceof Error ? error.message : "Failed to load more solutions.";
+      errorMessage = error instanceof Error ? error.message : uiText.errors.failedLoadMore;
     } finally {
       if (requestId === activeRequest) {
         loadingMore = false;
@@ -447,39 +451,39 @@
 <section class="space-y-5">
   <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
     <div>
-      <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">Solution library</p>
-      <h2 class="mt-2 text-2xl font-semibold text-white sm:text-3xl">Scroll comfortably on phones without losing density on desktop.</h2>
+      <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">{uiText.heroEyebrow}</p>
+      <h2 class="mt-2 text-2xl font-semibold text-white sm:text-3xl">{uiText.heroTitle}</h2>
     </div>
     <div class="flex flex-wrap items-center gap-3 text-sm text-ocean-100/75">
-      <span class="rounded-full bg-white/6 px-3 py-1.5">{visibleSolutions.length} loaded</span>
-      <span class="rounded-full bg-white/6 px-3 py-1.5">{nextCursor ? "More available" : "End of results"}</span>
+      <span class="rounded-full bg-white/6 px-3 py-1.5">{uiText.loadedCount(visibleSolutions.length)}</span>
+      <span class="rounded-full bg-white/6 px-3 py-1.5">{nextCursor ? uiText.moreAvailable : uiText.endOfResults}</span>
     </div>
   </div>
 
   <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_14rem]">
     <label class="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-ocean-300/80">
-      Search by name
-      <input bind:value={search} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none transition focus:border-ocean-300 focus:bg-black/30" placeholder="Calcium, cucumber, bloom..." />
+      {uiText.searchByName}
+      <input bind:value={search} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none transition focus:border-ocean-300 focus:bg-black/30" placeholder={uiText.searchPlaceholder} />
     </label>
 
     <label class="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-ocean-300/80">
-      Author
-      <input bind:value={author} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none transition focus:border-ocean-300 focus:bg-black/30" placeholder="superuser, guest..." />
+      {uiText.author}
+      <input bind:value={author} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none transition focus:border-ocean-300 focus:bg-black/30" placeholder={uiText.authorPlaceholder} />
     </label>
   </div>
 
   <div class="rounded-[1.75rem] border border-white/10 bg-black/10 p-4 sm:p-5">
     <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-ocean-300/75">Create solution</p>
-        <p class="mt-1 text-sm text-ocean-100/70">Build a new solution card directly from the shelf and save it to the backend.</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-ocean-300/75">{uiText.createEyebrow}</p>
+        <p class="mt-1 text-sm text-ocean-100/70">{uiText.createBody}</p>
       </div>
       <div class="flex items-center gap-3">
         {#if !currentUser}
-          <p class="text-sm text-ocean-100/65">Log in to create or edit your own solutions.</p>
+          <p class="text-sm text-ocean-100/65">{uiText.loginHint}</p>
         {/if}
         <button type="button" class="touch-target rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10 disabled:opacity-60" onclick={toggleCreatePanel} disabled={!currentUser || createBusy}>
-          {createPanelOpen ? "Hide form" : "New solution"}
+          {createPanelOpen ? uiText.hideForm : uiText.newSolution}
         </button>
       </div>
     </div>
@@ -491,12 +495,12 @@
     {#if createPanelOpen}
       <div class="mt-4 grid gap-3">
         <label class="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-ocean-300/80">
-          Solution name
-          <input bind:value={createName} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none transition focus:border-ocean-300 focus:bg-black/30 disabled:opacity-60" placeholder="Bloom target week 3" disabled={!currentUser || createBusy} />
+          {uiText.createName}
+          <input bind:value={createName} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none transition focus:border-ocean-300 focus:bg-black/30 disabled:opacity-60" placeholder={uiText.createNamePlaceholder} disabled={!currentUser || createBusy} />
         </label>
 
         <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.22em] text-ocean-300/75">Elements</p>
+          <p class="text-xs font-semibold uppercase tracking-[0.22em] text-ocean-300/75">{uiText.elements}</p>
           <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {#each elementOrder as key}
               <label class="flex flex-col gap-1 rounded-2xl bg-black/20 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-ocean-100/65">
@@ -509,7 +513,7 @@
 
         <div class="flex flex-wrap gap-2">
           <button type="button" class="touch-target rounded-2xl bg-sand-200 px-4 text-sm font-semibold text-ocean-950 transition hover:bg-sand-100 disabled:cursor-not-allowed disabled:opacity-60" onclick={() => void createSolution()} disabled={!currentUser || createBusy}>
-            {createBusy ? "Creating..." : "Create solution"}
+            {createBusy ? uiText.creating : uiText.createAction}
           </button>
         </div>
 
@@ -527,9 +531,9 @@
   {/if}
 
   {#if loadingInitial}
-    <div class="rounded-[1.75rem] border border-white/10 bg-black/10 px-4 py-10 text-sm text-ocean-100/75">Loading solutions from the RPC catalog...</div>
+    <div class="rounded-[1.75rem] border border-white/10 bg-black/10 px-4 py-10 text-sm text-ocean-100/75">{uiText.loading}</div>
   {:else if visibleSolutions.length === 0}
-    <div class="rounded-[1.75rem] border border-white/10 bg-black/10 px-4 py-10 text-sm text-ocean-100/75">No solutions match the current filters.</div>
+    <div class="rounded-[1.75rem] border border-white/10 bg-black/10 px-4 py-10 text-sm text-ocean-100/75">{uiText.noMatches}</div>
   {:else}
     <Virtual
       items={visibleSolutions}
@@ -552,6 +556,7 @@
           busy={solutionBusyById[solution.id] ?? false}
           errorMessage={solutionErrorById[solution.id] ?? null}
           successMessage={solutionMessageById[solution.id] ?? null}
+          uiText={uiText.card}
           onBeginEdit={() => beginEdit(solution)}
           onCancelEdit={() => cancelEdit(solution)}
           onDelete={() => void deleteSolution(solution)}
@@ -564,7 +569,7 @@
 
     <div class="flex justify-center pt-1">
       <button type="button" class="touch-target rounded-2xl border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60" onclick={() => void loadMoreSolutions()} disabled={!nextCursor || loadingMore}>
-        {loadingMore ? "Loading more..." : nextCursor ? "Load more solutions" : "All solutions loaded"}
+        {loadingMore ? uiText.loadingMore : nextCursor ? uiText.loadMore : uiText.allLoaded}
       </button>
     </div>
   {/if}

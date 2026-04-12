@@ -2,6 +2,7 @@
   import * as NPRPC from "nprpc";
   import * as nscalc from "@rpc/nscalc";
   import { onMount } from "svelte";
+  import type { CalculatorCopy } from "../lib/i18n";
   import type { Calculation as RpcCalculation, Fertilizer as RpcFertilizer, Solution as RpcSolution } from "@rpc/nscalc";
   import {
     computeElementsFromDoses,
@@ -19,10 +20,6 @@
   import { getNscalcRpc } from "../lib/nscalcRpc";
   import { getCalculatorBootstrapCached, listFertilizersPageCached, listSolutionsPageCached } from "../lib/catalogRpcCache";
 
-  type Props = {
-    currentUser?: nscalc.RegisteredUser | null;
-  };
-
   type SelectedFertilizer = {
     fertilizerId: number;
     gramsPerLiter: number;
@@ -38,9 +35,15 @@
   const featuredElements: ElementKey[] = ["NO3", "NH4", "P", "K", "Ca", "Mg"];
   const traceElements: ElementKey[] = ["S", "Cl", "Fe", "Zn", "B", "Mn", "Cu", "Mo"];
 
-  let { currentUser = null }: Props = $props();
+  let {
+    currentUser = null,
+    uiText,
+  }: {
+    currentUser?: nscalc.RegisteredUser | null;
+    uiText: CalculatorCopy;
+  } = $props();
 
-  let calculationName = $state("New Calculation");
+  let calculationName = $state(uiText.fallbackNames.defaultCalculation);
   let activeCalculationId = $state<number | null>(null);
   let savedCalculations = $state<RpcCalculation[]>([]);
   let loadingCalculations = $state(false);
@@ -282,7 +285,7 @@
   }
 
   function createCalculationName(): string {
-    return selectedSolution?.name ?? "New Calculation";
+    return selectedSolution?.name ?? uiText.fallbackNames.defaultCalculation;
   }
 
   function resetDraftCalculation(): void {
@@ -292,9 +295,9 @@
     volumeLiters = 40;
     selectedFertilizers = [];
     calculatorMode = "auto";
-    solverMessage = "Pick fertilizers to let the engine solve the dose set.";
+    solverMessage = uiText.messages.pickFertilizers;
     calculationError = null;
-    calculationMessage = currentUser ? "New calculation draft ready." : "Guest calculations are read-only. Sign in to save your own draft.";
+    calculationMessage = currentUser ? uiText.messages.draftReady : uiText.messages.guestDraftReadonly;
   }
 
   function parseStoredElements(elementsJSON: string): SolutionElements {
@@ -338,7 +341,7 @@
     const fertilizerIds = parseStoredFertilizerIds(record.fertilizersIds);
 
     activeCalculationId = record.id;
-    calculationName = record.name || "Saved calculation";
+    calculationName = record.name || uiText.fallbackNames.savedCalculation;
     targetElements = storedElements;
     selectedSolutionId = findMatchingSolutionId(storedElements);
     volumeLiters = Number.isFinite(record.volume) && record.volume > 0 ? record.volume : 40;
@@ -349,10 +352,10 @@
       if (fertilizerIds.length > 0) {
         solveSelectedDoses();
         if (record.mode) {
-          solverMessage = "Saved calculation restored. Doses were recomputed from the stored fertilizer set.";
+          solverMessage = uiText.messages.savedRestored;
         }
       } else {
-        solverMessage = "Calculation loaded. Pick fertilizers to solve a new recipe.";
+        solverMessage = uiText.messages.calculationLoaded;
       }
     });
   }
@@ -392,19 +395,19 @@
         if (selectedCalculation) {
           applyCalculation(selectedCalculation);
         }
-      } else if (activeCalculationId !== null || calculationName === "New Calculation") {
+      } else if (activeCalculationId !== null || calculationName === uiText.fallbackNames.defaultCalculation) {
         resetDraftCalculation();
       }
 
       calculationMessage = currentUser
         ? calculations.length > 0
-          ? `Loaded ${calculations.length} saved calculation${calculations.length === 1 ? "" : "s"}.`
-          : "No saved calculations yet."
+          ? uiText.loadedSavedCalculations(calculations.length)
+          : uiText.messages.noSaved
         : calculations.length > 0
-          ? `Loaded ${calculations.length} guest calculation${calculations.length === 1 ? "" : "s"}.`
-          : "No guest calculations are available.";
+          ? uiText.loadedGuestCalculations(calculations.length)
+          : uiText.messages.noGuest;
     } catch (error) {
-      calculationError = error instanceof Error ? error.message : "Failed to load calculations.";
+      calculationError = error instanceof Error ? error.message : uiText.errors.failedLoadCalculations;
     } finally {
       loadingCalculations = false;
     }
@@ -419,7 +422,7 @@
     const record = savedCalculations.find((item) => item.id === Number(value));
     if (record) {
       applyCalculation(record);
-      calculationMessage = `Loaded ${record.name}.`;
+      calculationMessage = uiText.loadedCalculation(record.name);
       calculationError = null;
     }
   }
@@ -440,7 +443,7 @@
 
   async function saveCalculation(): Promise<void> {
     if (!currentUser) {
-      calculationMessage = "Sign in to save calculations.";
+      calculationMessage = uiText.messages.signInSave;
       return;
     }
 
@@ -450,9 +453,9 @@
     try {
       const savedId = await currentUser.UpdateCalculation(serializeCalculation());
       await loadCalculations(savedId);
-      calculationMessage = "Calculation saved.";
+      calculationMessage = uiText.messages.saved;
     } catch (error) {
-      calculationError = error instanceof Error ? error.message : "Failed to save calculation.";
+      calculationError = error instanceof Error ? error.message : uiText.errors.failedSaveCalculation;
     } finally {
       savingCalculation = false;
     }
@@ -460,7 +463,7 @@
 
   async function deleteCalculation(): Promise<void> {
     if (!currentUser || activeCalculationId === null) {
-      calculationMessage = !currentUser ? "Sign in to delete saved calculations." : "Select a saved calculation to delete.";
+      calculationMessage = !currentUser ? uiText.messages.signInDelete : uiText.messages.selectSavedToDelete;
       return;
     }
 
@@ -471,9 +474,9 @@
       await currentUser.DeleteCalculation(activeCalculationId);
       activeCalculationId = null;
       await loadCalculations(null);
-      calculationMessage = "Calculation deleted.";
+      calculationMessage = uiText.messages.deleted;
     } catch (error) {
-      calculationError = error instanceof Error ? error.message : "Failed to delete calculation.";
+      calculationError = error instanceof Error ? error.message : uiText.errors.failedDeleteCalculation;
     } finally {
       deletingCalculation = false;
     }
@@ -504,7 +507,7 @@
   function updateDose(fertilizerId: number, gramsPerLiterText: string): void {
     const gramsPerLiter = Number.parseFloat(gramsPerLiterText);
     calculatorMode = "manual";
-    solverMessage = "Manual tweak mode. Use Auto-solve doses to return to the engine output.";
+    solverMessage = uiText.messages.manualTweak;
     selectedFertilizers = selectedFertilizers.map((entry) => {
       if (entry.fertilizerId !== fertilizerId) {
         return entry;
@@ -524,13 +527,13 @@
 
   function solveSelectedDoses(): void {
     if (elementOrder.every((key) => (targetElements[key] ?? 0) === 0)) {
-      solverMessage = "Load a solution target before solving doses.";
+      solverMessage = uiText.messages.loadTargetBeforeSolve;
       return;
     }
 
     if (selectedFertilizerRows.length === 0) {
       calculatorMode = "auto";
-      solverMessage = "Pick fertilizers to let the engine solve the dose set.";
+      solverMessage = uiText.messages.pickFertilizers;
       return;
     }
 
@@ -540,7 +543,7 @@
       gramsPerLiter: roundDose(solveResult.doses[index] ?? 0),
     }));
     calculatorMode = "auto";
-    solverMessage = `Engine solved ${selectedFertilizerRows.length} fertilizer inputs with residual ${solveResult.residual.toFixed(1)}.`;
+    solverMessage = uiText.engineSolved(selectedFertilizerRows.length, solveResult.residual);
   }
 
   function suggestedDoseFor(fertilizerId: number): number {
@@ -575,7 +578,7 @@
   }
 
   function bottleLabel(bottle: nscalc.FertilizerBottle): string {
-    return bottle === nscalc.FertilizerBottle.A ? "Tank A" : bottle === nscalc.FertilizerBottle.B ? "Tank B" : "Tank C";
+    return bottle === nscalc.FertilizerBottle.A ? uiText.bottleLabels.A : bottle === nscalc.FertilizerBottle.B ? uiText.bottleLabels.B : uiText.bottleLabels.C;
   }
 
   function bottleBadgeClass(bottle: nscalc.FertilizerBottle | null | undefined): string {
@@ -622,14 +625,14 @@
 
   async function savePdf(): Promise<void> {
     if (!selectedSolution || selectedFertilizerRows.length === 0) {
-      solverMessage = "Pick a target and at least one fertilizer before exporting a PDF.";
+      solverMessage = uiText.errors.exportRequiresTarget;
       return;
     }
 
     exportBusy = true;
     try {
       const report = {
-        solutionName: calculationName.trim() || selectedSolution?.name || "Custom calculation",
+        solutionName: calculationName.trim() || selectedSolution?.name || uiText.fallbackNames.customCalculation,
         volumeLiters,
         rows: selectedFertilizerRows.map((row) => ({
           name: row.fertilizer.name,
@@ -650,10 +653,10 @@
         ratio: mixRatio,
         estimatedCost,
       };
-      await saveCalculatorReportPdf(report, `${(calculationName.trim() || selectedSolution?.name || "custom-calculation").replace(/\s+/g, "-")}-recipe.pdf`);
-      solverMessage = "PDF report downloaded.";
+      await saveCalculatorReportPdf(report, `${(calculationName.trim() || selectedSolution?.name || uiText.fallbackNames.customCalculationFile).replace(/\s+/g, "-")}-recipe.pdf`);
+      solverMessage = uiText.messages.pdfDownloaded;
     } catch (error) {
-      solverMessage = error instanceof Error ? error.message : "Failed to generate PDF report.";
+      solverMessage = error instanceof Error ? error.message : uiText.errors.failedExportPdf;
     } finally {
       exportBusy = false;
     }
@@ -685,8 +688,8 @@
         queueMicrotask(() => solveSelectedDoses());
       }
     } catch (error) {
-      catalogError = error instanceof Error ? error.message : "Failed to load calculator bootstrap data.";
-      solverMessage = "Calculator catalog data could not be loaded from the RPC backend.";
+      catalogError = error instanceof Error ? error.message : uiText.errors.failedBootstrap;
+      solverMessage = uiText.messages.catalogLoadFailed;
     } finally {
       loadingBootstrap = false;
     }
@@ -720,7 +723,7 @@
       if (requestId !== solutionRequestToken) {
         return;
       }
-      catalogError = error instanceof Error ? error.message : "Failed to search solutions.";
+      catalogError = error instanceof Error ? error.message : uiText.errors.failedSearchSolutions;
     } finally {
       if (requestId === solutionRequestToken) {
         loadingSolutionSearch = false;
@@ -757,7 +760,7 @@
       if (requestId !== fertilizerRequestToken) {
         return;
       }
-      catalogError = error instanceof Error ? error.message : "Failed to search fertilizers.";
+      catalogError = error instanceof Error ? error.message : uiText.errors.failedSearchFertilizers;
     } finally {
       if (requestId === fertilizerRequestToken) {
         loadingFertilizerSearch = false;
@@ -785,26 +788,26 @@
 <section class="space-y-5">
   <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
     <div class="max-w-3xl">
-      <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">Calculator cockpit</p>
-      <h2 class="mt-2 text-2xl font-semibold text-white sm:text-3xl">Build a recipe from target solution numbers instead of staring at migration notes.</h2>
-      <p class="mt-3 text-sm leading-6 text-ocean-100/80">The calculator now boots from frequently used solutions and fertilizers fetched over RPC, then expands into cursor-paged search when you need something outside the default shelf.</p>
+      <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">{uiText.heroEyebrow}</p>
+      <h2 class="mt-2 text-2xl font-semibold text-white sm:text-3xl">{uiText.heroTitle}</h2>
+      <p class="mt-3 text-sm leading-6 text-ocean-100/80">{uiText.heroBody}</p>
     </div>
 
     <div class="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
       <div class="rounded-3xl border border-white/10 bg-black/20 px-4 py-3">
-        <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">Target NH4 %</p>
+        <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">{uiText.summaryTargetNh4}</p>
         <p class="mt-2 text-2xl font-semibold text-white">{targetRatio.nh4Percent.toFixed(1)}</p>
       </div>
       <div class="rounded-3xl border border-white/10 bg-black/20 px-4 py-3">
-        <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">Mix NH4 %</p>
+        <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">{uiText.summaryMixNh4}</p>
         <p class="mt-2 text-2xl font-semibold text-white">{mixRatio.nh4Percent.toFixed(1)}</p>
       </div>
       <div class="rounded-3xl border border-white/10 bg-black/20 px-4 py-3">
-        <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">Mix EC</p>
+        <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">{uiText.summaryMixEc}</p>
         <p class="mt-2 text-2xl font-semibold text-white">{estimatedEc.toFixed(2)}</p>
       </div>
       <div class="rounded-3xl border border-white/10 bg-black/20 px-4 py-3">
-        <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">Residual</p>
+        <p class="text-xs uppercase tracking-[0.22em] text-ocean-300/70">{uiText.summaryResidual}</p>
         <p class="mt-2 text-2xl font-semibold text-white">{solverResidual.toFixed(1)}</p>
       </div>
     </div>
@@ -813,30 +816,30 @@
   <div class="grid gap-4 2xl:grid-cols-[minmax(19rem,24rem)_minmax(0,1fr)] 2xl:items-start">
     <aside class="space-y-4">
       <section class="rounded-[1.75rem] border border-white/10 bg-black/12 p-5">
-        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">Calculations</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">{uiText.calculations}</p>
         <label class="mt-4 flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ocean-200/75">
-          Calculation name
-          <input bind:value={calculationName} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300" placeholder="New Calculation" />
+          {uiText.calculationName}
+          <input bind:value={calculationName} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300" placeholder={uiText.calculationNamePlaceholder} />
         </label>
         <label class="mt-4 flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ocean-200/75">
-          Saved calculations
+          {uiText.savedCalculations}
           <select value={activeCalculationSelectValue} onchange={(event) => handleCalculationSelection((event.currentTarget as HTMLSelectElement).value)} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300" disabled={loadingCalculations}>
-            <option value="">{currentUser ? "Unsaved draft" : "Guest calculation or draft"}</option>
+            <option value="">{currentUser ? uiText.unsavedDraft : uiText.guestDraft}</option>
             {#each savedCalculations as calculation}
               <option value={calculation.id}>{calculation.name}</option>
             {/each}
           </select>
         </label>
         <div class="mt-4 flex flex-wrap gap-3">
-          <button type="button" class="touch-target rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10" onclick={resetDraftCalculation}>New</button>
-          <button type="button" class="touch-target rounded-2xl bg-sand-200 px-4 text-sm font-semibold text-ocean-950 transition hover:bg-sand-100 disabled:cursor-not-allowed disabled:opacity-60" onclick={() => void saveCalculation()} disabled={!currentUser || savingCalculation || loadingCalculations}>{savingCalculation ? "Saving..." : "Save"}</button>
-          <button type="button" class="touch-target rounded-2xl border border-rose-200/20 bg-rose-950/20 px-4 text-sm font-semibold text-rose-100 transition hover:bg-rose-950/30 disabled:cursor-not-allowed disabled:opacity-60" onclick={() => void deleteCalculation()} disabled={!currentUser || activeCalculationId === null || deletingCalculation || loadingCalculations}>{deletingCalculation ? "Deleting..." : "Delete"}</button>
+          <button type="button" class="touch-target rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10" onclick={resetDraftCalculation}>{uiText.newAction}</button>
+          <button type="button" class="touch-target rounded-2xl bg-sand-200 px-4 text-sm font-semibold text-ocean-950 transition hover:bg-sand-100 disabled:cursor-not-allowed disabled:opacity-60" onclick={() => void saveCalculation()} disabled={!currentUser || savingCalculation || loadingCalculations}>{savingCalculation ? uiText.savingAction : uiText.saveAction}</button>
+          <button type="button" class="touch-target rounded-2xl border border-rose-200/20 bg-rose-950/20 px-4 text-sm font-semibold text-rose-100 transition hover:bg-rose-950/30 disabled:cursor-not-allowed disabled:opacity-60" onclick={() => void deleteCalculation()} disabled={!currentUser || activeCalculationId === null || deletingCalculation || loadingCalculations}>{deletingCalculation ? uiText.deletingAction : uiText.deleteAction}</button>
         </div>
         <div class="mt-3 space-y-2 text-sm">
           {#if loadingCalculations}
-            <p class="text-ocean-100/70">Loading calculations...</p>
+            <p class="text-ocean-100/70">{uiText.loadingCalculations}</p>
           {:else if !currentUser}
-            <p class="text-ocean-100/70">Guest calculations are loaded from the server. Sign in to save or delete your own calculations.</p>
+            <p class="text-ocean-100/70">{uiText.guestReadonlyHint}</p>
           {/if}
           {#if calculationMessage}
             <p class="text-ocean-100/80">{calculationMessage}</p>
@@ -848,13 +851,13 @@
       </section>
 
       <section class="rounded-[1.75rem] border border-white/10 bg-black/12 p-5">
-        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">Target recipe</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">{uiText.targetRecipe}</p>
         <label class="mt-4 flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ocean-200/75">
-          Search solutions
-          <input bind:value={solutionSearch} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300" placeholder="Tomato, basil, cucumber..." />
+          {uiText.searchSolutions}
+          <input bind:value={solutionSearch} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300" placeholder={uiText.searchSolutionsPlaceholder} />
         </label>
         <label class="mt-4 flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ocean-200/75">
-          Solution preset
+          {uiText.solutionPreset}
           <select value={selectedSolutionId ?? ""} onchange={(event) => {
             const value = (event.currentTarget as HTMLSelectElement).value;
             if (!value) {
@@ -864,10 +867,10 @@
             setSelectedSolution(Number(value));
           }} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300" disabled={loadingBootstrap || solutionSelectOptions.length === 0}>
             {#if solutionSelectOptions.length === 0}
-              <option value="">{loadingBootstrap ? "Loading solutions..." : "No solutions found"}</option>
+              <option value="">{loadingBootstrap ? uiText.loadingSolutions : uiText.noSolutionsFound}</option>
             {/if}
             {#if selectedSolutionId === null && solutionSelectOptions.length > 0}
-              <option value="">Custom target</option>
+              <option value="">{uiText.customTarget}</option>
             {/if}
             {#each solutionSelectOptions as solution}
               <option value={solution.id}>{solution.name}</option>
@@ -875,40 +878,40 @@
           </select>
         </label>
         <div class="mt-3 flex flex-wrap items-center gap-2 text-xs text-ocean-100/70">
-          <span class="rounded-full bg-black/20 px-3 py-1.5">{solutionSearch.trim().length > 0 ? "Search mode" : "Most-used defaults"}</span>
+          <span class="rounded-full bg-black/20 px-3 py-1.5">{solutionSearch.trim().length > 0 ? uiText.searchMode : uiText.defaultsMode}</span>
           {#if loadingSolutionSearch}
-            <span class="rounded-full bg-black/20 px-3 py-1.5">Searching...</span>
+            <span class="rounded-full bg-black/20 px-3 py-1.5">{uiText.searching}</span>
           {/if}
         </div>
         {#if solutionSearch.trim().length > 0}
           <div class="mt-3">
             <button type="button" class="touch-target w-full rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60" onclick={() => void searchSolutions(false)} disabled={!nextSolutionCursor || loadingMoreSolutions}>
-              {loadingMoreSolutions ? "Loading more solutions..." : nextSolutionCursor ? "Load more solution matches" : "No more solution matches"}
+              {loadingMoreSolutions ? uiText.loadingMoreSolutions : nextSolutionCursor ? uiText.loadMoreSolutionMatches : uiText.noMoreSolutionMatches}
             </button>
           </div>
         {/if}
         <label class="mt-3 flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ocean-200/75">
-          Tank volume
+          {uiText.tankVolume}
           <input bind:value={volumeLiters} type="number" min="1" step="1" class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300" />
         </label>
         <div class="mt-4 grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
           {#each featuredElements as key}
             <div class="rounded-3xl bg-black/18 px-4 py-3">
               <p class="text-xs uppercase tracking-[0.18em] text-ocean-300/70">{key}</p>
-              <p class="mt-2 text-lg font-semibold text-white">{formatPpm(targetElements[key] ?? 0)} ppm</p>
+              <p class="mt-2 text-lg font-semibold text-white">{formatPpm(targetElements[key] ?? 0)} {uiText.ppmSuffix}</p>
             </div>
           {/each}
         </div>
 
         <details class="mt-4 rounded-3xl border border-white/10 bg-black/14 px-4 py-3 text-ocean-100/78">
           <summary class="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.2em] text-ocean-300/80">
-            Secondary + micronutrients
+            {uiText.secondaryMicronutrients}
           </summary>
           <div class="mt-3 grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
             {#each traceElements as key}
               <div class="rounded-3xl bg-black/18 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.18em] text-ocean-300/70">{key}</p>
-                <p class="mt-2 text-lg font-semibold text-white">{formatPpm(targetElements[key] ?? 0)} ppm</p>
+                <p class="mt-2 text-lg font-semibold text-white">{formatPpm(targetElements[key] ?? 0)} {uiText.ppmSuffix}</p>
               </div>
             {/each}
           </div>
@@ -921,24 +924,24 @@
       <section class="rounded-[1.75rem] border border-white/10 bg-black/12 p-5 sm:p-6 2xl:flex 2xl:max-h-[calc(100vh-10rem)] 2xl:flex-col">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">Fertilizers</p>
-            <p class="mt-2 text-sm leading-6 text-ocean-100/75">Search the library, select products, and adjust active doses from the same list.</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">{uiText.fertilizers}</p>
+            <p class="mt-2 text-sm leading-6 text-ocean-100/75">{uiText.fertilizersBody}</p>
           </div>
           <div class="flex flex-wrap items-center gap-3">
-            <div class="rounded-3xl bg-black/20 px-4 py-3 text-sm text-ocean-100/80">{selectedFertilizerRows.length} inputs active</div>
-            <button type="button" class="touch-target rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60" onclick={() => void savePdf()} disabled={selectedFertilizerRows.length === 0 || exportBusy}>{exportBusy ? "Saving PDF..." : "Save PDF"}</button>
-            <button type="button" class="touch-target rounded-2xl bg-sand-200 px-4 text-sm font-semibold text-ocean-950 transition hover:bg-sand-100 disabled:cursor-not-allowed disabled:opacity-60" onclick={solveSelectedDoses} disabled={selectedFertilizerRows.length === 0}>Auto-solve doses</button>
+            <div class="rounded-3xl bg-black/20 px-4 py-3 text-sm text-ocean-100/80">{uiText.inputsActive(selectedFertilizerRows.length)}</div>
+            <button type="button" class="touch-target rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60" onclick={() => void savePdf()} disabled={selectedFertilizerRows.length === 0 || exportBusy}>{exportBusy ? uiText.savingPdf : uiText.savePdf}</button>
+            <button type="button" class="touch-target rounded-2xl bg-sand-200 px-4 text-sm font-semibold text-ocean-950 transition hover:bg-sand-100 disabled:cursor-not-allowed disabled:opacity-60" onclick={solveSelectedDoses} disabled={selectedFertilizerRows.length === 0}>{uiText.autoSolve}</button>
           </div>
         </div>
 
         <label class="mt-4 flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ocean-200/75">
-          Search fertilizers
-          <input bind:value={fertilizerSearch} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300" placeholder="Calcium, sulfate, blend..." />
+          {uiText.searchFertilizers}
+          <input bind:value={fertilizerSearch} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300" placeholder={uiText.searchFertilizersPlaceholder} />
         </label>
         <div class="mt-3 flex flex-wrap items-center gap-2 text-xs text-ocean-100/70">
-          <span class="rounded-full bg-black/20 px-3 py-1.5">{fertilizerSearch.trim().length > 0 ? "Search results" : "Most-used defaults"}</span>
+          <span class="rounded-full bg-black/20 px-3 py-1.5">{fertilizerSearch.trim().length > 0 ? uiText.searchResults : uiText.defaultsMode}</span>
           {#if loadingFertilizerSearch}
-            <span class="rounded-full bg-black/20 px-3 py-1.5">Searching...</span>
+            <span class="rounded-full bg-black/20 px-3 py-1.5">{uiText.searching}</span>
           {/if}
         </div>
 
@@ -952,7 +955,7 @@
           {/if}
 
           {#if combinedFertilizerList.selected.length === 0 && combinedFertilizerList.remaining.length === 0}
-            <div class="rounded-[1.4rem] border border-white/10 bg-black/18 px-4 py-5 text-sm text-ocean-100/70">No fertilizers match the current query.</div>
+            <div class="rounded-[1.4rem] border border-white/10 bg-black/18 px-4 py-5 text-sm text-ocean-100/70">{uiText.noFertilizersMatch}</div>
           {/if}
 
           {#each combinedFertilizerList.selected as row}
@@ -961,23 +964,23 @@
                 <div class="flex flex-wrap items-center gap-2">
                   <p class="wrap-break-word font-semibold text-white">{row.fertilizer.name}</p>
                   <span class={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${bottleBadgeClass(row.fertilizerCard.bottle)}`}>{bottleLabel(row.fertilizerCard.bottle)}</span>
-                  <span class="rounded-full border border-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-ocean-100/75">Selected</span>
+                  <span class="rounded-full border border-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-ocean-100/75">{uiText.selected}</span>
                 </div>
-                <p class="mt-1 wrap-break-word text-xs uppercase tracking-[0.16em] text-ocean-200/60">{row.fertilizer.userName} • {calculatorMode === "auto" ? "engine" : "manual"}</p>
+                <p class="mt-1 wrap-break-word text-xs uppercase tracking-[0.16em] text-ocean-200/60">{row.fertilizer.userName} • {calculatorMode === "auto" ? uiText.engineMode : uiText.manualMode}</p>
               </div>
               <label class="min-w-0 flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-ocean-200/70">
-                g / L
+                {uiText.gramsPerLiter}
                 <input type="number" min="0" step="0.01" value={row.gramsPerLiter} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm font-normal tracking-normal text-white outline-none focus:border-ocean-300" oninput={(event) => updateDose(row.fertilizer.id, (event.currentTarget as HTMLInputElement).value)} />
               </label>
               <div class="flex items-end justify-end xl:justify-start">
-                <button type="button" class="touch-target rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10" onclick={() => unselectFertilizer(row.fertilizer.id)}>Unselect</button>
+                <button type="button" class="touch-target rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10" onclick={() => unselectFertilizer(row.fertilizer.id)}>{uiText.unselect}</button>
               </div>
               <div class="min-w-0 rounded-2xl bg-black/20 px-4 py-3 text-sm text-ocean-100/80">
-                <p class="text-xs uppercase tracking-[0.16em] text-ocean-200/60">Tank mass</p>
-                <p class="mt-1 font-semibold text-white">{formatMass(row.totalGrams)} g</p>
+                <p class="text-xs uppercase tracking-[0.16em] text-ocean-200/60">{uiText.tankMass}</p>
+                <p class="mt-1 font-semibold text-white">{formatMass(row.totalGrams)} {uiText.massUnit}</p>
               </div>
               <div class="min-w-0 rounded-2xl bg-black/20 px-4 py-3 text-sm text-ocean-100/80">
-                <p class="text-xs uppercase tracking-[0.16em] text-ocean-200/60">Cost</p>
+                <p class="text-xs uppercase tracking-[0.16em] text-ocean-200/60">{uiText.cost}</p>
                 <p class="mt-1 font-semibold text-white">{formatMoney(row.estimatedCost)}</p>
               </div>
             </div>
@@ -1001,7 +1004,7 @@
           {#if fertilizerSearch.trim().length > 0}
             <div>
               <button type="button" class="touch-target w-full rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60" onclick={() => void searchFertilizers(false)} disabled={!nextFertilizerCursor || loadingMoreFertilizers}>
-                {loadingMoreFertilizers ? "Loading more fertilizers..." : nextFertilizerCursor ? "Load more fertilizer matches" : "No more fertilizer matches"}
+                {loadingMoreFertilizers ? uiText.loadingMoreFertilizers : nextFertilizerCursor ? uiText.loadMoreFertilizerMatches : uiText.noMoreFertilizerMatches}
               </button>
             </div>
           {/if}
@@ -1011,20 +1014,20 @@
       <section class="rounded-[1.75rem] border border-white/10 bg-black/12 p-5 sm:p-6 2xl:sticky 2xl:top-6">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">Target vs mix</p>
-            <p class="mt-2 text-sm leading-6 text-ocean-100/75">This uses the real client-side engine against RPC-backed target and fertilizer data: frequently used defaults load first, and search expands into the paged catalog only when needed.</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">{uiText.targetVsMix}</p>
+            <p class="mt-2 text-sm leading-6 text-ocean-100/75">{uiText.targetVsMixBody}</p>
           </div>
-          <div class="rounded-3xl bg-black/20 px-4 py-3 text-sm text-ocean-100/80">Target EC {targetEc.ec.toFixed(2)} • Mix EC {mixEc.ec.toFixed(2)} • N:K {formatRatio(mixRatio.nk)}</div>
+          <div class="rounded-3xl bg-black/20 px-4 py-3 text-sm text-ocean-100/80">{uiText.targetEcLabel} {targetEc.ec.toFixed(2)} • {uiText.mixEcLabel} {mixEc.ec.toFixed(2)} • {uiText.nkLabel} {formatRatio(mixRatio.nk)}</div>
         </div>
 
         <div class="mt-4 overflow-auto 2xl:max-h-[52vh]">
           <table class="min-w-full border-separate border-spacing-y-2 text-sm">
             <thead>
               <tr class="text-left text-xs uppercase tracking-[0.18em] text-ocean-200/60">
-                <th class="px-3 py-2">Element</th>
-                <th class="px-3 py-2">Target</th>
-                <th class="px-3 py-2">Mix</th>
-                <th class="px-3 py-2">Delta</th>
+                <th class="px-3 py-2">{uiText.element}</th>
+                <th class="px-3 py-2">{uiText.target}</th>
+                <th class="px-3 py-2">{uiText.mix}</th>
+                <th class="px-3 py-2">{uiText.delta}</th>
               </tr>
             </thead>
             <tbody>
@@ -1042,15 +1045,15 @@
 
         <div class="mt-4 grid gap-3 sm:grid-cols-3">
           <div class="rounded-3xl bg-black/18 px-4 py-4">
-            <p class="text-xs uppercase tracking-[0.18em] text-ocean-300/70">Total target</p>
+            <p class="text-xs uppercase tracking-[0.18em] text-ocean-300/70">{uiText.totalTarget}</p>
             <p class="mt-2 text-2xl font-semibold text-white">{formatPpm(targetTotal)}</p>
           </div>
           <div class="rounded-3xl bg-black/18 px-4 py-4">
-            <p class="text-xs uppercase tracking-[0.18em] text-ocean-300/70">Total mixed</p>
+            <p class="text-xs uppercase tracking-[0.18em] text-ocean-300/70">{uiText.totalMixed}</p>
             <p class="mt-2 text-2xl font-semibold text-white">{formatPpm(mixedTotal)}</p>
           </div>
           <div class="rounded-3xl bg-black/18 px-4 py-4">
-            <p class="text-xs uppercase tracking-[0.18em] text-ocean-300/70">Delta</p>
+            <p class="text-xs uppercase tracking-[0.18em] text-ocean-300/70">{uiText.delta}</p>
             <p class={`mt-2 text-2xl font-semibold ${metricTone(mixedTotal - targetTotal)}`}>{mixedTotal - targetTotal >= 0 ? '+' : ''}{formatPpm(mixedTotal - targetTotal)}</p>
           </div>
         </div>
@@ -1061,27 +1064,27 @@
   <section class="hidden rounded-[1.75rem] border border-white/10 bg-black/12 p-5 sm:p-6 md:block">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">Solution matrix</p>
-        <p class="mt-2 text-sm leading-6 text-ocean-100/75">Inspect how each selected fertilizer contributes to each nutrient and optionally tweak total grams directly.</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">{uiText.solutionMatrix}</p>
+        <p class="mt-2 text-sm leading-6 text-ocean-100/75">{uiText.solutionMatrixBody}</p>
       </div>
       <label class="flex items-center gap-3 rounded-3xl bg-black/20 px-4 py-3 text-sm text-ocean-100/80">
-        <span class="text-xs font-semibold uppercase tracking-[0.18em] text-ocean-200/70">Edit mass</span>
+        <span class="text-xs font-semibold uppercase tracking-[0.18em] text-ocean-200/70">{uiText.editMass}</span>
         <input bind:checked={matrixEditMode} type="checkbox" class="h-4 w-4 accent-sand-200" />
       </label>
     </div>
 
     {#if matrixRows.length === 0}
-      <div class="mt-4 rounded-[1.4rem] border border-white/10 bg-black/18 px-4 py-5 text-sm text-ocean-100/70">Solve or select fertilizers to populate the solution matrix.</div>
+      <div class="mt-4 rounded-[1.4rem] border border-white/10 bg-black/18 px-4 py-5 text-sm text-ocean-100/70">{uiText.emptyMatrix}</div>
     {:else}
       <div class="mt-4 overflow-auto rounded-[1.4rem] border border-white/10 bg-black/12">
         <table class="min-w-full border-separate border-spacing-0 text-sm">
           <thead>
             <tr class="bg-white/6 text-left text-xs uppercase tracking-[0.18em] text-ocean-200/70">
-              <th class="sticky left-0 z-10 border-b border-white/10 bg-white/6 px-3 py-3">Fertilizer</th>
+              <th class="sticky left-0 z-10 border-b border-white/10 bg-white/6 px-3 py-3">{uiText.fertilizerColumn}</th>
               {#each elementOrder as key}
                 <th class="border-b border-white/10 px-3 py-3 text-right">{key === "NO3" ? "N-NO3" : key === "NH4" ? "N-NH4" : key}</th>
               {/each}
-              <th class="border-b border-white/10 px-3 py-3 text-right">Mass (g.)</th>
+              <th class="border-b border-white/10 px-3 py-3 text-right">{uiText.massColumn}</th>
             </tr>
           </thead>
           <tbody>

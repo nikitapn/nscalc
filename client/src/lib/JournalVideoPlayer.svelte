@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
+  import { translations, type JournalVideoPlayerCopy } from "./i18n";
   import { getJournalRpc } from "./journalRpc";
   import { loadShakaPlayer } from "./loadShakaPlayer";
 
   type PlaybackState = "loading" | "playing" | "error";
 
-  let { assetId, title, posterUrl = null }: { assetId: bigint; title: string; posterUrl?: string | null } = $props();
+  let { assetId, title, posterUrl = null, strings = translations.en.journal.videoPlayer }: { assetId: bigint; title: string; posterUrl?: string | null; strings?: JournalVideoPlayerCopy } = $props();
 
   let videoEl = $state<HTMLVideoElement | null>(null);
   let status = $state<PlaybackState>("loading");
@@ -164,16 +165,16 @@
 
     {#if status === "loading"}
       <div class="absolute inset-0 flex items-center justify-center bg-black/55 backdrop-blur-sm">
-        <p class="text-sm font-medium text-white/85">Loading adaptive stream...</p>
+        <p class="text-sm font-medium text-white/85">{strings.loading}</p>
       </div>
     {/if}
 
     {#if status === "error"}
       <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/75 px-6 text-center">
-        <p class="text-sm font-semibold text-rose-200">Playback failed</p>
+        <p class="text-sm font-semibold text-rose-200">{strings.failed}</p>
         <p class="max-w-md text-sm leading-6 text-white/72">{errorMessage}</p>
         <button type="button" class="rounded-full border border-white/15 bg-white/8 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/12" onclick={() => void startPlayback()}>
-          Retry stream
+          {strings.retry}
         </button>
       </div>
     {/if}
@@ -182,8 +183,8 @@
   <div class="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/10 bg-black/16 px-4 py-3 text-sm text-ocean-100/78">
     <div>
       <p class="font-semibold text-white">{title}</p>
-      <p class="mt-1 text-xs uppercase tracking-[0.18em] text-ocean-200/60">Adaptive DASH via NPRPC + Shaka</p>
+      <p class="mt-1 text-xs uppercase tracking-[0.18em] text-ocean-200/60">{strings.meta}</p>
     </div>
-    <p class="text-xs uppercase tracking-[0.18em] text-ocean-200/60">{(bytesLoaded / 1024 / 1024).toFixed(1)} MB received</p>
+    <p class="text-xs uppercase tracking-[0.18em] text-ocean-200/60">{(bytesLoaded / 1024 / 1024).toFixed(1)} MB {strings.receivedSuffix}</p>
   </div>
 </div>

@@ -5,12 +5,10 @@
   import Journal from "./view/Journal.svelte";
   import Solutions from "./view/Solutions.svelte";
   import Fertilizers from "./view/Fertilizers.svelte";
+  import { localeLabels, resolveLocale, translations, type Locale } from "./lib/i18n";
   import {
     createDefaultSiteEventConfig,
-    describeSiteEventWindow,
     getSiteEventSessionSignature,
-    getSiteEventVariantDescription,
-    getSiteEventVariantLabel,
     isSiteEventActive,
     parseSiteEventConfig,
     stringifySiteEventConfig,
@@ -40,16 +38,10 @@
     detail: string;
   };
 
-  const navItems: Array<{ id: View; label: string; blurb: string }> = [
-    { id: "journal", label: "Journal", blurb: "Capture crop progress as a story feed." },
-    { id: "calculator", label: "Calculator", blurb: "Mix recipes fast on touch screens." },
-    { id: "solutions", label: "Solutions", blurb: "Browse reusable nutrient targets." },
-    { id: "fertilizers", label: "Fertilizers", blurb: "Inspect products and element ratios." },
-    { id: "chat", label: "Chat", blurb: "Realtime collaboration can land here." },
-    { id: "about", label: "About", blurb: "Project notes and rollout status." },
-  ];
+  const availableLocales: Locale[] = ["en", "ru"];
 
   let mobileMenuEnabled = $state(false);
+  let locale = $state<Locale>("en");
   let currentView = $state<View>("journal");
   let email = $state("superuser@nscalc.com");
   let password = $state("1234");
@@ -65,147 +57,164 @@
   let eventRuntimeBusy = $state(false);
   let eventRuntime = $state<FireworksOverlayController | null>(null);
 
+  const copy = $derived(translations[locale]);
+  const navItems = $derived.by<Array<{ id: View; label: string; blurb: string }>>(() => [
+    { id: "journal", label: copy.nav.journal.label, blurb: copy.nav.journal.blurb },
+    { id: "calculator", label: copy.nav.calculator.label, blurb: copy.nav.calculator.blurb },
+    { id: "solutions", label: copy.nav.solutions.label, blurb: copy.nav.solutions.blurb },
+    { id: "fertilizers", label: copy.nav.fertilizers.label, blurb: copy.nav.fertilizers.blurb },
+    { id: "chat", label: copy.nav.chat.label, blurb: copy.nav.chat.blurb },
+    { id: "about", label: copy.nav.about.label, blurb: copy.nav.about.blurb },
+  ]);
+
   function changeView(view: View) {
     mobileMenuEnabled = false;
     currentView = view;
   }
 
+  function applyLocale(next: Locale): void {
+    locale = next;
+    window.localStorage.setItem("nscalc.locale", next);
+  }
+
   const activeItem = $derived(navItems.find((item) => item.id === currentView) ?? navItems[0]);
   const eventIsLive = $derived(isSiteEventActive(eventConfig));
-  const eventWindowLabel = $derived(describeSiteEventWindow(eventConfig));
+  const eventWindowLabel = $derived(getEventWindowLabel(eventConfig));
   const eventDraftDirty = $derived(JSON.stringify(eventDraft) !== JSON.stringify(eventConfig));
-  const accountLabel = $derived(authState ? authState.name : "Guest");
+  const accountLabel = $derived(authState ? authState.name : copy.app.snapshot.values.guest);
   const accessLabel = $derived(
     authState?.isAdmin
-      ? "Admin"
+      ? copy.app.snapshot.values.admin
       : authState
-        ? "Signed in"
-        : "Guest",
+        ? copy.app.snapshot.values.signedIn
+        : copy.app.snapshot.values.guest,
   );
   const eventStatusLabel = $derived(
     eventLoading
-      ? "Loading"
+      ? copy.app.snapshot.values.loading
       : eventIsLive
-        ? "Live now"
+        ? copy.app.snapshot.values.liveNow
         : eventConfig.enabled
-          ? "Scheduled"
-          : "Inactive",
+          ? copy.app.snapshot.values.scheduled
+          : copy.app.snapshot.values.inactive,
   );
   const snapshotCards = $derived.by<SnapshotCard[]>(() => {
+    const snapshot = copy.app.snapshot;
+
     switch (currentView) {
       case "journal":
         return [
           {
-            label: "Account",
+            label: snapshot.labels.account,
             value: accountLabel,
-            detail: authState?.isAdmin ? "Moderator tools available in the journal." : authState ? "Story actions use your signed-in account." : "Browsing stories without account-specific tools.",
+            detail: authState?.isAdmin ? snapshot.details.journalAdminAccount : authState ? snapshot.details.journalSignedInAccount : snapshot.details.journalGuestAccount,
           },
           {
-            label: "Journal mode",
-            value: authState?.isAdmin ? "Moderation" : "Reader",
-            detail: authState?.isAdmin ? "You can manage the shared event panel and journal moderation flows." : "Stories, uploads, and fullscreen media stay optimized for mobile review.",
+            label: snapshot.labels.journalMode,
+            value: authState?.isAdmin ? snapshot.values.moderation : snapshot.values.reader,
+            detail: authState?.isAdmin ? snapshot.details.journalModerationMode : snapshot.details.journalReaderMode,
           },
           {
-            label: "Shared event",
+            label: snapshot.labels.sharedEvent,
             value: eventStatusLabel,
-            detail: eventLoading ? "Refreshing the shared overlay state from the server." : `${getSiteEventVariantLabel(eventConfig)} • ${eventWindowLabel}`,
+            detail: eventLoading ? snapshot.details.sharedEventRefreshing : `${siteEventVariantLabel(eventConfig.variant)} • ${eventWindowLabel}`,
           },
           {
-            label: "Event draft",
-            value: eventDraftDirty ? "Unsaved" : "Synced",
-            detail: authState?.isAdmin ? (eventDraftDirty ? "Admin changes are staged locally until you save them." : "Server config and local draft are aligned.") : "Only admins can edit the shared event configuration.",
+            label: snapshot.labels.eventDraft,
+            value: eventDraftDirty ? snapshot.values.unsaved : snapshot.values.synced,
+            detail: authState?.isAdmin ? (eventDraftDirty ? snapshot.details.eventDraftStaged : snapshot.details.eventDraftSynced) : snapshot.details.eventDraftReadonly,
           },
         ];
       case "solutions":
         return [
           {
-            label: "Account",
+            label: snapshot.labels.account,
             value: accountLabel,
-            detail: authState ? "Your solution list can include personal and shared targets." : "Guest mode can inspect the shared solution library.",
+            detail: authState ? snapshot.details.solutionsAccountSignedIn : snapshot.details.solutionsAccountGuest,
           },
           {
-            label: "Library access",
-            value: authState ? "Personal + shared" : "Shared only",
-            detail: authState ? "Save, update, and delete your own nutrient targets." : "Sign in to create or maintain a personal solution library.",
+            label: snapshot.labels.libraryAccess,
+            value: authState ? snapshot.values.personalShared : snapshot.values.sharedOnly,
+            detail: authState ? snapshot.details.solutionsLibrarySignedIn : snapshot.details.solutionsLibraryGuest,
           },
           {
-            label: "Primary use",
-            value: "Target recipes",
-            detail: "Reusable nutrient profiles feed the calculator and journal workflows.",
+            label: snapshot.labels.primaryUse,
+            value: snapshot.values.targetRecipes,
+            detail: snapshot.details.solutionsPrimaryUse,
           },
           {
-            label: "Workflow",
-            value: authState ? "Editable" : "Read-only",
-            detail: authState ? "Use this space to curate mixes you return to often." : "Browse targets now, then sign in if you want to keep your own set.",
+            label: snapshot.labels.workflow,
+            value: authState ? snapshot.values.editable : snapshot.values.readOnly,
+            detail: authState ? snapshot.details.solutionsWorkflowSignedIn : snapshot.details.solutionsWorkflowGuest,
           },
         ];
       case "fertilizers":
         return [
           {
-            label: "Account",
+            label: snapshot.labels.account,
             value: accountLabel,
-            detail: authState ? "Your fertilizer list can combine personal and shared products." : "Guest mode can inspect the shared fertilizer catalog.",
+            detail: authState ? snapshot.details.fertilizersAccountSignedIn : snapshot.details.fertilizersAccountGuest,
           },
           {
-            label: "Catalog access",
-            value: authState ? "Personal + shared" : "Shared only",
-            detail: authState ? "Save the products you actually stock and keep their analyses current." : "Sign in to maintain a personal fertilizer catalog.",
+            label: snapshot.labels.catalogAccess,
+            value: authState ? snapshot.values.personalShared : snapshot.values.sharedOnly,
+            detail: authState ? snapshot.details.fertilizersCatalogSignedIn : snapshot.details.fertilizersCatalogGuest,
           },
           {
-            label: "Primary use",
-            value: "Element ratios",
-            detail: "Product analyses here feed the calculator matrix and solver.",
+            label: snapshot.labels.primaryUse,
+            value: snapshot.values.elementRatios,
+            detail: snapshot.details.fertilizersPrimaryUse,
           },
           {
-            label: "Workflow",
-            value: authState ? "Editable" : "Read-only",
-            detail: authState ? "Adjust personal entries without affecting the shared reference list." : "Browse the reference list now, then sign in to save your own products.",
+            label: snapshot.labels.workflow,
+            value: authState ? snapshot.values.editable : snapshot.values.readOnly,
+            detail: authState ? snapshot.details.fertilizersWorkflowSignedIn : snapshot.details.fertilizersWorkflowGuest,
           },
         ];
       case "chat":
         return [
           {
-            label: "Account",
+            label: snapshot.labels.account,
             value: accountLabel,
-            detail: authState ? "A signed-in session is already available for future collaboration features." : "Guest browsing is active until realtime chat lands.",
+            detail: authState ? snapshot.details.chatAccountSignedIn : snapshot.details.chatAccountGuest,
           },
           {
-            label: "Status",
-            value: "Planned",
-            detail: "This area is reserved for realtime collaboration rather than static notes.",
+            label: snapshot.labels.status,
+            value: snapshot.values.planned,
+            detail: snapshot.details.chatStatus,
           },
           {
-            label: "Context",
+            label: snapshot.labels.context,
             value: accessLabel,
-            detail: authState?.isAdmin ? "Admin context can later cover support and moderation workflows." : "User identity is ready to flow into future chat sessions.",
+            detail: authState?.isAdmin ? snapshot.details.chatContextAdmin : snapshot.details.chatContextUser,
           },
           {
-            label: "Next step",
-            value: "Realtime sync",
-            detail: "The useful outcome here is shared crop discussion, not another static info page.",
+            label: snapshot.labels.nextStep,
+            value: snapshot.values.realtimeSync,
+            detail: snapshot.details.chatNextStep,
           },
         ];
       case "about":
         return [
           {
-            label: "Current view",
+            label: snapshot.labels.currentView,
             value: activeItem.label,
             detail: activeItem.blurb,
           },
           {
-            label: "Account",
+            label: snapshot.labels.account,
             value: accountLabel,
-            detail: authState?.isAdmin ? "Admin tools are enabled for shared event configuration." : authState ? "Signed-in flows are active across the app." : "Guest mode still exposes shared data and guest calculations.",
+            detail: authState?.isAdmin ? snapshot.details.aboutAccountAdmin : authState ? snapshot.details.aboutAccountSignedIn : snapshot.details.aboutAccountGuest,
           },
           {
-            label: "Experience",
-            value: "Mobile-first",
-            detail: "The shell prioritizes readable touch workflows for journal, calculator, and libraries.",
+            label: snapshot.labels.experience,
+            value: snapshot.values.mobileFirst,
+            detail: snapshot.details.aboutExperience,
           },
           {
-            label: "Shared event",
+            label: snapshot.labels.sharedEvent,
             value: eventStatusLabel,
-            detail: eventLoading ? "Refreshing event state from the server." : `${getSiteEventVariantLabel(eventConfig)} • ${eventWindowLabel}`,
+            detail: eventLoading ? snapshot.details.sharedEventStateRefreshing : `${siteEventVariantLabel(eventConfig.variant)} • ${eventWindowLabel}`,
           },
         ];
       default:
@@ -213,7 +222,57 @@
     }
   });
 
+  function siteEventVariantLabel(variant: SiteEventConfig["variant"]): string {
+    return copy.app.event.variants[variant];
+  }
+
+  function siteEventVariantDescription(variant: SiteEventConfig["variant"]): string {
+    return copy.app.event.descriptions[variant];
+  }
+
+  function formatEventDateTime(value: string): string {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+
+    return new Intl.DateTimeFormat(locale, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(parsed);
+  }
+
+  function getEventWindowLabel(config: SiteEventConfig): string {
+    const startsAt = config.startAt ? new Date(config.startAt) : null;
+    const endsAt = config.endAt ? new Date(config.endAt) : null;
+
+    const hasStart = startsAt !== null && !Number.isNaN(startsAt.getTime());
+    const hasEnd = endsAt !== null && !Number.isNaN(endsAt.getTime());
+
+    if (hasStart && hasEnd) {
+      return copy.app.event.windowRange(formatEventDateTime(config.startAt), formatEventDateTime(config.endAt));
+    }
+
+    if (hasStart) {
+      return copy.app.event.windowStarts(formatEventDateTime(config.startAt));
+    }
+
+    if (hasEnd) {
+      return copy.app.event.windowEnds(formatEventDateTime(config.endAt));
+    }
+
+    return copy.app.event.windowAutoplay;
+  }
+
+  function getEventLastUpdate(config: SiteEventConfig): string {
+    const updatedAt = config.updatedAt ? formatEventDateTime(config.updatedAt) : copy.app.event.notYetSaved;
+    return copy.app.event.lastUpdate(updatedAt, config.updatedBy);
+  }
+
   onMount(() => {
+    applyLocale(resolveLocale(window.localStorage.getItem("nscalc.locale") ?? window.navigator.language));
     let refreshTimer = window.setInterval(() => {
       void loadSiteEventConfig(false);
     }, 60_000);
@@ -229,7 +288,7 @@
     return () => {
       window.clearInterval(refreshTimer);
       document.removeEventListener("visibilitychange", handleVisibility);
-      stopFireworks("Event stopped.");
+      stopFireworks(copy.app.event.eventStoppedMessage);
     };
   });
 
@@ -261,7 +320,7 @@
 
   async function logIn(): Promise<void> {
     if (!email.trim() || !password.trim()) {
-      authError = "Enter an email and password.";
+      authError = copy.app.auth.enterCredentials;
       return;
     }
 
@@ -284,16 +343,16 @@
         const reason = () => {
           switch (error.reason) {
             case nscalc.AuthorizationFailed_Reason.email_does_not_exist:
-              return "No account found with that email.";
+              return copy.app.auth.noAccountForEmail;
             case nscalc.AuthorizationFailed_Reason.incorrect_password:
-              return "Incorrect password.";
+              return copy.app.auth.incorrectPassword;
             default:
-              return "Unknown error.";
+              return copy.app.auth.unknownError;
           }
         };
-        authError = `Login failed: ${reason()}`;
+        authError = `${copy.app.auth.loginFailedPrefix} ${reason()}`;
       } else {
-        authError = error instanceof Error ? error.message : "Login failed.";
+        authError = error instanceof Error ? error.message : copy.app.auth.loginFailed;
       }
     } finally {
       authBusy = false;
@@ -310,7 +369,7 @@
         await authorizator.LogOut(sessionId);
       }
     } catch (error) {
-      authError = error instanceof Error ? error.message : "Logout failed.";
+      authError = error instanceof Error ? error.message : copy.app.auth.logoutFailed;
     } finally {
       setCookie("sid", null);
       authState = null;
@@ -321,15 +380,15 @@
   function clearEventWindow(): void {
     eventDraft.startAt = "";
     eventDraft.endAt = "";
-    eventMessage = "Schedule window cleared.";
+    eventMessage = copy.app.event.clearScheduleMessage;
   }
 
   function resetEventDraft(): void {
     eventDraft = { ...eventConfig };
-    eventMessage = "Draft reset to server config.";
+    eventMessage = copy.app.event.resetDraftMessage;
   }
 
-  function stopFireworks(message = "Preview stopped."): void {
+  function stopFireworks(message = copy.app.event.stopPreviewMessage): void {
     if (!eventRuntime) {
       return;
     }
@@ -345,19 +404,19 @@
     }
 
     if (eventRuntime) {
-      eventMessage = trigger === "preview" ? "Fireworks are already running." : eventMessage;
+      eventMessage = trigger === "preview" ? copy.app.event.alreadyRunning : eventMessage;
       return false;
     }
 
     eventRuntimeBusy = true;
-    eventMessage = trigger === "preview" ? "Loading event preview..." : "Loading seasonal event...";
+    eventMessage = trigger === "preview" ? copy.app.event.loadingPreview : copy.app.event.loadingSeasonal;
 
     try {
       let stoppedManually = false;
       const handleFinish = () => {
         eventRuntime = null;
         if (!stoppedManually) {
-          eventMessage = trigger === "preview" ? "Preview finished." : `${getSiteEventVariantLabel(config)} completed.`;
+          eventMessage = trigger === "preview" ? copy.app.event.previewFinished : copy.app.event.completed(siteEventVariantLabel(config.variant));
         }
       };
       const runtime = config.variant === "snow"
@@ -383,11 +442,11 @@
           runtime.stop();
         },
       };
-      eventMessage = trigger === "preview" ? `${getSiteEventVariantLabel(config)} preview is live.` : `${getSiteEventVariantLabel(config)} triggered.`;
+      eventMessage = trigger === "preview" ? copy.app.event.previewLive(siteEventVariantLabel(config.variant)) : copy.app.event.triggered(siteEventVariantLabel(config.variant));
       return true;
     } catch (error) {
       eventRuntime = null;
-      eventMessage = error instanceof Error ? error.message : "Unable to start event effect.";
+      eventMessage = error instanceof Error ? error.message : copy.app.event.unableToStart;
       return false;
     } finally {
       eventRuntimeBusy = false;
@@ -413,7 +472,7 @@
       await maybeAutoplayEvent(config);
     } catch (error) {
       if (showLoadingState) {
-        eventMessage = error instanceof Error ? error.message : "Unable to load site event config.";
+        eventMessage = error instanceof Error ? error.message : copy.app.event.unableLoad;
       }
     } finally {
       eventLoading = false;
@@ -423,12 +482,12 @@
   async function saveSiteEventConfig(): Promise<void> {
     const sessionId = authState?.sessionId;
     if (!sessionId) {
-      eventMessage = "Log in as an admin to save event changes.";
+      eventMessage = copy.app.event.adminRequiredSave;
       return;
     }
 
     eventSaving = true;
-    eventMessage = "Saving shared event config...";
+    eventMessage = copy.app.event.savingSharedConfig;
 
     try {
       const { siteEvents } = await getNscalcRpc();
@@ -436,18 +495,18 @@
       const savedConfig = parseSiteEventConfig(savedJSON);
       eventConfig = savedConfig;
       eventDraft = { ...savedConfig };
-      eventMessage = `Saved ${getSiteEventVariantLabel(savedConfig)} for all visitors.`;
+      eventMessage = copy.app.event.savedForVisitors(siteEventVariantLabel(savedConfig.variant));
       applySeasonalTheme(savedConfig.enabled && isSiteEventActive(savedConfig) ? seasonForVariant(savedConfig.variant) : "default");
       await maybeAutoplayEvent(savedConfig);
     } catch (error) {
       if (error instanceof nscalc.AuthorizationFailed) {
-        eventMessage = "Your admin session expired. Log in again and retry.";
+        eventMessage = copy.app.event.adminExpired;
       } else if (error instanceof nscalc.PermissionViolation) {
         eventMessage = error.msg;
       } else if (error instanceof nscalc.InvalidArgument) {
         eventMessage = error.msg;
       } else {
-        eventMessage = error instanceof Error ? error.message : "Unable to save site event config.";
+        eventMessage = error instanceof Error ? error.message : copy.app.event.unableSave;
       }
     } finally {
       eventSaving = false;
@@ -472,7 +531,7 @@
 </script>
 
 <svelte:head>
-  <title>NScalc Grow Journal</title>
+  <title>{copy.headTitle}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 </svelte:head>
 
@@ -480,39 +539,54 @@
   <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(125,198,255,0.12),transparent_22%),radial-gradient(circle_at_bottom_left,rgba(201,138,53,0.12),transparent_18%)]"></div>
 
   <header class="sticky top-0 z-20 border-b border-white/10 bg-ocean-900/80 backdrop-blur-xl">
-    <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8 2xl:max-w-[96rem]">
+    <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8 2xl:max-w-384">
       <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between 2xl:gap-6">
         <div class="max-w-2xl">
-          <p class="text-xs font-semibold uppercase tracking-[0.3em] text-ocean-300">NScalc</p>
-          <h1 class="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">A mobile-first grow journal with nutrient context built in.</h1>
-          <p class="mt-3 text-sm leading-6 text-ocean-100/80 sm:text-base">The new shell keeps stories, measurements, and upload status readable on phones first, while leaving room for the calculator and solution library beside it.</p>
+          <p class="text-xs font-semibold uppercase tracking-[0.3em] text-ocean-300">{copy.shell.brandEyebrow}</p>
+          <h1 class="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">{copy.shell.heroTitle}</h1>
+          <p class="mt-3 text-sm leading-6 text-ocean-100/80 sm:text-base">{copy.shell.heroBody}</p>
         </div>
 
         <form class="panel-surface hairline grid w-full gap-3 rounded-3xl p-3 sm:grid-cols-2 lg:max-w-3xl lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] lg:items-end xl:max-w-184" onsubmit={(event) => { event.preventDefault(); void logIn(); }}>
           <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-[0.2em] text-ocean-200/70">
-            Email
-            <input bind:value={email} class="touch-target min-w-0 rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-ocean-300 focus:bg-black/30" type="email" placeholder="grower@example.com" />
+            {copy.shell.email}
+            <input bind:value={email} class="touch-target min-w-0 rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-ocean-300 focus:bg-black/30" type="email" placeholder={copy.shell.emailPlaceholder} />
           </label>
           <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-[0.2em] text-ocean-200/70">
-            Password
-            <input bind:value={password} class="touch-target min-w-0 rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-ocean-300 focus:bg-black/30" type="password" placeholder="••••••••" />
+            {copy.shell.password}
+            <input bind:value={password} class="touch-target min-w-0 rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-ocean-300 focus:bg-black/30" type="password" placeholder={copy.shell.passwordPlaceholder} />
           </label>
-          <button type="submit" class="touch-target rounded-2xl bg-ocean-400 px-4 text-sm font-semibold text-ocean-950 transition hover:bg-ocean-300 lg:self-end" disabled={authBusy}>{authBusy ? "Working..." : authState ? "Refresh login" : "Log in"}</button>
+          <button type="submit" class="touch-target rounded-2xl bg-ocean-400 px-4 text-sm font-semibold text-ocean-950 transition hover:bg-ocean-300 lg:self-end" disabled={authBusy}>{authBusy ? copy.shell.working : authState ? copy.shell.refreshLogin : copy.shell.logIn}</button>
           {#if authState}
-            <button type="button" class="touch-target rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10 lg:self-end" onclick={() => void logOut()} disabled={authBusy}>Log out</button>
+            <button type="button" class="touch-target rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10 lg:self-end" onclick={() => void logOut()} disabled={authBusy}>{copy.shell.logOut}</button>
           {:else}
-            <button type="button" class="touch-target rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10 lg:self-end" disabled>Register</button>
+            <button type="button" class="touch-target rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10 lg:self-end" disabled>{copy.shell.register}</button>
           {/if}
-          {#if authState || authError}
-            <div class="sm:col-span-2 lg:col-span-4">
+          <div class="sm:col-span-2 lg:col-span-4 flex flex-wrap items-center justify-between gap-3">
+            <div class="text-xs text-ocean-100/80">
               {#if authState}
-                <p class="text-xs text-ocean-100/80">Signed in as {authState.name}{authState.isAdmin ? " • moderator controls enabled" : ""}.</p>
+                <p>{copy.shell.signedInAs} {authState.name}{authState.isAdmin ? ` • ${copy.shell.moderatorEnabled}` : ""}.</p>
               {/if}
               {#if authError}
-                <p class="mt-1 text-xs text-rose-200">{authError}</p>
+                <p class:mt-1={authState !== null} class="text-rose-200">{authError}</p>
               {/if}
             </div>
-          {/if}
+
+            <div class="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-ocean-200/70">
+              <span>{copy.shell.language}</span>
+              <div class="flex items-center gap-1 rounded-full border border-white/10 bg-black/20 p-1">
+                {#each availableLocales as availableLocale}
+                  <button
+                    type="button"
+                    class={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${locale === availableLocale ? 'bg-sand-200 text-ocean-950' : 'text-ocean-100/75 hover:bg-white/8'}`}
+                    onclick={() => applyLocale(availableLocale)}
+                  >
+                    {localeLabels[availableLocale]}
+                  </button>
+                {/each}
+              </div>
+            </div>
+          </div>
         </form>
       </div>
 
@@ -520,8 +594,8 @@
         <div class="mt-4 rounded-3xl border border-sand-200/22 bg-sand-200/10 px-4 py-3 text-sm text-sand-50">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p class="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-sand-100/85">Seasonal event</p>
-              <p class="mt-1 font-semibold text-white">{getSiteEventVariantLabel(eventConfig)} {eventIsLive ? "is live now" : "is armed"}.</p>
+              <p class="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-sand-100/85">{copy.app.event.seasonalEvent}</p>
+              <p class="mt-1 font-semibold text-white">{siteEventVariantLabel(eventConfig.variant)} {eventIsLive ? copy.app.event.isLiveNow : copy.app.event.isArmed}.</p>
               <p class="mt-1 text-xs text-sand-100/78">{eventWindowLabel}</p>
             </div>
             {#if authState?.isAdmin}
@@ -530,7 +604,7 @@
                 class="touch-target rounded-2xl border border-white/15 bg-white/8 px-4 text-sm font-semibold text-white transition hover:bg-white/12"
                 onclick={() => (eventPanelOpen = !eventPanelOpen)}
               >
-                {eventPanelOpen ? "Hide event panel" : "Manage event"}
+                {eventPanelOpen ? copy.app.event.hideEventPanel : copy.app.event.manageEvent}
               </button>
             {/if}
           </div>
@@ -539,7 +613,7 @@
 
       <div class="mt-5 flex items-center justify-between md:hidden">
         <div>
-          <p class="text-xs uppercase tracking-[0.25em] text-ocean-300/80">Current view</p>
+          <p class="text-xs uppercase tracking-[0.25em] text-ocean-300/80">{copy.shell.currentView}</p>
           <p class="mt-1 text-lg font-semibold text-white">{activeItem.label}</p>
         </div>
         <button
@@ -547,7 +621,7 @@
           class="touch-target rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-medium text-white transition hover:bg-white/10"
           onclick={() => (mobileMenuEnabled = !mobileMenuEnabled)}
         >
-          {mobileMenuEnabled ? "Close menu" : "Open menu"}
+          {mobileMenuEnabled ? copy.shell.closeMenu : copy.shell.openMenu}
         </button>
       </div>
 
@@ -568,44 +642,44 @@
     </div>
   </header>
 
-  <main class="relative mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 2xl:max-w-[96rem]">
+  <main class="relative mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 2xl:max-w-384">
     <section class={`grid gap-4 ${currentView === "calculator" ? 'grid-cols-1' : '2xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:items-start'}`}>
       <div class={`panel-surface relative rounded-4xl p-4 sm:p-6 ${currentView === "journal" ? 'z-30' : ''}`}>
         {#if currentView === "journal"}
-          <Journal moderatorSessionId={authState?.sessionId ?? null} canModerate={authState?.isAdmin ?? false} moderatorName={authState?.name ?? null} />
+            <Journal moderatorSessionId={authState?.sessionId ?? null} canModerate={authState?.isAdmin ?? false} moderatorName={authState?.name ?? null} locale={locale} uiText={copy.journal} />
         {:else if currentView === "calculator"}
-          <Calculator currentUser={authState?.registeredUser ?? null} />
+          <Calculator currentUser={authState?.registeredUser ?? null} uiText={copy.calculator} />
         {:else if currentView === "solutions"}
-          <Solutions currentUserName={authState?.name ?? null} currentUser={authState?.registeredUser ?? null} />
+          <Solutions currentUserName={authState?.name ?? null} currentUser={authState?.registeredUser ?? null} uiText={copy.solutions} />
         {:else if currentView === "fertilizers"}
-          <Fertilizers currentUserName={authState?.name ?? null} currentUser={authState?.registeredUser ?? null} />
+          <Fertilizers currentUserName={authState?.name ?? null} currentUser={authState?.registeredUser ?? null} uiText={copy.fertilizers} />
         {:else if currentView === "chat"}
           <div class="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">Realtime shell</p>
-              <h2 class="mt-2 text-2xl font-semibold text-white">Chat should feel like messaging, not a spreadsheet sidebar.</h2>
-              <p class="mt-3 text-sm leading-6 text-ocean-100/80">A phone-friendly chat view wants a message list, composer pinned to the bottom, and strong separation between collaboration and calculation tools.</p>
+              <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">{copy.app.chat.eyebrow}</p>
+              <h2 class="mt-2 text-2xl font-semibold text-white">{copy.app.chat.title}</h2>
+              <p class="mt-3 text-sm leading-6 text-ocean-100/80">{copy.app.chat.body}</p>
             </div>
             <div class="rounded-[1.75rem] border border-white/10 bg-black/20 p-4">
               <div class="space-y-3">
-                <div class="ml-auto max-w-[80%] rounded-3xl rounded-br-md bg-ocean-400 px-4 py-3 text-sm text-ocean-950">Stream-based chat is wired on the server, but the new client can use a proper mobile conversation layout.</div>
-                <div class="max-w-[82%] rounded-3xl rounded-bl-md bg-white/10 px-4 py-3 text-sm text-ocean-50">Keep the composer sticky, support attachment chips, and treat presence separately from the feed.</div>
+                <div class="ml-auto max-w-[80%] rounded-3xl rounded-br-md bg-ocean-400 px-4 py-3 text-sm text-ocean-950">{copy.app.chat.outgoingMessage}</div>
+                <div class="max-w-[82%] rounded-3xl rounded-bl-md bg-white/10 px-4 py-3 text-sm text-ocean-50">{copy.app.chat.incomingMessage}</div>
               </div>
               <div class="mt-4 flex gap-3">
-                <input class="touch-target min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none focus:border-ocean-300" placeholder="Type a message" />
-                <button type="button" class="touch-target rounded-2xl bg-sand-200 px-4 text-sm font-semibold text-ocean-950">Send</button>
+                <input class="touch-target min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none focus:border-ocean-300" placeholder={copy.app.chat.placeholder} />
+                <button type="button" class="touch-target rounded-2xl bg-sand-200 px-4 text-sm font-semibold text-ocean-950">{copy.app.chat.send}</button>
               </div>
             </div>
           </div>
         {:else}
           <div class="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">About this pass</p>
-              <h2 class="mt-2 text-2xl font-semibold text-white">The current work is about layout and interaction reliability.</h2>
-              <p class="mt-3 text-sm leading-6 text-ocean-100/80">Tailwind 4 gives you a faster styling loop, Svelte 5 is already in place, and the new virtualized grid is designed around predictable card heights instead of measuring arbitrary HTML after the fact.</p>
+              <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">{copy.about.eyebrow}</p>
+              <h2 class="mt-2 text-2xl font-semibold text-white">{copy.about.title}</h2>
+              <p class="mt-3 text-sm leading-6 text-ocean-100/80">{copy.about.body}</p>
             </div>
             <div class="rounded-[1.75rem] border border-white/10 bg-black/20 p-5 text-sm leading-6 text-ocean-100/80">
-              <p>The next step after this UI pass is to bind these screens to the NPRPC data model and session flow, while keeping the same mobile-first shell.</p>
+              <p>{copy.about.aside}</p>
             </div>
           </div>
         {/if}
@@ -617,96 +691,96 @@
             <section class="panel-surface rounded-4xl p-5">
               <div class="flex items-start justify-between gap-4">
                 <div>
-                  <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">Admin event panel</p>
-                  <h2 class="mt-2 text-xl font-semibold text-white">Seasonal runtime controls</h2>
-                  <p class="mt-2 text-sm leading-6 text-ocean-100/78">This pass stores the schedule in local browser storage and loads the fireworks code only when a live event or preview actually starts.</p>
+                  <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">{copy.app.event.adminEyebrow}</p>
+                  <h2 class="mt-2 text-xl font-semibold text-white">{copy.app.event.adminTitle}</h2>
+                  <p class="mt-2 text-sm leading-6 text-ocean-100/78">{copy.app.event.adminBody}</p>
                 </div>
                 <button
                   type="button"
                   class="touch-target rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10"
                   onclick={() => (eventPanelOpen = !eventPanelOpen)}
                 >
-                  {eventPanelOpen ? "Collapse" : "Expand"}
+                  {eventPanelOpen ? copy.app.event.collapse : copy.app.event.expand}
                 </button>
               </div>
 
               <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
                 <div class="rounded-3xl bg-black/20 p-4">
-                  <p class="text-ocean-100/70">Runtime</p>
-                  <p class="mt-1 text-lg font-semibold text-white">{eventRuntime ? "Live" : "Idle"}</p>
+                  <p class="text-ocean-100/70">{copy.app.event.runtime}</p>
+                  <p class="mt-1 text-lg font-semibold text-white">{eventRuntime ? copy.app.event.runtimeLive : copy.app.event.runtimeIdle}</p>
                 </div>
                 <div class="rounded-3xl bg-black/20 p-4">
-                  <p class="text-ocean-100/70">Schedule</p>
-                  <p class="mt-1 text-lg font-semibold text-white">{eventIsLive ? "Active" : eventConfig.enabled ? "Armed" : "Off"}</p>
+                  <p class="text-ocean-100/70">{copy.app.event.schedule}</p>
+                  <p class="mt-1 text-lg font-semibold text-white">{eventIsLive ? copy.app.event.scheduleActive : eventConfig.enabled ? copy.app.event.scheduleArmed : copy.app.event.scheduleOff}</p>
                 </div>
               </div>
 
               {#if eventPanelOpen}
                 <div class="mt-5 space-y-4 rounded-[1.75rem] border border-white/10 bg-black/18 p-4">
                   <div class="rounded-3xl border border-white/10 bg-white/4 px-4 py-3 text-sm text-ocean-50">
-                    <p class="font-semibold text-white">Shared server event</p>
-                    <p class="mt-1 text-xs text-ocean-100/70">{eventLoading ? "Loading from server..." : `Last update ${eventConfig.updatedAt || "not yet saved"}${eventConfig.updatedBy ? ` by ${eventConfig.updatedBy}` : ""}.`}</p>
+                    <p class="font-semibold text-white">{copy.app.event.sharedServerEvent}</p>
+                    <p class="mt-1 text-xs text-ocean-100/70">{eventLoading ? copy.app.event.loadingFromServer : getEventLastUpdate(eventConfig)}</p>
                   </div>
 
                   <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-[0.2em] text-ocean-200/70">
-                    Variant
+                    {copy.app.event.variant}
                     <select bind:value={eventDraft.variant} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-ocean-300 focus:bg-black/30">
-                      <option value="fireworks">New Year fireworks</option>
-                      <option value="snow">Winter snowfall</option>
-                      <option value="petals">Spring blossom</option>
+                      <option value="fireworks">{copy.app.event.variants.fireworks}</option>
+                      <option value="snow">{copy.app.event.variants.snow}</option>
+                      <option value="petals">{copy.app.event.variants.petals}</option>
                     </select>
                   </label>
 
                   <label class="flex items-center justify-between gap-4 rounded-3xl border border-white/10 bg-white/4 px-4 py-3 text-sm text-ocean-50">
                     <div>
-                      <span class="block font-semibold text-white">Enable shared event</span>
-                      <span class="mt-1 block text-xs text-ocean-100/70">Keeps the event armed for the configured window.</span>
+                      <span class="block font-semibold text-white">{copy.app.event.enableSharedEvent}</span>
+                      <span class="mt-1 block text-xs text-ocean-100/70">{copy.app.event.enableSharedEventHelp}</span>
                     </div>
                     <input bind:checked={eventDraft.enabled} class="h-5 w-5 accent-sand-200" type="checkbox" />
                   </label>
 
                   <label class="flex items-center justify-between gap-4 rounded-3xl border border-white/10 bg-white/4 px-4 py-3 text-sm text-ocean-50">
                     <div>
-                      <span class="block font-semibold text-white">Autoplay when users open the site</span>
-                      <span class="mt-1 block text-xs text-ocean-100/70">If no window is set, this will run on every fresh visit in this browser.</span>
+                      <span class="block font-semibold text-white">{copy.app.event.autoplay}</span>
+                      <span class="mt-1 block text-xs text-ocean-100/70">{copy.app.event.autoplayHelp}</span>
                     </div>
                     <input bind:checked={eventDraft.autoPlay} class="h-5 w-5 accent-sand-200" type="checkbox" />
                   </label>
 
                   <div class="grid gap-3 sm:grid-cols-2">
                     <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-[0.2em] text-ocean-200/70">
-                      Starts
+                      {copy.app.event.starts}
                       <input bind:value={eventDraft.startAt} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-ocean-300 focus:bg-black/30" type="datetime-local" />
                     </label>
                     <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-[0.2em] text-ocean-200/70">
-                      Ends
+                      {copy.app.event.ends}
                       <input bind:value={eventDraft.endAt} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-ocean-300 focus:bg-black/30" type="datetime-local" />
                     </label>
                   </div>
 
                   <div class="grid gap-3 sm:grid-cols-2">
                     <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-[0.2em] text-ocean-200/70">
-                      Duration
+                      {copy.app.event.duration}
                       <select bind:value={eventDraft.durationSeconds} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-ocean-300 focus:bg-black/30">
-                        <option value={10}>10 seconds</option>
-                        <option value={18}>18 seconds</option>
-                        <option value={24}>24 seconds</option>
-                        <option value={30}>30 seconds</option>
+                        <option value={10}>{copy.app.event.durationOptions.ten}</option>
+                        <option value={18}>{copy.app.event.durationOptions.eighteen}</option>
+                        <option value={24}>{copy.app.event.durationOptions.twentyFour}</option>
+                        <option value={30}>{copy.app.event.durationOptions.thirty}</option>
                       </select>
                     </label>
                     <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-[0.2em] text-ocean-200/70">
-                      Intensity
+                      {copy.app.event.intensity}
                       <select bind:value={eventDraft.intensity} class="touch-target rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition focus:border-ocean-300 focus:bg-black/30">
-                        <option value="gentle">Gentle</option>
-                        <option value="showtime">Showtime</option>
+                        <option value="gentle">{copy.app.event.intensities.gentle}</option>
+                        <option value="showtime">{copy.app.event.intensities.showtime}</option>
                       </select>
                     </label>
                   </div>
 
                   <div class="rounded-3xl border border-sand-200/18 bg-sand-200/8 px-4 py-3 text-sm text-sand-50">
-                    <p class="font-semibold text-white">{getSiteEventVariantLabel(eventDraft)}</p>
-                    <p class="mt-1 text-xs text-sand-100/80">{getSiteEventVariantDescription(eventDraft.variant)}</p>
-                    <p class="mt-2 text-xs text-sand-100/75">{describeSiteEventWindow(eventDraft)}</p>
+                    <p class="font-semibold text-white">{siteEventVariantLabel(eventDraft.variant)}</p>
+                    <p class="mt-1 text-xs text-sand-100/80">{siteEventVariantDescription(eventDraft.variant)}</p>
+                    <p class="mt-2 text-xs text-sand-100/75">{getEventWindowLabel(eventDraft)}</p>
                   </div>
 
                   <div class="flex flex-wrap gap-3">
@@ -716,7 +790,7 @@
                       onclick={() => void startEventPlayback("preview", eventDraft)}
                       disabled={eventRuntimeBusy}
                     >
-                      {eventRuntimeBusy ? "Loading..." : `Preview ${eventDraft.variant === "snow" ? "snow" : eventDraft.variant === "petals" ? "petals" : "fireworks"}`}
+                      {eventRuntimeBusy ? copy.shell.working : copy.app.event.previewVariant(siteEventVariantLabel(eventDraft.variant))}
                     </button>
                     <button
                       type="button"
@@ -724,14 +798,14 @@
                       onclick={() => stopFireworks()}
                       disabled={!eventRuntime}
                     >
-                      Stop preview
+                      {copy.app.event.stopPreview}
                     </button>
                     <button
                       type="button"
                       class="touch-target rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10"
                       onclick={clearEventWindow}
                     >
-                      Clear schedule
+                      {copy.app.event.clearSchedule}
                     </button>
                     <button
                       type="button"
@@ -739,7 +813,7 @@
                       onclick={resetEventDraft}
                       disabled={!eventDraftDirty}
                     >
-                      Reset draft
+                      {copy.app.event.resetDraft}
                     </button>
                     <button
                       type="button"
@@ -747,7 +821,7 @@
                       onclick={() => void saveSiteEventConfig()}
                       disabled={eventSaving || !eventDraftDirty}
                     >
-                      {eventSaving ? "Saving..." : "Save shared event"}
+                      {eventSaving ? copy.app.event.savingSharedEvent : copy.app.event.saveSharedEvent}
                     </button>
                   </div>
 
@@ -763,7 +837,7 @@
             <section class="panel-surface rounded-4xl p-5">
               <div class="flex items-start justify-between gap-3">
                 <div>
-                  <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">{activeItem.label} snapshot</p>
+                  <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">{activeItem.label} {copy.app.snapshot.titleSuffix}</p>
                   <p class="mt-2 text-sm leading-6 text-ocean-100/72">{activeItem.blurb}</p>
                 </div>
               </div>
@@ -779,11 +853,11 @@
             </section>
 
             <section class="panel-surface rounded-4xl p-5">
-              <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">Mobile priorities</p>
+              <p class="text-xs font-semibold uppercase tracking-[0.25em] text-ocean-300">{copy.app.priorities.title}</p>
               <ol class="mt-4 space-y-3 text-sm leading-6 text-ocean-100/80">
-                <li>Keep story context visible while uploads continue in the background.</li>
-                <li>Collapse dense control groups into stacked sections.</li>
-                <li>Avoid desktop-only hover affordances for core actions.</li>
+                {#each copy.app.priorities.items as priority}
+                  <li>{priority}</li>
+                {/each}
               </ol>
             </section>
           {/if}
@@ -791,4 +865,11 @@
       {/if}
     </section>
   </main>
+
+  <footer class="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-8 2xl:max-w-384">
+    <div class="panel-surface flex flex-col gap-3 rounded-4xl px-5 py-4 text-sm text-ocean-100/76 sm:flex-row sm:items-center sm:justify-between">
+      <p>{copy.footer.summary}</p>
+      <p>{copy.footer.poweredBy} <span class="font-semibold text-white">NPRPC</span></p>
+    </div>
+  </footer>
 </div>
