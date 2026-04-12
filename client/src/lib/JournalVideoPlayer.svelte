@@ -30,24 +30,6 @@
     return [offset, end - offset + 1n];
   }
 
-  async function mergeStream(stream: AsyncIterable<Uint8Array>): Promise<Uint8Array> {
-    const chunks: Uint8Array[] = [];
-    let totalLength = 0;
-
-    for await (const chunk of stream) {
-      chunks.push(chunk);
-      totalLength += chunk.byteLength;
-    }
-
-    const output = new Uint8Array(totalLength);
-    let position = 0;
-    for (const chunk of chunks) {
-      output.set(chunk, position);
-      position += chunk.byteLength;
-    }
-    return output;
-  }
-
   async function ensureSchemeRegistered(shaka: any): Promise<void> {
     if (schemeRegistered) {
       return;
@@ -58,56 +40,41 @@
       "nprpc-journal",
       (uri: string, request: any, type: number) => {
         const MANIFEST = 0;
-        let streamReader: any = null;
-        let aborted = false;
-        let rejectFn: ((e: Error) => void) | null = null;
+        const abortManifest = new AbortController();
+        const abortChunk = new AbortController();
 
-        const promise = new Promise<any>((resolve, reject) => {
-          rejectFn = reject;
-          (async () => {
-            try {
-              const url = new URL(uri);
-              const requestedAssetId = BigInt(url.hostname);
-              const representation = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
+        const promise = (async (): Promise<any> => {
+          const url = new URL(uri);
+          const requestedAssetId = BigInt(url.hostname);
+          const representation = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
 
-              let bytes: Uint8Array;
+          let bytes: Uint8Array;
 
-              if (type === MANIFEST) {
-                const manifest = await media.GetVideoDashManifest(requestedAssetId);
-                bytes = new TextEncoder().encode(manifest);
-              } else {
-                const rangeHeader = request.headers?.Range ?? request.headers?.range;
-                if (!rangeHeader) {
-                  throw new Error(`Missing Range header for media request: ${uri}`);
-                }
-                const [offset, length] = parseByteRange(rangeHeader);
-                const stream = await media.GetVideoDashSegmentRange(requestedAssetId, offset, length, representation);
-                if (aborted) {
-                  stream.cancel();
-                  return;
-                }
-                streamReader = stream;
-                bytes = await mergeStream(stream as AsyncIterable<Uint8Array>);
-                bytesLoaded += bytes.byteLength;
-              }
-
-              resolve({
-                uri,
-                headers: {},
-                data: bytes.buffer,
-                fromCache: false,
-                timeMs: 0,
-              });
-            } catch (e) {
-              reject(e);
+          if (type === MANIFEST) {
+            const manifest = await media.http.GetVideoDashManifest(requestedAssetId, abortManifest.signal);
+            bytes = new TextEncoder().encode(manifest);
+          } else {
+            const rangeHeader = request.headers?.Range ?? request.headers?.range;
+            if (!rangeHeader) {
+              throw new Error(`Missing Range header for media request: ${uri}`);
             }
-          })();
-        });
+            const [offset, length] = parseByteRange(rangeHeader);
+            bytes = await media.http.GetVideoDashSegmentRange(requestedAssetId, offset, length, representation, abortChunk.signal);
+            bytesLoaded += bytes.byteLength;
+          }
+
+          return {
+            uri,
+            headers: {},
+            data: bytes,
+            fromCache: false,
+            timeMs: 0,
+          };
+        })();
 
         return new shaka.util.AbortableOperation(promise, () => {
-          aborted = true;
-          streamReader?.cancel();
-          rejectFn?.(new Error("AbortError"));
+          abortManifest.abort();
+          abortChunk.abort();
           return Promise.resolve();
         });
       },

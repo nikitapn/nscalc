@@ -1672,24 +1672,9 @@ final class MediaServiceServantImpl: MediaServiceServant, @unchecked Sendable {
         """
     }
 
-    override func getVideoDashSegmentRange(asset_id: UInt64, byte_offset: UInt64, byte_length: UInt64, representation: String) -> AsyncStream<binary> {
+    override func getVideoDashSegmentRange(asset_id: UInt64, byte_offset: UInt64, byte_length: UInt64, representation: String) -> binary {
         let processedSlice = try? store.processedMediaSlice(assetId: asset_id, representation: representation, offset: byte_offset, length: byte_length)
         let useLegacyFallback = representation.isEmpty || representation == "segment.mp4" || representation == "stream.mp4" || representation == "stream_dashinit.mp4"
-        let slice = processedSlice ?? (useLegacyFallback ? store.mediaSlice(assetId: asset_id, offset: byte_offset, length: byte_length) : [])
-        return AsyncStream { continuation in
-            guard !slice.isEmpty else {
-                continuation.finish()
-                return
-            }
-
-            let chunkSize = 32 * 1024
-            var start = 0
-            while start < slice.count {
-                let end = min(start + chunkSize, slice.count)
-                continuation.yield(Array(slice[start..<end]))
-                start = end
-            }
-            continuation.finish()
-        }
+        return processedSlice ?? (useLegacyFallback ? store.mediaSlice(assetId: asset_id, offset: byte_offset, length: byte_length) : [])
     }
 }

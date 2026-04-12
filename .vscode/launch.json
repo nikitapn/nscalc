@@ -1,0 +1,24 @@
+{
+  "configurations": [
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:nscalc}/server",
+      "name": "Debug NScalcServer (server)",
+      "target": "NScalcServer",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug NScalcServer (server)"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:nscalc}/server",
+      "name": "Release NScalcServer (server)",
+      "target": "NScalcServer",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release NScalcServer (server)"
+    }
+  ]
+}
