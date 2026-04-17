@@ -46,8 +46,6 @@ docker run --rm \
     cp -a /lib/x86_64-linux-gnu/libstdc++.so.6* /out/system/x86_64-linux-gnu/
     cp -a /lib/x86_64-linux-gnu/libgcc_s.so.1* /out/system/x86_64-linux-gnu/
     cp -a /lib/x86_64-linux-gnu/libatomic.so.1* /out/system/x86_64-linux-gnu/
-    cp -a /opt/openssl/lib/libssl.so.3* /out/system/x86_64-linux-gnu/
-    cp -a /opt/openssl/lib/libcrypto.so.3* /out/system/x86_64-linux-gnu/
   '
 
 tar -C "$BUNDLE_ROOT" -czf "$ROOT_DIR/runtime/nscalc-prod-bundle.tar.gz" .
