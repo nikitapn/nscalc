@@ -15,7 +15,7 @@ CERT_DIR="/etc/letsencrypt"
 PUBLIC_KEY="/certs/live/nikitapn.com/fullchain.pem"
 PRIVATE_KEY="/certs/live/nikitapn.com/privkey.pem"
 DH_PARAMS=""
-SHM_C2S="/dev/shm/nprpc_quic_edge_c2s"
+SHM_C2S="/dev/shm/nprpc_nscalc_ingress_c2s"
 SHM_S2C="/dev/shm/nprpc_quic_edge_s2c"
 
 usage() {
@@ -166,7 +166,7 @@ DOCKER_ARGS=(
   -p "$PORT:443/udp"
   -v "$APP_DIR/data:/data"
   -v "$CERT_DIR:/certs:ro"
-  --mount "type=bind,src=$SHM_C2S,dst=/dev/shm/nprpc_quic_edge_c2s"
+  --mount "type=bind,src=$SHM_C2S,dst=/dev/shm/nprpc_nscalc_ingress_c2s"
   --mount "type=bind,src=$SHM_S2C,dst=/dev/shm/nprpc_quic_edge_s2c"
   -e "NSCALC_HOSTNAME=$HOSTNAME"
   -e "NSCALC_PORT=443"
