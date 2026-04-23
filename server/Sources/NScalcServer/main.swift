@@ -289,7 +289,9 @@ do {
             .maxWebSocketMessageSize(6 * 1024 * 1024)
             .maxWebTransportMessageSize(6 * 1024 * 1024)
             .allowOrigins(["http://localhost:5173", "http://127.0.0.1:5173"]) // Vite dev server
-            .watchFiles()
+            // .watchFiles()
+            .http3ShmEgressChannel("quic_edge")
+            .http3Workers(1)
 
     if config.useSsl {
         httpBuilder.ssl(

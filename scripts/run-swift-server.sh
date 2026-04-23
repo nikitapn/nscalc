@@ -14,8 +14,8 @@ DOCKER_IMAGE="nscalc-builder:latest"
 BUILD_CONFIG="release"
 HOSTNAME_ARG="localhost"
 PORT_ARG="8443"
-ENABLE_HTTP3=0
-USE_SSL=0
+ENABLE_HTTP3=1
+USE_SSL=1
 PUBLIC_KEY_ARG="/app/certs/out/localhost.crt"
 PRIVATE_KEY_ARG="/app/certs/out/localhost.key"
 DH_PARAMS_ARG=""
@@ -104,6 +104,7 @@ DOCKER_CMD=(
     --name nscalc-swift
     --cap-add=NET_ADMIN
     --cap-add=BPF
+    --ipc=host
 
     # Mount project sub-trees the server needs at runtime
     -v "$ROOT_DIR/server":/app/server:ro
@@ -112,8 +113,8 @@ DOCKER_CMD=(
     -v "$ROOT_DIR/sample_data":/app/sample_data      # rw — SQLite DB lives here
 
     # Expose the RPC/HTTP port
-    -p "${PORT_ARG}:${PORT_ARG}/tcp"
-    -p "${PORT_ARG}:${PORT_ARG}/udp"    # HTTP/3 (QUIC) uses UDP
+    -p "${PORT_ARG}:443/tcp"
+    -p "${PORT_ARG}:443/udp"
 
     -w /app
     "$DOCKER_IMAGE"
@@ -126,7 +127,7 @@ fi
 DOCKER_CMD+=(
     "$BINARY"
     --hostname "$HOSTNAME_ARG"
-    --port     "$PORT_ARG"
+    --port     443
     --http-dir /app/runtime/www
     --data-dir /app/sample_data
     --use-ssl  "$USE_SSL"

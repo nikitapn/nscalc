@@ -8,13 +8,15 @@ APP_DIR="/home/debian/nscalc-new"
 REMOTE_TMP_DIR="/tmp/nscalc-release"
 IMAGE_NAME="nscalc-swift:latest"
 CONTAINER_NAME="nscalc-swift"
-PORT="443"
+PORT="8443"
 HOSTNAME=""
 SSH_TARGET=""
 CERT_DIR="/etc/letsencrypt"
 PUBLIC_KEY="/certs/live/nikitapn.com/fullchain.pem"
 PRIVATE_KEY="/certs/live/nikitapn.com/privkey.pem"
 DH_PARAMS=""
+SHM_C2S="/dev/shm/nprpc_quic_edge_c2s"
+SHM_S2C="/dev/shm/nprpc_quic_edge_s2c"
 
 usage() {
   cat <<'EOF'
@@ -31,6 +33,8 @@ Usage: ./deploy.sh --ssh user@server --hostname calc.example.com --cert-dir /pat
   --public-key <path>         Certificate path inside the container (default: /certs/fullchain.pem)
   --private-key <path>        Private key path inside the container (default: /certs/privkey.pem)
   --dh-params <path>          DH params path inside the container
+  --shm-c2s <path>            Host shared-memory file for QUIC client->server traffic
+  --shm-s2c <path>            Host shared-memory file for QUIC server->client traffic
 
 The production container is started with CAP_NET_ADMIN and CAP_BPF so NPRPC can
 install the eBPF SO_REUSEPORT selector required by multi-worker HTTP/3.
@@ -83,6 +87,14 @@ while [ $# -gt 0 ]; do
       DH_PARAMS="$2"
       shift
       ;;
+    --shm-c2s)
+      SHM_C2S="$2"
+      shift
+      ;;
+    --shm-s2c)
+      SHM_S2C="$2"
+      shift
+      ;;
     --help)
       usage
       exit 0
@@ -122,9 +134,18 @@ ssh "$SSH_TARGET" \
   PRIVATE_KEY="$PRIVATE_KEY" \
   PUBLIC_KEY="$PUBLIC_KEY" \
   RELEASE_DIR="$RELEASE_DIR" \
+  SHM_C2S="$SHM_C2S" \
+  SHM_S2C="$SHM_S2C" \
   REMOTE_TMP_DIR="$REMOTE_TMP_DIR" \
   'bash -se' <<'EOF'
 set -euo pipefail
+
+for shm_file in "$SHM_C2S" "$SHM_S2C"; do
+  if [ ! -e "$shm_file" ]; then
+    echo "Required shared-memory file not found: $shm_file" >&2
+    exit 1
+  fi
+done
 
 mkdir -p "$REMOTE_TMP_DIR" "$APP_DIR/data" "$RELEASE_DIR"
 rm -rf "$REMOTE_TMP_DIR"/*
@@ -141,12 +162,14 @@ DOCKER_ARGS=(
   --user 0:0
   --cap-add=NET_ADMIN
   --cap-add=BPF
-  -p "$PORT:$PORT/tcp"
-  -p "$PORT:$PORT/udp"
+  -p "$PORT:443/tcp"
+  -p "$PORT:443/udp"
   -v "$APP_DIR/data:/data"
   -v "$CERT_DIR:/certs:ro"
+  --mount "type=bind,src=$SHM_C2S,dst=/dev/shm/nprpc_quic_edge_c2s"
+  --mount "type=bind,src=$SHM_S2C,dst=/dev/shm/nprpc_quic_edge_s2c"
   -e "NSCALC_HOSTNAME=$HOSTNAME"
-  -e "NSCALC_PORT=$PORT"
+  -e "NSCALC_PORT=443"
   -e "NSCALC_DATA_DIR=/data"
   -e "NSCALC_ENABLE_HTTP3=1"
   -e "NSCALC_USE_SSL=1"

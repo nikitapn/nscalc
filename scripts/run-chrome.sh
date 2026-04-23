@@ -3,7 +3,7 @@
 SCRIPTS_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") 
 ROOT_DIR=$(dirname "$SCRIPTS_DIR")
 CHROMIUM_BIN="/usr/bin/chromium"
-HOST="localhost:8443"
+HOST="calculator.lan:443"
 CERTIFICATE_PATH="$ROOT_DIR/certs/out/localhost.crt"
 
 CERTIFICATE_SPKI=$(node <<EOF
