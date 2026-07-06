@@ -230,6 +230,36 @@ final class AppDatabase: Sendable {
             """)
         }
 
+        // `formula X purity Y` used to be a no-op for Y — the purity
+        // multiplier was folded into the formula's element masses *before*
+        // normalizing by their own sum, so it canceled out algebraically.
+        // Re-run the same re-parse-and-overwrite pass as v2 with the fixed
+        // parser so already-migrated rows (e.g. the many "P2O5 purity NN"/
+        // "K2O purity NN" seed entries) get corrected percentages.
+        migrator.registerMigration("v6_fertilizer_purity_fix") { db in
+            let rows = try Row.fetchAll(db, sql: "SELECT id, formula FROM Fertilizer")
+            for row in rows {
+                let id: Int64 = row["id"]
+                let formula = (row["formula"] as String?) ?? ""
+                let parsed = try FertilizerFormulaParser.parse(script: formula)
+                try db.execute(
+                    sql: """
+                        UPDATE Fertilizer
+                        SET NO3 = ?, NH4 = ?, P = ?, K = ?, Ca = ?, Mg = ?, S = ?, Cl = ?,
+                          Fe = ?, Zn = ?, B = ?, Mn = ?, Cu = ?, Mo = ?,
+                          bottle = ?, fertilizerType = ?, density = ?, cost = ?
+                        WHERE id = ?
+                    """,
+                    arguments: [
+                        parsed.elements[0], parsed.elements[1], parsed.elements[2], parsed.elements[3], parsed.elements[4], parsed.elements[5], parsed.elements[6], parsed.elements[7],
+                        parsed.elements[8], parsed.elements[9], parsed.elements[10], parsed.elements[11], parsed.elements[12], parsed.elements[13],
+                        parsed.bottle, parsed.fertilizerType, parsed.density, parsed.cost,
+                        id,
+                    ]
+                )
+            }
+        }
+
         try migrator.migrate(dbQueue)
     }
 }

@@ -50,6 +50,12 @@ private struct ParsedFormula {
     var nh2Count: Double
     var nh4Count: Double
     var no3Count: Double
+    /// Fraction (0...1) of the fertilizer's mass that this formula's compound
+    /// actually represents — applied as a final scale on the computed percent,
+    /// *after* normalizing by the formula's own molecular mass. Must not be
+    /// folded into `elements`/`nh2Count`/etc. before that normalization, or it
+    /// cancels out algebraically (ratio of two values scaled by the same factor).
+    var purityMultiplier: Double = 1.0
 }
 
 private enum FormulaNode {
@@ -180,11 +186,12 @@ private final class ScriptParser {
         guard totalMass > 0 else {
             throw ParserError.message("formula mass must be greater than zero")
         }
+        let purityMultiplier = formula.purityMultiplier
 
         if let nitrogenMass = formula.elements["N"] {
             let nSum = formula.nh2Count + formula.nh4Count + formula.no3Count
             if nSum > 0 {
-                let nitrogenPercent = nitrogenMass / totalMass * 100
+                let nitrogenPercent = nitrogenMass / totalMass * 100 * purityMultiplier
                 let no3Percent = formula.no3Count / nSum * nitrogenPercent
                 let nh4Percent = formula.nh4Count / nSum * nitrogenPercent
                 try setNitrogen(no3Percent: no3Percent, nh4Percent: nh4Percent, elements: &elements)
@@ -195,7 +202,7 @@ private final class ScriptParser {
             guard let index = Self.formulaElementToTargetIndex[symbol] else {
                 continue
             }
-            let percent = mass / totalMass * 100
+            let percent = mass / totalMass * 100 * purityMultiplier
             if elements[index] != 0, percent != 0 {
                 throw ParserError.message("element redefinition")
             }
@@ -307,30 +314,20 @@ private final class FormulaStatementParser {
     }
 
     func parse() throws -> ParsedFormula {
-        let formula = try parser.parseFormula()
+        var formula = try parser.parseFormula()
         parser.skipWhitespace()
 
-        var purity: Double? = nil
         if parser.consumeKeyword("purity") {
-            purity = try ExpressionParser(text: parser.remainingText()).parse()
+            let purity = try ExpressionParser(text: parser.remainingText()).parse()
             parser = ChemicalFormulaParser(text: "")
+            guard purity >= 0, purity <= 100 else {
+                throw ParserError.message("invalid purity value: \(purity)")
+            }
+            formula.purityMultiplier = purity * 0.01
         }
 
         if !parser.remainingText().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             throw ParserError.message("unexpected trailing formula input: \(text)")
-        }
-
-        if let purity {
-            if purity < 0 || purity > 100 {
-                throw ParserError.message("invalid purity value: \(purity)")
-            }
-            let multiplier = purity * 0.01
-            return ParsedFormula(
-                elements: formula.elements.mapValues { $0 * multiplier },
-                nh2Count: formula.nh2Count * multiplier,
-                nh4Count: formula.nh4Count * multiplier,
-                no3Count: formula.no3Count * multiplier
-            )
         }
 
         return formula
