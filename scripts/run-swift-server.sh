@@ -13,20 +13,22 @@ ROOT_DIR=$(dirname "$SCRIPTS_DIR")
 DOCKER_IMAGE="nscalc-builder:latest"
 BUILD_CONFIG="release"
 HOSTNAME_ARG="localhost"
-PORT_ARG="8443"
+PORT_ARG="443"
 ENABLE_HTTP3=1
 USE_SSL=1
 PUBLIC_KEY_ARG="/app/certs/out/localhost.crt"
 PRIVATE_KEY_ARG="/app/certs/out/localhost.key"
 DH_PARAMS_ARG=""
+OLLAMA_HOST_ARG="${NSCALC_OLLAMA_HOST:-}"
+OLLAMA_MODEL_ARG="${NSCALC_OLLAMA_MODEL:-}"
 
-HOST_JSON="$ROOT_DIR/client/dist/host.json"
-if [ -f "$HOST_JSON" ]; then
-    _host=$(python3 -c "import json,sys; d=json.load(open('$HOST_JSON')); print(d.get('hostname','localhost'))" 2>/dev/null || true)
-    _port=$(python3 -c "import json,sys; d=json.load(open('$HOST_JSON')); print(d.get('port',8443))" 2>/dev/null || true)
-    [ -n "$_host" ] && HOSTNAME_ARG=$_host
-    [ -n "$_port" ] && PORT_ARG=$_port
-fi
+# HOST_JSON="$ROOT_DIR/client/dist/host.json"
+# if [ -f "$HOST_JSON" ]; then
+#     _host=$(python3 -c "import json,sys; d=json.load(open('$HOST_JSON')); print(d.get('hostname','localhost'))" 2>/dev/null || true)
+#     _port=$(python3 -c "import json,sys; d=json.load(open('$HOST_JSON')); print(d.get('port',8443))" 2>/dev/null || true)
+#     [ -n "$_host" ] && HOSTNAME_ARG=$_host
+#     [ -n "$_port" ] && PORT_ARG=$_port
+# fi
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -53,6 +55,14 @@ while [ $# -gt 0 ]; do
             DH_PARAMS_ARG="$2"
             shift
             ;;
+        --ollama-host)
+            OLLAMA_HOST_ARG="$2"
+            shift
+            ;;
+        --ollama-model)
+            OLLAMA_MODEL_ARG="$2"
+            shift
+            ;;
         --disable-http3)
             ENABLE_HTTP3=0
             ;;
@@ -69,6 +79,8 @@ Usage: ./run-swift-server.sh [options]
   --public-key <path>  Certificate path inside the container
   --private-key <path> Private key path inside the container
   --dh-params <path>   Optional DH params path inside the container
+  --ollama-host <url>  Ollama server base URL for the AI assistant (default: NSCALC_OLLAMA_HOST env, else http://localhost:11434)
+  --ollama-model <name> Ollama model to use for the AI assistant (default: NSCALC_OLLAMA_MODEL env; assistant disabled if unset)
   --disable-http3      Disable HTTP/3
   --disable-ssl        Disable TLS
 EOF
@@ -105,6 +117,13 @@ DOCKER_CMD=(
     --cap-add=NET_ADMIN
     --cap-add=BPF
     --ipc=host
+
+    # Lets --ollama-host http://host.docker.internal:<port> reach an Ollama
+    # instance running on this same machine (outside the container). Linux
+    # Docker doesn't map this hostname by default the way Docker Desktop
+    # does, so it must be added explicitly; harmless/no-op if you point
+    # --ollama-host at a real remote machine instead.
+    --add-host=host.docker.internal:host-gateway
 
     # Mount project sub-trees the server needs at runtime
     -v "$ROOT_DIR/server":/app/server:ro
@@ -145,6 +164,13 @@ fi
 
 if [ "$ENABLE_HTTP3" = "1" ]; then
     DOCKER_CMD+=(--enable-http3)
+fi
+
+if [ -n "$OLLAMA_HOST_ARG" ]; then
+    DOCKER_CMD+=(--ollama-host "$OLLAMA_HOST_ARG")
+fi
+if [ -n "$OLLAMA_MODEL_ARG" ]; then
+    DOCKER_CMD+=(--ollama-model "$OLLAMA_MODEL_ARG")
 fi
 
 exec "${DOCKER_CMD[@]}"

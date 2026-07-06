@@ -1,4 +1,4 @@
-// Copyright (c) 2025 nikitapnn1@gmail.com
+// Copyright (c) 2026 nikitapnn1@gmail.com
 
 import GRDB
 import NScalc
@@ -6,7 +6,7 @@ import NScalc
 // MARK: - Column-name order mirrors ELEMENT enum in nscalc.npidl
 // Index: 0=NO3  1=NH4  2=P  3=K  4=Ca  5=Mg  6=S   7=Cl
 //        8=Fe   9=Zn  10=B  11=Mn 12=Cu 13=Mo
-private let elementColumns = ["NO3","NH4","P","K","Ca","Mg","S","Cl","Fe","Zn","B","Mn","Cu","Mo"]
+let elementColumns = ["NO3","NH4","P","K","Ca","Mg","S","Cl","Fe","Zn","B","Mn","Cu","Mo"]
 
 // MARK: - SolutionRecord
 

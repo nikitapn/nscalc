@@ -1,4 +1,4 @@
-// Copyright (c) 2022-2025 nikitapnn1@gmail.com
+// Copyright (c) 2022-2026 nikitapnn1@gmail.com
 // This file is a part of Nikita's NPK calculator and covered by LICENSING file in the topmost directory
 
 module nscalc;
@@ -229,4 +229,27 @@ interface Calculator {
 interface SiteEventService {
   string GetSiteEventConfig();
   string SetSiteEventConfig(session_id: in string, config_json: in string) raises(AuthorizationFailed, PermissionViolation, InvalidArgument);
+}
+
+enum AssistantEventStatus {
+  Thinking,
+  ToolCall,
+  Done,
+  Error
+}
+
+message AssistantAsk {
+  request_id: string;
+  prompt: string;
+}
+
+message AssistantEvent {
+  request_id: string;
+  status: AssistantEventStatus;
+  detail?: string;
+  solution?: Solution;
+}
+
+interface AssistantService {
+  bidi_stream<AssistantAsk, AssistantEvent> Connect(session_id: in string);
 }

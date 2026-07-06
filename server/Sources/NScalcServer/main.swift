@@ -1,4 +1,4 @@
-// Copyright (c) 2025 nikitapnn1@gmail.com
+// Copyright (c) 2026 nikitapnn1@gmail.com
 // NScalc Swift Server — skeleton entry point.
 //
 // Run gen_stubs.py first to populate Sources/NScalcServer/Generated/ before building.
@@ -18,6 +18,8 @@ struct ServerConfig {
     let publicKeyPath: String?
     let privateKeyPath: String?
     let dhParamsPath: String?
+    let ollamaHost: String
+    let ollamaModel: String?
 
     var dbPath: String {
         let dataURL = URL(fileURLWithPath: dataDir)
@@ -91,6 +93,8 @@ private func printUsage() {
       --public-key <path>     TLS certificate path
       --private-key <path>    TLS private key path
       --dh-params <path>      Optional DH params path
+      --ollama-host <url>     Ollama server base URL for the AI assistant (default: http://localhost:11434)
+      --ollama-model <name>   Ollama model to use for the AI assistant (must support tool calling, e.g. llama3.1, qwen2.5). If unset, the assistant feature is disabled.
       --help                  Show this help message
     """)
 }
@@ -118,6 +122,8 @@ private func parseServerConfig() throws -> ServerConfig {
     var publicKeyPath = env["NSCALC_PUBLIC_KEY"]
     var privateKeyPath = env["NSCALC_PRIVATE_KEY"]
     var dhParamsPath = env["NSCALC_DH_PARAMS"]
+    var ollamaHost = env["NSCALC_OLLAMA_HOST"] ?? "http://localhost:11434"
+    var ollamaModel = env["NSCALC_OLLAMA_MODEL"]
 
     let args = Array(CommandLine.arguments.dropFirst())
     var index = 0
@@ -164,6 +170,10 @@ private func parseServerConfig() throws -> ServerConfig {
             privateKeyPath = try optionValue(option, inlineValue: inlineValue, index: &index, args: args)
         case "--dh-params":
             dhParamsPath = try optionValue(option, inlineValue: inlineValue, index: &index, args: args)
+        case "--ollama-host":
+            ollamaHost = try optionValue(option, inlineValue: inlineValue, index: &index, args: args)
+        case "--ollama-model":
+            ollamaModel = try optionValue(option, inlineValue: inlineValue, index: &index, args: args)
         default:
             throw ServerConfigError.unknownArgument(argument)
         }
@@ -188,6 +198,8 @@ private func parseServerConfig() throws -> ServerConfig {
         publicKeyPath: publicKeyPath,
         privateKeyPath: privateKeyPath,
         dhParamsPath: dhParamsPath,
+        ollamaHost: ollamaHost,
+        ollamaModel: ollamaModel,
     )
 }
 
@@ -289,7 +301,7 @@ do {
             .maxWebSocketMessageSize(6 * 1024 * 1024)
             .maxWebTransportMessageSize(6 * 1024 * 1024)
             .allowOrigins(["http://localhost:5173", "http://127.0.0.1:5173"]) // Vite dev server
-            .http3ShmChannels(egress: "quic_edge", ingress: "nscalc_ingress")
+            // .http3ShmChannels(egress: "quic_edge", ingress: "nscalc_ingress")
             .http3Workers(1)
             // .watchFiles()
 
@@ -343,6 +355,9 @@ do {
     let siteEvents = SiteEventServiceServantImpl(db: appDB)
     let siteEventsOid = try poa.activateObjectWithId(objectId: UInt64(10), servant: siteEvents, flags: .allowAll)
 
+    let assistant = AssistantServiceServantImpl(db: appDB, ollamaHost: config.ollamaHost, ollamaModel: config.ollamaModel)
+    let assistantOid = try poa.activateObjectWithId(objectId: UInt64(11), servant: assistant, flags: .allowAll)
+
     rpc.clearHostJson()
     try rpc.addToHostJson(name: "calculator", objectId: calcOid)
     try rpc.addToHostJson(name: "authorizator", objectId: authOid)
@@ -353,6 +368,7 @@ do {
     try rpc.addToHostJson(name: "journal_stream", objectId: storyStreamOid)
     try rpc.addToHostJson(name: "journal_media", objectId: mediaOid)
     try rpc.addToHostJson(name: "site_events", objectId: siteEventsOid)
+    try rpc.addToHostJson(name: "assistant", objectId: assistantOid)
     let hostJsonPath = try rpc.produceHostJson(outputPath: config.hostJsonOutputPath)
 
     if false {
@@ -364,6 +380,7 @@ do {
         print("Activated StoryStreamService with oid: \(storyStreamOid)")
         print("Activated MediaService with oid: \(mediaOid)")
         print("Activated SiteEventService with oid: \(siteEventsOid)")
+        print("Activated AssistantService with oid: \(assistantOid)")
         print("host.json: \(hostJsonPath)")
     }
     // Set up signal handling for graceful shutdown
@@ -377,7 +394,11 @@ do {
     signal(SIGINT, SIG_IGN)
     signalSource.resume()
 
-    try rpc.startThreadPool(1)
+    // 4 workers (was 1): AssistantService.Ask blocks its worker thread for the
+    // duration of up to several sequential Ollama HTTP round-trips, so a single
+    // worker would stall every other RPC call server-wide while an assistant
+    // request is in flight.
+    try rpc.startThreadPool(4)
 
     // Block forever waiting for RPC calls
     dispatchMain()

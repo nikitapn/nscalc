@@ -3,7 +3,8 @@
   import { onMount } from "svelte";
   import Solution from "./Solution.svelte";
   import Virtual from "./Virtual.svelte";
-  import type { SolutionsCopy } from "../lib/i18n";
+  import AssistantPanel from "../lib/AssistantPanel.svelte";
+  import type { SolutionsCopy, AssistantCopy } from "../lib/i18n";
   import { elementOrder, type ElementKey } from "../lib/calculatorEngine";
   import { solutionCardFromRpc, type SolutionCardData } from "../lib/catalogData";
   import { invalidateSolutionsCatalogCache, listSolutionsPageCached } from "../lib/catalogRpcCache";
@@ -12,11 +13,15 @@
   let {
     currentUserName = null,
     currentUser = null,
+    sessionId = null,
     uiText,
+    assistantUiText,
   }: {
     currentUserName?: string | null;
     currentUser?: nscalc.RegisteredUser | null;
+    sessionId?: string | null;
     uiText: SolutionsCopy;
+    assistantUiText: AssistantCopy;
   } = $props();
 
   const initialState = getSolutionsViewState();
@@ -459,6 +464,15 @@
       <span class="rounded-full bg-white/6 px-3 py-1.5">{nextCursor ? uiText.moreAvailable : uiText.endOfResults}</span>
     </div>
   </div>
+
+  <AssistantPanel
+    {sessionId}
+    uiText={assistantUiText}
+    onSolutionChanged={() => {
+      invalidateSolutionsCatalogCache();
+      void refreshVisibleSolutions();
+    }}
+  />
 
   <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_14rem]">
     <label class="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-ocean-300/80">

@@ -650,7 +650,7 @@
         {:else if currentView === "calculator"}
           <Calculator currentUser={authState?.registeredUser ?? null} uiText={copy.calculator} />
         {:else if currentView === "solutions"}
-          <Solutions currentUserName={authState?.name ?? null} currentUser={authState?.registeredUser ?? null} uiText={copy.solutions} />
+          <Solutions currentUserName={authState?.name ?? null} currentUser={authState?.registeredUser ?? null} sessionId={authState?.sessionId ?? null} uiText={copy.solutions} assistantUiText={copy.assistant} />
         {:else if currentView === "fertilizers"}
           <Fertilizers currentUserName={authState?.name ?? null} currentUser={authState?.registeredUser ?? null} uiText={copy.fertilizers} />
         {:else if currentView === "chat"}

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 nikitapnn1@gmail.com
+// Copyright (c) 2026 nikitapnn1@gmail.com
 
 import Foundation
 import GRDB

@@ -10,7 +10,9 @@
     "check": "svelte-check --tsconfig ./tsconfig.json && tsc -p tsconfig.node.json"
   },
   "dependencies": {
+    "dompurify": "^3.4.11",
     "jspdf": "^4.2.1",
+    "marked": "^18.0.5",
     "nprpc": "file:../external/nprpc/nprpc_js",
     "shaka-player": "^5.0.10"
   },

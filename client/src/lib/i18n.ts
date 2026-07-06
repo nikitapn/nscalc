@@ -198,6 +198,23 @@ export type SolutionsCopy = {
   card: SolutionCardCopy;
 };
 
+export type AssistantCopy = {
+  heroEyebrow: string;
+  heroTitle: string;
+  heroBody: string;
+  promptPlaceholder: string;
+  loginHint: string;
+  ask: string;
+  asking: string;
+  toolCallLabel: (toolName: string) => string;
+  solutionUpdatedLabel: (name: string) => string;
+  errors: {
+    notLoggedIn: string;
+    unavailable: string;
+    failed: string;
+  };
+};
+
 export type FertilizersCopy = {
   heroEyebrow: string;
   heroTitle: string;
@@ -613,6 +630,7 @@ export type TranslationSet = {
   calculator: CalculatorCopy;
   solutions: SolutionsCopy;
   fertilizers: FertilizersCopy;
+  assistant: AssistantCopy;
 };
 
 export const localeLabels: Record<Locale, string> = {
@@ -1022,6 +1040,22 @@ export const translations: Record<Locale, TranslationSet> = {
         save: "Save solution",
         saving: "Saving...",
         ratios: "Ratios",
+      },
+    },
+    assistant: {
+      heroEyebrow: "AI assistant",
+      heroTitle: "Describe a crop, get a target solution.",
+      heroBody: "Tell it what you're growing and it will propose (and save) a target nutrient solution for you.",
+      promptPlaceholder: "I'm growing lettuce in vegetative stage...",
+      loginHint: "Log in to ask the assistant to create or update solutions for you.",
+      ask: "Ask assistant",
+      asking: "Thinking...",
+      toolCallLabel: (toolName) => `Working: ${toolName}...`,
+      solutionUpdatedLabel: (name) => `Updated solution: ${name}`,
+      errors: {
+        notLoggedIn: "Log in before asking the assistant.",
+        unavailable: "The AI assistant is unavailable right now.",
+        failed: "Something went wrong asking the assistant.",
       },
     },
     fertilizers: {
@@ -1635,6 +1669,22 @@ export const translations: Record<Locale, TranslationSet> = {
         save: "Сохранить раствор",
         saving: "Сохранение...",
         ratios: "Соотношения",
+      },
+    },
+    assistant: {
+      heroEyebrow: "ИИ-ассистент",
+      heroTitle: "Опишите культуру — получите целевой раствор.",
+      heroBody: "Расскажите, что вы выращиваете, и ассистент предложит (и сохранит) целевой раствор для вас.",
+      promptPlaceholder: "Выращиваю салат на стадии вегетации...",
+      loginHint: "Войдите, чтобы попросить ассистента создать или изменить растворы.",
+      ask: "Спросить ассистента",
+      asking: "Думаю...",
+      toolCallLabel: (toolName) => `Выполняю: ${toolName}...`,
+      solutionUpdatedLabel: (name) => `Обновлён раствор: ${name}`,
+      errors: {
+        notLoggedIn: "Войдите перед обращением к ассистенту.",
+        unavailable: "ИИ-ассистент сейчас недоступен.",
+        failed: "Не удалось получить ответ от ассистента.",
       },
     },
     fertilizers: {
