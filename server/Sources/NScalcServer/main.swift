@@ -20,6 +20,7 @@ struct ServerConfig {
     let dhParamsPath: String?
     let ollamaHost: String
     let ollamaModel: String?
+    let ollamaTimeoutSeconds: TimeInterval
 
     var dbPath: String {
         let dataURL = URL(fileURLWithPath: dataDir)
@@ -95,6 +96,7 @@ private func printUsage() {
       --dh-params <path>      Optional DH params path
       --ollama-host <url>     Ollama server base URL for the AI assistant (default: http://localhost:11434)
       --ollama-model <name>   Ollama model to use for the AI assistant (must support tool calling, e.g. llama3.1, qwen2.5). If unset, the assistant feature is disabled.
+      --ollama-timeout <secs> Per-request timeout in seconds for Ollama calls (default: 120)
       --help                  Show this help message
     """)
 }
@@ -124,6 +126,7 @@ private func parseServerConfig() throws -> ServerConfig {
     var dhParamsPath = env["NSCALC_DH_PARAMS"]
     var ollamaHost = env["NSCALC_OLLAMA_HOST"] ?? "http://localhost:11434"
     var ollamaModel = env["NSCALC_OLLAMA_MODEL"]
+    var ollamaTimeoutSeconds = TimeInterval(env["NSCALC_OLLAMA_TIMEOUT"] ?? "120") ?? 120
 
     let args = Array(CommandLine.arguments.dropFirst())
     var index = 0
@@ -174,6 +177,12 @@ private func parseServerConfig() throws -> ServerConfig {
             ollamaHost = try optionValue(option, inlineValue: inlineValue, index: &index, args: args)
         case "--ollama-model":
             ollamaModel = try optionValue(option, inlineValue: inlineValue, index: &index, args: args)
+        case "--ollama-timeout":
+            let value = try optionValue(option, inlineValue: inlineValue, index: &index, args: args)
+            guard let parsedTimeout = TimeInterval(value), parsedTimeout > 0 else {
+                throw ServerConfigError.invalidValue(option, value)
+            }
+            ollamaTimeoutSeconds = parsedTimeout
         default:
             throw ServerConfigError.unknownArgument(argument)
         }
@@ -200,6 +209,7 @@ private func parseServerConfig() throws -> ServerConfig {
         dhParamsPath: dhParamsPath,
         ollamaHost: ollamaHost,
         ollamaModel: ollamaModel,
+        ollamaTimeoutSeconds: ollamaTimeoutSeconds,
     )
 }
 
@@ -355,7 +365,7 @@ do {
     let siteEvents = SiteEventServiceServantImpl(db: appDB)
     let siteEventsOid = try poa.activateObjectWithId(objectId: UInt64(10), servant: siteEvents, flags: .allowAll)
 
-    let assistant = AssistantServiceServantImpl(db: appDB, ollamaHost: config.ollamaHost, ollamaModel: config.ollamaModel)
+    let assistant = AssistantServiceServantImpl(db: appDB, ollamaHost: config.ollamaHost, ollamaModel: config.ollamaModel, ollamaTimeoutSeconds: config.ollamaTimeoutSeconds)
     let assistantOid = try poa.activateObjectWithId(objectId: UInt64(11), servant: assistant, flags: .allowAll)
 
     rpc.clearHostJson()

@@ -3,16 +3,19 @@
   import * as nscalc from "@rpc/nscalc";
   import { getNscalcRpc } from "./nscalcRpc";
   import { renderMarkdown } from "./markdown";
+  import { downscaleImageFile } from "./imageDownscale";
   import type { AssistantCopy } from "./i18n";
 
   let {
     sessionId = null,
     uiText,
     onSolutionChanged,
+    onFertilizerChanged,
   }: {
     sessionId?: string | null;
     uiText: AssistantCopy;
     onSolutionChanged: () => void;
+    onFertilizerChanged: () => void;
   } = $props();
 
   let prompt = $state("");
@@ -20,7 +23,12 @@
   let statusLabel = $state<string | null>(null);
   let replyMessage = $state<string | null>(null);
   let updatedSolutionName = $state<string | null>(null);
+  let updatedFertilizerName = $state<string | null>(null);
   let errorMessage = $state<string | null>(null);
+
+  let attachedImage = $state<{ mimeType: string; data: Uint8Array } | null>(null);
+  let attachedImagePreviewUrl = $state<string | null>(null);
+  let fileInput: HTMLInputElement | undefined;
 
   // Not reactive state on purpose — these track the live connection, not
   // anything rendered directly, and are only touched from async callbacks.
@@ -89,6 +97,10 @@
           updatedSolutionName = event.solution.name;
           onSolutionChanged();
         }
+        if (event.fertilizer) {
+          updatedFertilizerName = event.fertilizer.name;
+          onFertilizerChanged();
+        }
         break;
       case nscalc.AssistantEventStatus.Error:
         pendingRequestId = null;
@@ -99,19 +111,51 @@
     }
   }
 
+  function clearAttachedImage(): void {
+    if (attachedImagePreviewUrl) {
+      URL.revokeObjectURL(attachedImagePreviewUrl);
+    }
+    attachedImage = null;
+    attachedImagePreviewUrl = null;
+    if (fileInput) {
+      fileInput.value = "";
+    }
+  }
+
+  async function onImageSelected(event: Event): Promise<void> {
+    const file = (event.currentTarget as HTMLInputElement).files?.[0];
+    if (!file) {
+      return;
+    }
+
+    errorMessage = null;
+    try {
+      const downscaled = await downscaleImageFile(file);
+      if (attachedImagePreviewUrl) {
+        URL.revokeObjectURL(attachedImagePreviewUrl);
+      }
+      attachedImage = downscaled;
+      attachedImagePreviewUrl = URL.createObjectURL(new Blob([downscaled.data], { type: downscaled.mimeType }));
+    } catch {
+      errorMessage = uiText.errors.invalidImage;
+      clearAttachedImage();
+    }
+  }
+
   async function ask(): Promise<void> {
     if (!sessionId) {
       errorMessage = uiText.errors.notLoggedIn;
       return;
     }
     const trimmedPrompt = prompt.trim();
-    if (!trimmedPrompt || busy) {
+    if ((!trimmedPrompt && !attachedImage) || busy) {
       return;
     }
 
     errorMessage = null;
     replyMessage = null;
     updatedSolutionName = null;
+    updatedFertilizerName = null;
     busy = true;
     statusLabel = uiText.asking;
 
@@ -125,8 +169,13 @@
       }
       const requestId = crypto.randomUUID();
       pendingRequestId = requestId;
-      await activeStream.writer.write({ request_id: requestId, prompt: trimmedPrompt });
+      await activeStream.writer.write({
+        request_id: requestId,
+        prompt: trimmedPrompt,
+        image: attachedImage ? { mime_type: attachedImage.mimeType, data: attachedImage.data } : undefined,
+      });
       prompt = "";
+      clearAttachedImage();
     } catch (error) {
       busy = false;
       statusLabel = null;
@@ -153,10 +202,41 @@
       disabled={!sessionId || busy}
     ></textarea>
     <div class="flex flex-wrap items-center gap-3">
+      <input
+        bind:this={fileInput}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        class="hidden"
+        onchange={(event) => void onImageSelected(event)}
+        disabled={!sessionId || busy}
+      />
+      <button
+        type="button"
+        class="touch-target rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+        onclick={() => fileInput?.click()}
+        disabled={!sessionId || busy}
+      >
+        {uiText.attachPhoto}
+      </button>
+      {#if attachedImagePreviewUrl}
+        <div class="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-2 py-1.5">
+          <img src={attachedImagePreviewUrl} alt="" class="h-8 w-8 rounded-lg object-cover" />
+          <span class="text-xs text-ocean-100/75">{uiText.photoAttached}</span>
+          <button
+            type="button"
+            class="text-xs font-semibold text-rose-200 underline"
+            onclick={clearAttachedImage}
+            disabled={busy}
+          >
+            {uiText.removePhoto}
+          </button>
+        </div>
+      {/if}
       <button
         type="submit"
         class="touch-target rounded-2xl bg-sand-200 px-4 text-sm font-semibold text-ocean-950 transition hover:bg-sand-100 disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={!sessionId || busy || !prompt.trim()}
+        disabled={!sessionId || busy || (!prompt.trim() && !attachedImage)}
       >
         {busy ? uiText.asking : uiText.ask}
       </button>
@@ -173,6 +253,9 @@
       <div class="assistant-markdown">{@html renderMarkdown(replyMessage)}</div>
       {#if updatedSolutionName}
         <p class="mt-1 text-xs text-emerald-100/75">{uiText.solutionUpdatedLabel(updatedSolutionName)}</p>
+      {/if}
+      {#if updatedFertilizerName}
+        <p class="mt-1 text-xs text-emerald-100/75">{uiText.fertilizerUpdatedLabel(updatedFertilizerName)}</p>
       {/if}
     </div>
   {/if}

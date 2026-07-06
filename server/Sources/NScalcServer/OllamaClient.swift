@@ -86,12 +86,22 @@ struct OllamaMessage: Codable, Sendable {
     var content: String
     var tool_calls: [OllamaToolCall]?
     var tool_name: String?
+    /// Base64-encoded image data — Ollama's vision input format for
+    /// multimodal models (attached to a "user" message).
+    var images: [String]?
 
-    init(role: String, content: String, tool_calls: [OllamaToolCall]? = nil, tool_name: String? = nil) {
+    init(
+        role: String,
+        content: String,
+        tool_calls: [OllamaToolCall]? = nil,
+        tool_name: String? = nil,
+        images: [String]? = nil
+    ) {
         self.role = role
         self.content = content
         self.tool_calls = tool_calls
         self.tool_name = tool_name
+        self.images = images
     }
 }
 

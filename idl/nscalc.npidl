@@ -238,9 +238,15 @@ enum AssistantEventStatus {
   Error
 }
 
+message AssistantImage {
+  mime_type: string;
+  data: vector<u8>;
+}
+
 message AssistantAsk {
   request_id: string;
   prompt: string;
+  image?: AssistantImage;
 }
 
 message AssistantEvent {
@@ -248,6 +254,7 @@ message AssistantEvent {
   status: AssistantEventStatus;
   detail?: string;
   solution?: Solution;
+  fertilizer?: Fertilizer;
 }
 
 interface AssistantService {

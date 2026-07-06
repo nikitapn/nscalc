@@ -208,10 +208,15 @@ export type AssistantCopy = {
   asking: string;
   toolCallLabel: (toolName: string) => string;
   solutionUpdatedLabel: (name: string) => string;
+  fertilizerUpdatedLabel: (name: string) => string;
+  attachPhoto: string;
+  photoAttached: string;
+  removePhoto: string;
   errors: {
     notLoggedIn: string;
     unavailable: string;
     failed: string;
+    invalidImage: string;
   };
 };
 
@@ -1045,17 +1050,22 @@ export const translations: Record<Locale, TranslationSet> = {
     assistant: {
       heroEyebrow: "AI assistant",
       heroTitle: "Describe a crop, get a target solution.",
-      heroBody: "Tell it what you're growing and it will propose (and save) a target nutrient solution for you.",
+      heroBody: "Tell it what you're growing (or attach a photo of a fertilizer label) and it will propose and save a solution or fertilizer for you.",
       promptPlaceholder: "I'm growing lettuce in vegetative stage...",
       loginHint: "Log in to ask the assistant to create or update solutions for you.",
       ask: "Ask assistant",
       asking: "Thinking...",
       toolCallLabel: (toolName) => `Working: ${toolName}...`,
       solutionUpdatedLabel: (name) => `Updated solution: ${name}`,
+      fertilizerUpdatedLabel: (name) => `Updated fertilizer: ${name}`,
+      attachPhoto: "Attach a fertilizer photo",
+      photoAttached: "Photo attached",
+      removePhoto: "Remove",
       errors: {
         notLoggedIn: "Log in before asking the assistant.",
         unavailable: "The AI assistant is unavailable right now.",
         failed: "Something went wrong asking the assistant.",
+        invalidImage: "Couldn't read that image — try a different photo.",
       },
     },
     fertilizers: {
@@ -1674,17 +1684,22 @@ export const translations: Record<Locale, TranslationSet> = {
     assistant: {
       heroEyebrow: "ИИ-ассистент",
       heroTitle: "Опишите культуру — получите целевой раствор.",
-      heroBody: "Расскажите, что вы выращиваете, и ассистент предложит (и сохранит) целевой раствор для вас.",
+      heroBody: "Расскажите, что вы выращиваете (или прикрепите фото этикетки удобрения), и ассистент предложит и сохранит раствор или удобрение для вас.",
       promptPlaceholder: "Выращиваю салат на стадии вегетации...",
       loginHint: "Войдите, чтобы попросить ассистента создать или изменить растворы.",
       ask: "Спросить ассистента",
       asking: "Думаю...",
       toolCallLabel: (toolName) => `Выполняю: ${toolName}...`,
       solutionUpdatedLabel: (name) => `Обновлён раствор: ${name}`,
+      fertilizerUpdatedLabel: (name) => `Обновлено удобрение: ${name}`,
+      attachPhoto: "Прикрепить фото удобрения",
+      photoAttached: "Фото прикреплено",
+      removePhoto: "Убрать",
       errors: {
         notLoggedIn: "Войдите перед обращением к ассистенту.",
         unavailable: "ИИ-ассистент сейчас недоступен.",
         failed: "Не удалось получить ответ от ассистента.",
+        invalidImage: "Не удалось прочитать это изображение — попробуйте другое фото.",
       },
     },
     fertilizers: {

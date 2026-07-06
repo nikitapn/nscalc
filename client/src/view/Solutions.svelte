@@ -7,7 +7,7 @@
   import type { SolutionsCopy, AssistantCopy } from "../lib/i18n";
   import { elementOrder, type ElementKey } from "../lib/calculatorEngine";
   import { solutionCardFromRpc, type SolutionCardData } from "../lib/catalogData";
-  import { invalidateSolutionsCatalogCache, listSolutionsPageCached } from "../lib/catalogRpcCache";
+  import { invalidateFertilizersCatalogCache, invalidateSolutionsCatalogCache, listSolutionsPageCached } from "../lib/catalogRpcCache";
   import { getSolutionsViewState, setSolutionsViewState } from "../lib/catalogViewState";
 
   let {
@@ -472,6 +472,7 @@
       invalidateSolutionsCatalogCache();
       void refreshVisibleSolutions();
     }}
+    onFertilizerChanged={() => invalidateFertilizersCatalogCache()}
   />
 
   <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_14rem]">
