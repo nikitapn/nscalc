@@ -21,6 +21,8 @@ struct ServerConfig {
     let ollamaHost: String
     let ollamaModel: String?
     let ollamaTimeoutSeconds: TimeInterval
+    let ragHost: String?
+    let ragTimeoutSeconds: TimeInterval
 
     var dbPath: String {
         let dataURL = URL(fileURLWithPath: dataDir)
@@ -97,6 +99,8 @@ private func printUsage() {
       --ollama-host <url>     Ollama server base URL for the AI assistant (default: http://localhost:11434)
       --ollama-model <name>   Ollama model to use for the AI assistant (must support tool calling, e.g. llama3.1, qwen2.5). If unset, the assistant feature is disabled.
       --ollama-timeout <secs> Per-request timeout in seconds for Ollama calls (default: 120)
+      --rag-host <url>        Base URL of the rag/serve.py bridge for the growing-guide search tool. If unset, that tool is not offered.
+      --rag-timeout <secs>    Per-request timeout in seconds for RAG search calls (default: 20)
       --help                  Show this help message
     """)
 }
@@ -127,6 +131,8 @@ private func parseServerConfig() throws -> ServerConfig {
     var ollamaHost = env["NSCALC_OLLAMA_HOST"] ?? "http://localhost:11434"
     var ollamaModel = env["NSCALC_OLLAMA_MODEL"]
     var ollamaTimeoutSeconds = TimeInterval(env["NSCALC_OLLAMA_TIMEOUT"] ?? "120") ?? 120
+    var ragHost = env["NSCALC_RAG_HOST"]
+    var ragTimeoutSeconds = TimeInterval(env["NSCALC_RAG_TIMEOUT"] ?? "20") ?? 20
 
     let args = Array(CommandLine.arguments.dropFirst())
     var index = 0
@@ -183,6 +189,14 @@ private func parseServerConfig() throws -> ServerConfig {
                 throw ServerConfigError.invalidValue(option, value)
             }
             ollamaTimeoutSeconds = parsedTimeout
+        case "--rag-host":
+            ragHost = try optionValue(option, inlineValue: inlineValue, index: &index, args: args)
+        case "--rag-timeout":
+            let value = try optionValue(option, inlineValue: inlineValue, index: &index, args: args)
+            guard let parsedTimeout = TimeInterval(value), parsedTimeout > 0 else {
+                throw ServerConfigError.invalidValue(option, value)
+            }
+            ragTimeoutSeconds = parsedTimeout
         default:
             throw ServerConfigError.unknownArgument(argument)
         }
@@ -210,6 +224,8 @@ private func parseServerConfig() throws -> ServerConfig {
         ollamaHost: ollamaHost,
         ollamaModel: ollamaModel,
         ollamaTimeoutSeconds: ollamaTimeoutSeconds,
+        ragHost: ragHost,
+        ragTimeoutSeconds: ragTimeoutSeconds,
     )
 }
 
@@ -365,7 +381,14 @@ do {
     let siteEvents = SiteEventServiceServantImpl(db: appDB)
     let siteEventsOid = try poa.activateObjectWithId(objectId: UInt64(10), servant: siteEvents, flags: .allowAll)
 
-    let assistant = AssistantServiceServantImpl(db: appDB, ollamaHost: config.ollamaHost, ollamaModel: config.ollamaModel, ollamaTimeoutSeconds: config.ollamaTimeoutSeconds)
+    let assistant = AssistantServiceServantImpl(
+        db: appDB,
+        ollamaHost: config.ollamaHost,
+        ollamaModel: config.ollamaModel,
+        ollamaTimeoutSeconds: config.ollamaTimeoutSeconds,
+        ragHost: config.ragHost,
+        ragTimeoutSeconds: config.ragTimeoutSeconds
+    )
     let assistantOid = try poa.activateObjectWithId(objectId: UInt64(11), servant: assistant, flags: .allowAll)
 
     rpc.clearHostJson()

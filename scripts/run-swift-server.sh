@@ -22,6 +22,8 @@ DH_PARAMS_ARG=""
 OLLAMA_HOST_ARG="${NSCALC_OLLAMA_HOST:-}"
 OLLAMA_MODEL_ARG="${NSCALC_OLLAMA_MODEL:-}"
 OLLAMA_TIMEOUT_ARG="${NSCALC_OLLAMA_TIMEOUT:-}"
+RAG_HOST_ARG="${NSCALC_RAG_HOST:-}"
+RAG_TIMEOUT_ARG="${NSCALC_RAG_TIMEOUT:-}"
 
 # HOST_JSON="$ROOT_DIR/client/dist/host.json"
 # if [ -f "$HOST_JSON" ]; then
@@ -68,6 +70,14 @@ while [ $# -gt 0 ]; do
             OLLAMA_TIMEOUT_ARG="$2"
             shift
             ;;
+        --rag-host)
+            RAG_HOST_ARG="$2"
+            shift
+            ;;
+        --rag-timeout)
+            RAG_TIMEOUT_ARG="$2"
+            shift
+            ;;
         --disable-http3)
             ENABLE_HTTP3=0
             ;;
@@ -87,6 +97,8 @@ Usage: ./run-swift-server.sh [options]
   --ollama-host <url>  Ollama server base URL for the AI assistant (default: NSCALC_OLLAMA_HOST env, else http://localhost:11434)
   --ollama-model <name> Ollama model to use for the AI assistant (default: NSCALC_OLLAMA_MODEL env; assistant disabled if unset)
   --ollama-timeout <s>  Per-request timeout in seconds for Ollama calls (default: NSCALC_OLLAMA_TIMEOUT env, else 120)
+  --rag-host <url>      Base URL of the rag/serve.py bridge for growing-guide search (default: NSCALC_RAG_HOST env; tool disabled if unset)
+  --rag-timeout <s>     Per-request timeout in seconds for RAG search calls (default: NSCALC_RAG_TIMEOUT env, else 20)
   --disable-http3      Disable HTTP/3
   --disable-ssl        Disable TLS
 EOF
@@ -180,6 +192,12 @@ if [ -n "$OLLAMA_MODEL_ARG" ]; then
 fi
 if [ -n "$OLLAMA_TIMEOUT_ARG" ]; then
     DOCKER_CMD+=(--ollama-timeout "$OLLAMA_TIMEOUT_ARG")
+fi
+if [ -n "$RAG_HOST_ARG" ]; then
+    DOCKER_CMD+=(--rag-host "$RAG_HOST_ARG")
+fi
+if [ -n "$RAG_TIMEOUT_ARG" ]; then
+    DOCKER_CMD+=(--rag-timeout "$RAG_TIMEOUT_ARG")
 fi
 
 exec "${DOCKER_CMD[@]}"

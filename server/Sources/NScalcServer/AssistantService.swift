@@ -146,10 +146,29 @@ private enum AssistantTools {
         ])
     ))
 
-    static let all: [OllamaTool] = [
+    static let searchGrowingGuides = OllamaTool(function: OllamaToolFunction(
+        name: "search_growing_guides",
+        description: "Search a reference library of nutrient-solution and crop-specific growing guides for passages relevant to a question. Use this for general horticultural/nutrition questions — not just when creating a solution or fertilizer. Returns excerpts with source/heading/page — cite them in your answer.",
+        parameters: .object([
+            "type": .string("object"),
+            "properties": .object([
+                "query": .object([
+                    "type": .string("string"),
+                    "description": .string("A natural-language question or topic to search for."),
+                ]),
+            ]),
+            "required": .array([.string("query")]),
+        ])
+    ))
+
+    static let base: [OllamaTool] = [
         listMySolutions, createSolution, updateSolution,
         listMyFertilizers, createFertilizer, updateFertilizer,
     ]
+
+    static func active(ragEnabled: Bool) -> [OllamaTool] {
+        ragEnabled ? base + [searchGrowingGuides] : base
+    }
 }
 
 // MARK: - AssistantStore
@@ -159,6 +178,7 @@ private struct AssistantStore: Sendable {
     private let solutionService: SolutionService
     private let fertilizerService: FertilizerService
     private let ollama: OllamaClient?
+    private let ragClient: RagClient?
     private let maxRounds = 4
 
     private static let systemPrompt = """
@@ -206,11 +226,26 @@ private struct AssistantStore: Sendable {
         S := 6.1;
         ```
 
+        You also have access to a reference library (nutrient-solution guides and crop-specific \
+        growing guides) via search_growing_guides. Use it for general horticultural or nutrition \
+        questions — not only when creating a solution or fertilizer — whenever your own knowledge \
+        might be incomplete, outdated, or crop-specific. When you use a passage from it, cite it \
+        inline like "(Source: <source>, <heading>, p. <page>)" using the fields the tool returns — \
+        don't present retrieved facts as if they were your own general knowledge. If nothing relevant \
+        comes back, say so and answer from your own knowledge instead of forcing a citation.
+
         Always finish with a short plain-language summary of what you did and why, written for the \
         end user.
         """
 
-    init(db: AppDatabase, ollamaHost: String?, ollamaModel: String?, ollamaTimeoutSeconds: TimeInterval) {
+    init(
+        db: AppDatabase,
+        ollamaHost: String?,
+        ollamaModel: String?,
+        ollamaTimeoutSeconds: TimeInterval,
+        ragHost: String?,
+        ragTimeoutSeconds: TimeInterval
+    ) {
         self.sessionService = SessionService(db: db)
         self.solutionService = SolutionService(db: db)
         self.fertilizerService = FertilizerService(db: db)
@@ -218,6 +253,11 @@ private struct AssistantStore: Sendable {
             self.ollama = OllamaClient(baseURL: url, model: ollamaModel, timeoutSeconds: ollamaTimeoutSeconds)
         } else {
             self.ollama = nil
+        }
+        if let ragHost, let url = URL(string: ragHost) {
+            self.ragClient = RagClient(baseURL: url, timeoutSeconds: ragTimeoutSeconds)
+        } else {
+            self.ragClient = nil
         }
     }
 
@@ -264,7 +304,7 @@ private struct AssistantStore: Sendable {
             let roundStart = Date()
             let reply: OllamaMessage
             do {
-                reply = try await ollama.chat(messages: messages, tools: AssistantTools.all)
+                reply = try await ollama.chat(messages: messages, tools: AssistantTools.active(ragEnabled: ragClient != nil))
             } catch {
                 let elapsed = Date().timeIntervalSince(roundStart)
                 if isTimeoutError(error) {
@@ -308,7 +348,7 @@ private struct AssistantStore: Sendable {
                 aslog("I", "ask \(ask.request_id) calling tool \(call.function.name)")
                 await emit(AssistantEvent(request_id: ask.request_id, status: .ToolCall, detail: call.function.name, solution: nil, fertilizer: nil))
                 let toolStart = Date()
-                let resultJSON = executeTool(
+                let resultJSON = await executeTool(
                     call,
                     userId: userId,
                     user: user,
@@ -340,7 +380,7 @@ private struct AssistantStore: Sendable {
         user: UserRecord,
         lastTouchedSolution: inout SolutionRecord?,
         lastTouchedFertilizer: inout FertilizerRecord?
-    ) -> String {
+    ) async -> String {
         switch call.function.name {
         case "list_my_solutions":
             return listSolutions(user: user)
@@ -354,6 +394,8 @@ private struct AssistantStore: Sendable {
             return createFertilizer(call.function.arguments, userId: userId, lastTouchedFertilizer: &lastTouchedFertilizer)
         case "update_fertilizer":
             return updateFertilizer(call.function.arguments, userId: userId, lastTouchedFertilizer: &lastTouchedFertilizer)
+        case "search_growing_guides":
+            return await searchGrowingGuides(call.function.arguments)
         default:
             return jsonString(["error": "Unknown tool '\(call.function.name)'."])
         }
@@ -523,6 +565,35 @@ private struct AssistantStore: Sendable {
         }
     }
 
+    private func searchGrowingGuides(_ arguments: [String: JSONValue]) async -> String {
+        guard let ragClient else {
+            return jsonString(["error": "The growing-guide library is not configured on this server."])
+        }
+        guard let query = arguments["query"]?.stringValue,
+              !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return jsonString(["error": "Missing or empty 'query'."])
+        }
+
+        aslog("D", "search_growing_guides query: \(query)")
+
+        do {
+            let chunks = try await ragClient.search(query: query)
+            let items: [[String: Any]] = chunks.map { chunk in
+                [
+                    "source": chunk.source,
+                    "headings": chunk.headings,
+                    "pages": chunk.pages,
+                    "text": chunk.text,
+                    "score": chunk.score,
+                ]
+            }
+            return jsonString(["results": items])
+        } catch {
+            return jsonString(["error": "Growing-guide search failed: \(error.localizedDescription)"])
+        }
+    }
+
     private func jsonString(_ value: [String: Any]) -> String {
         guard let data = try? JSONSerialization.data(withJSONObject: value) else {
             return "{}"
@@ -536,8 +607,22 @@ private struct AssistantStore: Sendable {
 final class AssistantServiceServantImpl: AssistantServiceServant, @unchecked Sendable {
     private let store: AssistantStore
 
-    init(db: AppDatabase, ollamaHost: String?, ollamaModel: String?, ollamaTimeoutSeconds: TimeInterval) {
-        self.store = AssistantStore(db: db, ollamaHost: ollamaHost, ollamaModel: ollamaModel, ollamaTimeoutSeconds: ollamaTimeoutSeconds)
+    init(
+        db: AppDatabase,
+        ollamaHost: String?,
+        ollamaModel: String?,
+        ollamaTimeoutSeconds: TimeInterval,
+        ragHost: String?,
+        ragTimeoutSeconds: TimeInterval
+    ) {
+        self.store = AssistantStore(
+            db: db,
+            ollamaHost: ollamaHost,
+            ollamaModel: ollamaModel,
+            ollamaTimeoutSeconds: ollamaTimeoutSeconds,
+            ragHost: ragHost,
+            ragTimeoutSeconds: ragTimeoutSeconds
+        )
         super.init()
     }
 
