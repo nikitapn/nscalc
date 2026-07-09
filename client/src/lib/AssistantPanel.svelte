@@ -26,6 +26,34 @@
   let updatedFertilizerName = $state<string | null>(null);
   let errorMessage = $state<string | null>(null);
 
+  // Live-typing preview while a round streams tokens in. Rendering markdown
+  // on every single token would flicker (tokens routinely land mid-`**bold`),
+  // so the visible streamingText is throttled; rawStreamBuffer accumulates
+  // instantly and isn't itself rendered.
+  let streamingText = $state("");
+  let rawStreamBuffer = "";
+  let streamRenderTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function pushStreamToken(token: string): void {
+    rawStreamBuffer += token;
+    if (streamRenderTimer) {
+      return;
+    }
+    streamRenderTimer = setTimeout(() => {
+      streamingText = rawStreamBuffer;
+      streamRenderTimer = null;
+    }, 80);
+  }
+
+  function resetStreamBuffer(): void {
+    if (streamRenderTimer) {
+      clearTimeout(streamRenderTimer);
+      streamRenderTimer = null;
+    }
+    rawStreamBuffer = "";
+    streamingText = "";
+  }
+
   let attachedImage = $state<{ mimeType: string; data: Uint8Array } | null>(null);
   let attachedImagePreviewUrl = $state<string | null>(null);
   let fileInput: HTMLInputElement | undefined;
@@ -75,6 +103,7 @@
       if (busy) {
         busy = false;
         statusLabel = null;
+        resetStreamBuffer();
         errorMessage = error instanceof Error ? error.message : uiText.errors.unavailable;
       }
     }
@@ -85,13 +114,18 @@
       case nscalc.AssistantEventStatus.Thinking:
         statusLabel = uiText.asking;
         break;
+      case nscalc.AssistantEventStatus.Token:
+        pushStreamToken(event.detail ?? "");
+        break;
       case nscalc.AssistantEventStatus.ToolCall:
+        resetStreamBuffer();
         statusLabel = uiText.toolCallLabel(event.detail ?? "");
         break;
       case nscalc.AssistantEventStatus.Done:
         pendingRequestId = null;
         busy = false;
         statusLabel = null;
+        resetStreamBuffer();
         replyMessage = event.detail ?? null;
         if (event.solution) {
           updatedSolutionName = event.solution.name;
@@ -106,6 +140,7 @@
         pendingRequestId = null;
         busy = false;
         statusLabel = null;
+        resetStreamBuffer();
         errorMessage = event.detail || uiText.errors.failed;
         break;
     }
@@ -156,6 +191,7 @@
     replyMessage = null;
     updatedSolutionName = null;
     updatedFertilizerName = null;
+    resetStreamBuffer();
     busy = true;
     statusLabel = uiText.asking;
 
@@ -248,6 +284,10 @@
 
   {#if errorMessage}
     <p class="mt-4 rounded-2xl border border-rose-200/20 bg-rose-950/20 px-3 py-2 text-sm text-rose-100">{errorMessage}</p>
+  {:else if busy && streamingText}
+    <div class="mt-4 rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-ocean-50">
+      <div class="assistant-markdown">{@html renderMarkdown(streamingText)}</div>
+    </div>
   {:else if replyMessage}
     <div class="mt-4 rounded-2xl border border-emerald-200/20 bg-emerald-950/20 px-3 py-2 text-sm text-emerald-100">
       <div class="assistant-markdown">{@html renderMarkdown(replyMessage)}</div>

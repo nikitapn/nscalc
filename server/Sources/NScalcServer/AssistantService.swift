@@ -304,7 +304,12 @@ private struct AssistantStore: Sendable {
             let roundStart = Date()
             let reply: OllamaMessage
             do {
-                reply = try await ollama.chat(messages: messages, tools: AssistantTools.active(ragEnabled: ragClient != nil))
+                reply = try await ollama.chatStream(
+                    messages: messages,
+                    tools: AssistantTools.active(ragEnabled: ragClient != nil)
+                ) { token in
+                    await emit(AssistantEvent(request_id: ask.request_id, status: .Token, detail: token, solution: nil, fertilizer: nil))
+                }
             } catch {
                 let elapsed = Date().timeIntervalSince(roundStart)
                 if isTimeoutError(error) {

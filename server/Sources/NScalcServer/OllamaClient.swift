@@ -133,28 +133,95 @@ enum OllamaClientError: Error, Sendable {
     case httpStatus(Int)
 }
 
+// MARK: - Streaming delegate
+
+/// Bridges URLSessionDataDelegate callbacks (received as raw bytes trickle
+/// in) to an AsyncThrowingStream of decoded chunks. URLSession.bytes(for:) —
+/// the modern async streaming API — is unavailable in this Linux Foundation
+/// build, so this delegate-based approach is used instead.
+private final class OllamaStreamDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    private var buffer = Data()
+    private let newline = Data([0x0A])
+    private let continuation: AsyncThrowingStream<OllamaChatResponse, Error>.Continuation
+
+    init(continuation: AsyncThrowingStream<OllamaChatResponse, Error>.Continuation) {
+        self.continuation = continuation
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive response: URLResponse,
+        completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
+    ) {
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            continuation.finish(throwing: OllamaClientError.httpStatus(http.statusCode))
+            completionHandler(.cancel)
+            return
+        }
+        completionHandler(.allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        buffer.append(data)
+        while let range = buffer.range(of: newline) {
+            let lineData = buffer.subdata(in: buffer.startIndex..<range.lowerBound)
+            buffer.removeSubrange(buffer.startIndex..<range.upperBound)
+            guard !lineData.isEmpty else { continue }
+            do {
+                continuation.yield(try JSONDecoder().decode(OllamaChatResponse.self, from: lineData))
+            } catch {
+                continuation.finish(throwing: error)
+            }
+        }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if let error {
+            continuation.finish(throwing: error)
+        } else {
+            continuation.finish()
+        }
+    }
+}
+
 // MARK: - OllamaClient
 
 struct OllamaClient: Sendable {
     let baseURL: URL
     let model: String
-    private let session: URLSession
+    private let timeoutSeconds: TimeInterval
 
     init(baseURL: URL, model: String, timeoutSeconds: TimeInterval = 45) {
         self.baseURL = baseURL
         self.model = model
+        self.timeoutSeconds = timeoutSeconds
+    }
+
+    private func makeSessionConfig() -> URLSessionConfiguration {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = timeoutSeconds
         config.timeoutIntervalForResource = timeoutSeconds
-        self.session = URLSession(configuration: config)
+        return config
     }
 
-    /// Async — safe to call from inside a bidi_stream's `connect()` handler,
-    /// which runs on Swift's cooperative concurrency pool. Must not block a
-    /// thread while waiting on the network (that's why this uses URLSession's
-    /// async API rather than a semaphore-blocked completion handler).
+    /// Non-streaming convenience, kept for callers that don't need incremental
+    /// tokens — just drains chatStream without forwarding anything.
     func chat(messages: [OllamaMessage], tools: [OllamaTool]) async throws -> OllamaMessage {
-        let request = OllamaChatRequest(model: model, messages: messages, tools: tools, stream: false)
+        try await chatStream(messages: messages, tools: tools) { _ in }
+    }
+
+    /// Streams the response over Ollama's `/api/chat` (stream:true), invoking
+    /// `onToken` for each content delta as it arrives, and returns the fully
+    /// assembled message (content + any tool calls) once the stream ends.
+    /// Safe to call from inside a bidi_stream's `connect()` handler — never
+    /// blocks a thread while waiting on the network.
+    func chatStream(
+        messages: [OllamaMessage],
+        tools: [OllamaTool],
+        onToken: (String) async -> Void
+    ) async throws -> OllamaMessage {
+        let request = OllamaChatRequest(model: model, messages: messages, tools: tools, stream: true)
         let body = try JSONEncoder().encode(request)
 
         var urlRequest = URLRequest(url: baseURL.appendingPathComponent("api/chat"))
@@ -162,10 +229,25 @@ struct OllamaClient: Sendable {
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.httpBody = body
 
-        let (data, response) = try await session.data(for: urlRequest)
-        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-            throw OllamaClientError.httpStatus(http.statusCode)
+        let sessionConfig = makeSessionConfig()
+        let chunkStream = AsyncThrowingStream<OllamaChatResponse, Error> { continuation in
+            let delegate = OllamaStreamDelegate(continuation: continuation)
+            let session = URLSession(configuration: sessionConfig, delegate: delegate, delegateQueue: nil)
+            session.dataTask(with: urlRequest).resume()
         }
-        return try JSONDecoder().decode(OllamaChatResponse.self, from: data).message
+
+        var content = ""
+        var toolCalls: [OllamaToolCall]?
+        for try await chunk in chunkStream {
+            if !chunk.message.content.isEmpty {
+                content += chunk.message.content
+                await onToken(chunk.message.content)
+            }
+            if let calls = chunk.message.tool_calls, !calls.isEmpty {
+                toolCalls = calls
+            }
+        }
+
+        return OllamaMessage(role: "assistant", content: content, tool_calls: toolCalls)
     }
 }

@@ -235,7 +235,8 @@ enum AssistantEventStatus {
   Thinking,
   ToolCall,
   Done,
-  Error
+  Error,
+  Token
 }
 
 message AssistantImage {
