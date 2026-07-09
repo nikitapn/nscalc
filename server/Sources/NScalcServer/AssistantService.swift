@@ -243,6 +243,7 @@ private struct AssistantStore: Sendable {
         ollamaHost: String?,
         ollamaModel: String?,
         ollamaTimeoutSeconds: TimeInterval,
+        ollamaNumCtx: Int?,
         ragHost: String?,
         ragTimeoutSeconds: TimeInterval
     ) {
@@ -250,7 +251,7 @@ private struct AssistantStore: Sendable {
         self.solutionService = SolutionService(db: db)
         self.fertilizerService = FertilizerService(db: db)
         if let ollamaHost, let url = URL(string: ollamaHost), let ollamaModel, !ollamaModel.isEmpty {
-            self.ollama = OllamaClient(baseURL: url, model: ollamaModel, timeoutSeconds: ollamaTimeoutSeconds)
+            self.ollama = OllamaClient(baseURL: url, model: ollamaModel, timeoutSeconds: ollamaTimeoutSeconds, numCtx: ollamaNumCtx)
         } else {
             self.ollama = nil
         }
@@ -617,6 +618,7 @@ final class AssistantServiceServantImpl: AssistantServiceServant, @unchecked Sen
         ollamaHost: String?,
         ollamaModel: String?,
         ollamaTimeoutSeconds: TimeInterval,
+        ollamaNumCtx: Int?,
         ragHost: String?,
         ragTimeoutSeconds: TimeInterval
     ) {
@@ -625,6 +627,7 @@ final class AssistantServiceServantImpl: AssistantServiceServant, @unchecked Sen
             ollamaHost: ollamaHost,
             ollamaModel: ollamaModel,
             ollamaTimeoutSeconds: ollamaTimeoutSeconds,
+            ollamaNumCtx: ollamaNumCtx,
             ragHost: ragHost,
             ragTimeoutSeconds: ragTimeoutSeconds
         )

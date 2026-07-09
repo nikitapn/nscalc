@@ -21,6 +21,7 @@ struct ServerConfig {
     let ollamaHost: String
     let ollamaModel: String?
     let ollamaTimeoutSeconds: TimeInterval
+    let ollamaNumCtx: Int?
     let ragHost: String?
     let ragTimeoutSeconds: TimeInterval
 
@@ -99,6 +100,7 @@ private func printUsage() {
       --ollama-host <url>     Ollama server base URL for the AI assistant (default: http://localhost:11434)
       --ollama-model <name>   Ollama model to use for the AI assistant (must support tool calling, e.g. llama3.1, qwen2.5). If unset, the assistant feature is disabled.
       --ollama-timeout <secs> Per-request timeout in seconds for Ollama calls (default: 120)
+      --ollama-num-ctx <n>    Context window size (tokens) to request from Ollama. If unset, Ollama's own default applies (often much smaller than the model's architectural max, e.g. 2048-4096) — conversations longer than that get silently truncated. Larger values use more GPU/CPU memory for the KV cache, so raise it deliberately rather than maxing it out.
       --rag-host <url>        Base URL of the rag/serve.py bridge for the growing-guide search tool. If unset, that tool is not offered.
       --rag-timeout <secs>    Per-request timeout in seconds for RAG search calls (default: 20)
       --help                  Show this help message
@@ -131,6 +133,7 @@ private func parseServerConfig() throws -> ServerConfig {
     var ollamaHost = env["NSCALC_OLLAMA_HOST"] ?? "http://localhost:11434"
     var ollamaModel = env["NSCALC_OLLAMA_MODEL"]
     var ollamaTimeoutSeconds = TimeInterval(env["NSCALC_OLLAMA_TIMEOUT"] ?? "120") ?? 120
+    var ollamaNumCtx = env["NSCALC_OLLAMA_NUM_CTX"].flatMap { Int($0) }
     var ragHost = env["NSCALC_RAG_HOST"]
     var ragTimeoutSeconds = TimeInterval(env["NSCALC_RAG_TIMEOUT"] ?? "20") ?? 20
 
@@ -189,6 +192,12 @@ private func parseServerConfig() throws -> ServerConfig {
                 throw ServerConfigError.invalidValue(option, value)
             }
             ollamaTimeoutSeconds = parsedTimeout
+        case "--ollama-num-ctx":
+            let value = try optionValue(option, inlineValue: inlineValue, index: &index, args: args)
+            guard let parsedNumCtx = Int(value), parsedNumCtx > 0 else {
+                throw ServerConfigError.invalidValue(option, value)
+            }
+            ollamaNumCtx = parsedNumCtx
         case "--rag-host":
             ragHost = try optionValue(option, inlineValue: inlineValue, index: &index, args: args)
         case "--rag-timeout":
@@ -224,6 +233,7 @@ private func parseServerConfig() throws -> ServerConfig {
         ollamaHost: ollamaHost,
         ollamaModel: ollamaModel,
         ollamaTimeoutSeconds: ollamaTimeoutSeconds,
+        ollamaNumCtx: ollamaNumCtx,
         ragHost: ragHost,
         ragTimeoutSeconds: ragTimeoutSeconds,
     )
@@ -386,6 +396,7 @@ do {
         ollamaHost: config.ollamaHost,
         ollamaModel: config.ollamaModel,
         ollamaTimeoutSeconds: config.ollamaTimeoutSeconds,
+        ollamaNumCtx: config.ollamaNumCtx,
         ragHost: config.ragHost,
         ragTimeoutSeconds: config.ragTimeoutSeconds
     )

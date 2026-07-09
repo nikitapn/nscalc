@@ -116,11 +116,21 @@ struct OllamaTool: Codable, Sendable {
     var function: OllamaToolFunction
 }
 
+struct OllamaOptions: Codable, Sendable {
+    /// Runtime context window size, in tokens. Ollama defaults this much
+    /// lower than a model's architectural max (often 2048-4096) unless set
+    /// explicitly — once a conversation's tokenized system+history+tool
+    /// schemas exceed it, llama.cpp silently truncates older context to keep
+    /// generating (visible in Ollama's logs as `truncated = 1`).
+    var num_ctx: Int?
+}
+
 struct OllamaChatRequest: Codable, Sendable {
     var model: String
     var messages: [OllamaMessage]
     var tools: [OllamaTool]?
     var stream: Bool = false
+    var options: OllamaOptions?
 }
 
 struct OllamaChatResponse: Codable, Sendable {
@@ -191,11 +201,13 @@ struct OllamaClient: Sendable {
     let baseURL: URL
     let model: String
     private let timeoutSeconds: TimeInterval
+    private let numCtx: Int?
 
-    init(baseURL: URL, model: String, timeoutSeconds: TimeInterval = 45) {
+    init(baseURL: URL, model: String, timeoutSeconds: TimeInterval = 45, numCtx: Int? = nil) {
         self.baseURL = baseURL
         self.model = model
         self.timeoutSeconds = timeoutSeconds
+        self.numCtx = numCtx
     }
 
     private func makeSessionConfig() -> URLSessionConfiguration {
@@ -221,7 +233,13 @@ struct OllamaClient: Sendable {
         tools: [OllamaTool],
         onToken: (String) async -> Void
     ) async throws -> OllamaMessage {
-        let request = OllamaChatRequest(model: model, messages: messages, tools: tools, stream: true)
+        let request = OllamaChatRequest(
+            model: model,
+            messages: messages,
+            tools: tools,
+            stream: true,
+            options: numCtx.map { OllamaOptions(num_ctx: $0) }
+        )
         let body = try JSONEncoder().encode(request)
 
         var urlRequest = URLRequest(url: baseURL.appendingPathComponent("api/chat"))
