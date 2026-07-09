@@ -30,9 +30,16 @@ SWIFT_IDL_FILES = [
     "idl/grow_journal.npidl",
 ]
 
+# IDL files for the standalone compute-worker app — only needs the
+# ComputeChannel interface (defined in nscalc.npidl), not grow_journal.
+WORKER_IDL_FILES = [
+    "idl/nscalc.npidl",
+]
+
 # Output directories (relative to ROOT_DIR, mirrored as /app/... inside container)
-TS_OUTPUT_DIR    = "client/src/rpc"
-SWIFT_OUTPUT_DIR = "server/Sources/NScalc"
+TS_OUTPUT_DIR     = "client/src/rpc"
+SWIFT_OUTPUT_DIR  = "server/Sources/NScalc"
+WORKER_OUTPUT_DIR = "compute-worker/Sources/NScalc"
 
 
 def run_npidl(lang_flag: str, idl_files: list, output_dir: str) -> None:
@@ -86,6 +93,7 @@ def main() -> None:
 
     if gen_swift:
         run_npidl("--swift", SWIFT_IDL_FILES, SWIFT_OUTPUT_DIR)
+        run_npidl("--swift", WORKER_IDL_FILES, WORKER_OUTPUT_DIR)
 
     print()
     print("Done.")

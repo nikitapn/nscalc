@@ -261,3 +261,37 @@ message AssistantEvent {
 interface AssistantService {
   bidi_stream<AssistantAsk, AssistantEvent> Connect(session_id: in string);
 }
+
+// Lets a compute worker (e.g. a laptop behind NAT, running Ollama + the RAG
+// bridge) dial *out* to this server and receive relayed HTTP jobs over the
+// resulting stream — the worker never needs to be reachable from the server,
+// only vice versa. The worker is a dumb JSON-over-HTTP relay: it doesn't
+// know Ollama's or the RAG bridge's schemas, it just POSTs request_body_json
+// to the right local endpoint and streams back whatever comes down the wire.
+enum ComputeJobKind {
+  OllamaChatStream,
+  RagSearch
+}
+
+enum ComputeJobResultStatus {
+  Chunk,
+  Done,
+  Error
+}
+
+message ComputeJobRequest {
+  job_id: string;
+  kind: ComputeJobKind;
+  request_body_json: string;
+}
+
+message ComputeJobResult {
+  job_id: string;
+  status: ComputeJobResultStatus;
+  chunk_json?: string;
+  error_message?: string;
+}
+
+interface ComputeChannel {
+  bidi_stream<ComputeJobResult, ComputeJobRequest> Connect(worker_token: in string);
+}

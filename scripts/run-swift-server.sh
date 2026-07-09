@@ -12,7 +12,7 @@ SCRIPTS_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")")
 ROOT_DIR=$(dirname "$SCRIPTS_DIR")
 DOCKER_IMAGE="nscalc-builder:latest"
 BUILD_CONFIG="release"
-HOSTNAME_ARG="localhost"
+HOSTNAME_ARG="calculator.lan"
 PORT_ARG="443"
 ENABLE_HTTP3=1
 USE_SSL=1
@@ -25,6 +25,7 @@ OLLAMA_TIMEOUT_ARG="${NSCALC_OLLAMA_TIMEOUT:-}"
 OLLAMA_NUM_CTX_ARG="${NSCALC_OLLAMA_NUM_CTX:-}"
 RAG_HOST_ARG="${NSCALC_RAG_HOST:-}"
 RAG_TIMEOUT_ARG="${NSCALC_RAG_TIMEOUT:-}"
+COMPUTE_WORKER_TOKEN_ARG="${NSCALC_COMPUTE_WORKER_TOKEN:-}"
 
 # HOST_JSON="$ROOT_DIR/client/dist/host.json"
 # if [ -f "$HOST_JSON" ]; then
@@ -83,6 +84,10 @@ while [ $# -gt 0 ]; do
             RAG_TIMEOUT_ARG="$2"
             shift
             ;;
+        --compute-worker-token)
+            COMPUTE_WORKER_TOKEN_ARG="$2"
+            shift
+            ;;
         --disable-http3)
             ENABLE_HTTP3=0
             ;;
@@ -105,6 +110,7 @@ Usage: ./run-swift-server.sh [options]
   --ollama-num-ctx <n>  Context window size (tokens) requested from Ollama (default: NSCALC_OLLAMA_NUM_CTX env; Ollama's own default if unset, often much smaller than the model max — raises KV-cache memory use)
   --rag-host <url>      Base URL of the rag/serve.py bridge for growing-guide search (default: NSCALC_RAG_HOST env; tool disabled if unset)
   --rag-timeout <s>     Per-request timeout in seconds for RAG search calls (default: NSCALC_RAG_TIMEOUT env, else 20)
+  --compute-worker-token <token>  Shared secret a compute-worker/ instance must present to relay Ollama/RAG calls (default: NSCALC_COMPUTE_WORKER_TOKEN env; ComputeChannel refuses all connections if unset)
   --disable-http3      Disable HTTP/3
   --disable-ssl        Disable TLS
 EOF
@@ -207,6 +213,9 @@ if [ -n "$RAG_HOST_ARG" ]; then
 fi
 if [ -n "$RAG_TIMEOUT_ARG" ]; then
     DOCKER_CMD+=(--rag-timeout "$RAG_TIMEOUT_ARG")
+fi
+if [ -n "$COMPUTE_WORKER_TOKEN_ARG" ]; then
+    DOCKER_CMD+=(--compute-worker-token "$COMPUTE_WORKER_TOKEN_ARG")
 fi
 
 exec "${DOCKER_CMD[@]}"

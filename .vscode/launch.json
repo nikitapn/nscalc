@@ -19,6 +19,26 @@
       "target": "NScalcServer",
       "configuration": "release",
       "preLaunchTask": "swift: Build Release NScalcServer (server)"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:nscalc}/compute-worker",
+      "name": "Debug ComputeWorker (compute-worker)",
+      "target": "ComputeWorker",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug ComputeWorker (compute-worker)"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:nscalc}/compute-worker",
+      "name": "Release ComputeWorker (compute-worker)",
+      "target": "ComputeWorker",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release ComputeWorker (compute-worker)"
     }
   ]
 }

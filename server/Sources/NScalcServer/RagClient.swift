@@ -16,12 +16,15 @@ struct RagChunk: Codable, Sendable {
     var score: Double
 }
 
-private struct RagSearchRequest: Codable, Sendable {
+// Not private: reused by the ComputeChannel relay path (ComputeBroker.swift),
+// which needs to build/parse the exact same wire JSON when a compute worker
+// makes this HTTP call on our behalf instead of us calling it directly.
+struct RagSearchRequest: Codable, Sendable {
     var query: String
     var top_k: Int
 }
 
-private struct RagSearchResponse: Codable, Sendable {
+struct RagSearchResponse: Codable, Sendable {
     var results: [RagChunk]
 }
 

@@ -24,6 +24,7 @@ struct ServerConfig {
     let ollamaNumCtx: Int?
     let ragHost: String?
     let ragTimeoutSeconds: TimeInterval
+    let computeWorkerToken: String?
 
     var dbPath: String {
         let dataURL = URL(fileURLWithPath: dataDir)
@@ -103,6 +104,7 @@ private func printUsage() {
       --ollama-num-ctx <n>    Context window size (tokens) to request from Ollama. If unset, Ollama's own default applies (often much smaller than the model's architectural max, e.g. 2048-4096) — conversations longer than that get silently truncated. Larger values use more GPU/CPU memory for the KV cache, so raise it deliberately rather than maxing it out.
       --rag-host <url>        Base URL of the rag/serve.py bridge for the growing-guide search tool. If unset, that tool is not offered.
       --rag-timeout <secs>    Per-request timeout in seconds for RAG search calls (default: 20)
+      --compute-worker-token <token>  Shared secret a remote compute worker (see compute-worker/) must present to relay Ollama/RAG calls through this server. Required for the ComputeChannel to accept any connections — with no token configured, all worker connections are refused (closed by default, not an open relay).
       --help                  Show this help message
     """)
 }
@@ -136,6 +138,7 @@ private func parseServerConfig() throws -> ServerConfig {
     var ollamaNumCtx = env["NSCALC_OLLAMA_NUM_CTX"].flatMap { Int($0) }
     var ragHost = env["NSCALC_RAG_HOST"]
     var ragTimeoutSeconds = TimeInterval(env["NSCALC_RAG_TIMEOUT"] ?? "20") ?? 20
+    var computeWorkerToken = env["NSCALC_COMPUTE_WORKER_TOKEN"]
 
     let args = Array(CommandLine.arguments.dropFirst())
     var index = 0
@@ -206,6 +209,8 @@ private func parseServerConfig() throws -> ServerConfig {
                 throw ServerConfigError.invalidValue(option, value)
             }
             ragTimeoutSeconds = parsedTimeout
+        case "--compute-worker-token":
+            computeWorkerToken = try optionValue(option, inlineValue: inlineValue, index: &index, args: args)
         default:
             throw ServerConfigError.unknownArgument(argument)
         }
@@ -236,6 +241,7 @@ private func parseServerConfig() throws -> ServerConfig {
         ollamaNumCtx: ollamaNumCtx,
         ragHost: ragHost,
         ragTimeoutSeconds: ragTimeoutSeconds,
+        computeWorkerToken: computeWorkerToken,
     )
 }
 
@@ -358,7 +364,7 @@ do {
 
     print("NScalc Swift server listening on \(config.hostname):\(config.httpPort)")
 
-    let poa  = try rpc.createPoa(maxObjects: 12, lifetime: .Persistent, idPolicy: .userSupplied)
+    let poa  = try rpc.createPoa(maxObjects: 13, lifetime: .Persistent, idPolicy: .userSupplied)
     let calc = CalculatorServantImpl(db: appDB)
     let calcOid = try poa.activateObjectWithId(objectId: UInt64(0), servant: calc, flags: .allowAll)
 
@@ -391,6 +397,7 @@ do {
     let siteEvents = SiteEventServiceServantImpl(db: appDB)
     let siteEventsOid = try poa.activateObjectWithId(objectId: UInt64(10), servant: siteEvents, flags: .allowAll)
 
+    let computeBroker = ComputeBroker()
     let assistant = AssistantServiceServantImpl(
         db: appDB,
         ollamaHost: config.ollamaHost,
@@ -398,9 +405,13 @@ do {
         ollamaTimeoutSeconds: config.ollamaTimeoutSeconds,
         ollamaNumCtx: config.ollamaNumCtx,
         ragHost: config.ragHost,
-        ragTimeoutSeconds: config.ragTimeoutSeconds
+        ragTimeoutSeconds: config.ragTimeoutSeconds,
+        computeBroker: computeBroker
     )
     let assistantOid = try poa.activateObjectWithId(objectId: UInt64(11), servant: assistant, flags: .allowAll)
+
+    let computeChannel = ComputeChannelServantImpl(broker: computeBroker, expectedToken: config.computeWorkerToken)
+    let computeChannelOid = try poa.activateObjectWithId(objectId: UInt64(12), servant: computeChannel, flags: .allowAll)
 
     rpc.clearHostJson()
     try rpc.addToHostJson(name: "calculator", objectId: calcOid)
@@ -413,6 +424,7 @@ do {
     try rpc.addToHostJson(name: "journal_media", objectId: mediaOid)
     try rpc.addToHostJson(name: "site_events", objectId: siteEventsOid)
     try rpc.addToHostJson(name: "assistant", objectId: assistantOid)
+    try rpc.addToHostJson(name: "compute_channel", objectId: computeChannelOid)
     let hostJsonPath = try rpc.produceHostJson(outputPath: config.hostJsonOutputPath)
 
     if false {

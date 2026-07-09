@@ -231,7 +231,7 @@ struct OllamaClient: Sendable {
     func chatStream(
         messages: [OllamaMessage],
         tools: [OllamaTool],
-        onToken: (String) async -> Void
+        onToken: @Sendable (String) async -> Void
     ) async throws -> OllamaMessage {
         let request = OllamaChatRequest(
             model: model,

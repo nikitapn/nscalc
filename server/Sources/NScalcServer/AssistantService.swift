@@ -17,6 +17,17 @@ private func isTimeoutError(_ error: Error) -> Bool {
     (error as? URLError)?.code == .timedOut
 }
 
+private enum AssistantBackendError: LocalizedError, Sendable {
+    case notConfigured
+
+    var errorDescription: String? {
+        switch self {
+        case .notConfigured:
+            return "not configured (no direct connection or compute worker available)"
+        }
+    }
+}
+
 private func formatSeconds(_ seconds: TimeInterval) -> String {
     String(format: "%.1fs", seconds)
 }
@@ -178,7 +189,10 @@ private struct AssistantStore: Sendable {
     private let solutionService: SolutionService
     private let fertilizerService: FertilizerService
     private let ollama: OllamaClient?
+    private let ollamaModel: String?
+    private let ollamaNumCtx: Int?
     private let ragClient: RagClient?
+    private let computeBroker: ComputeBroker?
     private let maxRounds = 4
 
     private static let systemPrompt = """
@@ -245,11 +259,14 @@ private struct AssistantStore: Sendable {
         ollamaTimeoutSeconds: TimeInterval,
         ollamaNumCtx: Int?,
         ragHost: String?,
-        ragTimeoutSeconds: TimeInterval
+        ragTimeoutSeconds: TimeInterval,
+        computeBroker: ComputeBroker?
     ) {
         self.sessionService = SessionService(db: db)
         self.solutionService = SolutionService(db: db)
         self.fertilizerService = FertilizerService(db: db)
+        self.ollamaModel = (ollamaModel?.isEmpty == false) ? ollamaModel : nil
+        self.ollamaNumCtx = ollamaNumCtx
         if let ollamaHost, let url = URL(string: ollamaHost), let ollamaModel, !ollamaModel.isEmpty {
             self.ollama = OllamaClient(baseURL: url, model: ollamaModel, timeoutSeconds: ollamaTimeoutSeconds, numCtx: ollamaNumCtx)
         } else {
@@ -260,6 +277,42 @@ private struct AssistantStore: Sendable {
         } else {
             self.ragClient = nil
         }
+        self.computeBroker = computeBroker
+    }
+
+    /// Prefers a connected compute worker (relay) over a direct Ollama HTTP
+    /// connection when both are available — the worker is what makes this
+    /// work when Ollama sits behind NAT (e.g. on a laptop) and can't be
+    /// dialed into directly from this server.
+    private func chat(
+        messages: [OllamaMessage],
+        tools: [OllamaTool],
+        workerAvailable: Bool,
+        onToken: @Sendable (String) async -> Void
+    ) async throws -> OllamaMessage {
+        if workerAvailable, let computeBroker, let ollamaModel {
+            return try await computeBroker.relayOllamaChatStream(
+                model: ollamaModel,
+                messages: messages,
+                tools: tools,
+                numCtx: ollamaNumCtx,
+                onToken: onToken
+            )
+        }
+        guard let ollama else {
+            throw AssistantBackendError.notConfigured
+        }
+        return try await ollama.chatStream(messages: messages, tools: tools, onToken: onToken)
+    }
+
+    private func ragSearch(query: String, workerAvailable: Bool) async throws -> [RagChunk] {
+        if workerAvailable, let computeBroker {
+            return try await computeBroker.relayRagSearch(query: query)
+        }
+        guard let ragClient else {
+            throw AssistantBackendError.notConfigured
+        }
+        return try await ragClient.search(query: query)
     }
 
     /// Processes one `AssistantAsk`, emitting progress/result events as they
@@ -267,16 +320,17 @@ private struct AssistantStore: Sendable {
     /// even while a slow model is still thinking. `emit` is called from this
     /// function's own async context — the caller (the servant) just forwards
     /// each event to its stream writer.
-    func handle(ask: AssistantAsk, sessionId: String, emit: (AssistantEvent) async -> Void) async {
+    func handle(ask: AssistantAsk, sessionId: String, emit: @Sendable (AssistantEvent) async -> Void) async {
         let askStart = Date()
         aslog("I", "ask \(ask.request_id) started (prompt_len=\(ask.prompt.count), has_image=\(ask.image != nil))")
 
-        guard let ollama else {
+        let workerAvailable = await computeBroker?.hasWorker ?? false
+        guard ollama != nil || (workerAvailable && ollamaModel != nil) else {
             aslog("E", "ask \(ask.request_id) rejected: assistant not configured")
             await emit(AssistantEvent(
                 request_id: ask.request_id,
                 status: .Error,
-                detail: "AI assistant is not configured (missing --ollama-host/--ollama-model).",
+                detail: "AI assistant is not configured (missing --ollama-model, and no direct --ollama-host or connected compute worker).",
                 solution: nil,
                 fertilizer: nil
             ))
@@ -300,14 +354,16 @@ private struct AssistantStore: Sendable {
         ]
         var lastTouchedSolution: SolutionRecord?
         var lastTouchedFertilizer: FertilizerRecord?
+        let ragEnabled = ragClient != nil || workerAvailable
 
         for round in 0..<maxRounds {
             let roundStart = Date()
             let reply: OllamaMessage
             do {
-                reply = try await ollama.chatStream(
+                reply = try await chat(
                     messages: messages,
-                    tools: AssistantTools.active(ragEnabled: ragClient != nil)
+                    tools: AssistantTools.active(ragEnabled: ragEnabled),
+                    workerAvailable: workerAvailable
                 ) { token in
                     await emit(AssistantEvent(request_id: ask.request_id, status: .Token, detail: token, solution: nil, fertilizer: nil))
                 }
@@ -358,6 +414,7 @@ private struct AssistantStore: Sendable {
                     call,
                     userId: userId,
                     user: user,
+                    workerAvailable: workerAvailable,
                     lastTouchedSolution: &lastTouchedSolution,
                     lastTouchedFertilizer: &lastTouchedFertilizer
                 )
@@ -384,6 +441,7 @@ private struct AssistantStore: Sendable {
         _ call: OllamaToolCall,
         userId: Int64,
         user: UserRecord,
+        workerAvailable: Bool,
         lastTouchedSolution: inout SolutionRecord?,
         lastTouchedFertilizer: inout FertilizerRecord?
     ) async -> String {
@@ -401,7 +459,7 @@ private struct AssistantStore: Sendable {
         case "update_fertilizer":
             return updateFertilizer(call.function.arguments, userId: userId, lastTouchedFertilizer: &lastTouchedFertilizer)
         case "search_growing_guides":
-            return await searchGrowingGuides(call.function.arguments)
+            return await searchGrowingGuides(call.function.arguments, workerAvailable: workerAvailable)
         default:
             return jsonString(["error": "Unknown tool '\(call.function.name)'."])
         }
@@ -571,10 +629,7 @@ private struct AssistantStore: Sendable {
         }
     }
 
-    private func searchGrowingGuides(_ arguments: [String: JSONValue]) async -> String {
-        guard let ragClient else {
-            return jsonString(["error": "The growing-guide library is not configured on this server."])
-        }
+    private func searchGrowingGuides(_ arguments: [String: JSONValue], workerAvailable: Bool) async -> String {
         guard let query = arguments["query"]?.stringValue,
               !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else {
@@ -584,7 +639,7 @@ private struct AssistantStore: Sendable {
         aslog("D", "search_growing_guides query: \(query)")
 
         do {
-            let chunks = try await ragClient.search(query: query)
+            let chunks = try await ragSearch(query: query, workerAvailable: workerAvailable)
             let items: [[String: Any]] = chunks.map { chunk in
                 [
                     "source": chunk.source,
@@ -620,7 +675,8 @@ final class AssistantServiceServantImpl: AssistantServiceServant, @unchecked Sen
         ollamaTimeoutSeconds: TimeInterval,
         ollamaNumCtx: Int?,
         ragHost: String?,
-        ragTimeoutSeconds: TimeInterval
+        ragTimeoutSeconds: TimeInterval,
+        computeBroker: ComputeBroker?
     ) {
         self.store = AssistantStore(
             db: db,
@@ -629,7 +685,8 @@ final class AssistantServiceServantImpl: AssistantServiceServant, @unchecked Sen
             ollamaTimeoutSeconds: ollamaTimeoutSeconds,
             ollamaNumCtx: ollamaNumCtx,
             ragHost: ragHost,
-            ragTimeoutSeconds: ragTimeoutSeconds
+            ragTimeoutSeconds: ragTimeoutSeconds,
+            computeBroker: computeBroker
         )
         super.init()
     }
