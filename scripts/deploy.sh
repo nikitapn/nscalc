@@ -17,6 +17,10 @@ PRIVATE_KEY="/certs/live/nikitapn.com/privkey.pem"
 DH_PARAMS=""
 SHM_C2S="/dev/shm/nprpc_nscalc_ingress_c2s"
 SHM_S2C="/dev/shm/nprpc_quic_edge_s2c"
+# RAG Model configuration
+OLLAMA_MODEL="gemma4"
+OLLAMA_NUM_CTX="16384"
+COMPUTE_WORKER_TOKEN="testsecret123"
 
 usage() {
   cat <<'EOF'
@@ -35,6 +39,7 @@ Usage: ./deploy.sh --ssh user@server --hostname calc.example.com --cert-dir /pat
   --dh-params <path>          DH params path inside the container
   --shm-c2s <path>            Host shared-memory file for QUIC client->server traffic
   --shm-s2c <path>            Host shared-memory file for QUIC server->client traffic
+  --ollama-model <name>       Ollama model name (default: gemma4)
 
 The production container is started with CAP_NET_ADMIN and CAP_BPF so NPRPC can
 install the eBPF SO_REUSEPORT selector required by multi-worker HTTP/3.
@@ -95,6 +100,18 @@ while [ $# -gt 0 ]; do
       SHM_S2C="$2"
       shift
       ;;
+    --ollama-model)
+      OLLAMA_MODEL="$2"
+      shift
+      ;;
+    --ollama-num-ctx)
+      OLLAMA_NUM_CTX="$2"
+      shift
+      ;;
+    --compute-worker-token)
+      COMPUTE_WORKER_TOKEN="$2"
+      shift
+      ;;
     --help)
       usage
       exit 0
@@ -136,6 +153,9 @@ ssh "$SSH_TARGET" \
   RELEASE_DIR="$RELEASE_DIR" \
   SHM_C2S="$SHM_C2S" \
   SHM_S2C="$SHM_S2C" \
+  OLLAMA_MODEL="$OLLAMA_MODEL" \
+  OLLAMA_NUM_CTX="$OLLAMA_NUM_CTX" \
+  COMPUTE_WORKER_TOKEN="$COMPUTE_WORKER_TOKEN" \
   REMOTE_TMP_DIR="$REMOTE_TMP_DIR" \
   'bash -se' <<'EOF'
 set -euo pipefail
@@ -172,9 +192,13 @@ DOCKER_ARGS=(
   -e "NSCALC_PORT=443"
   -e "NSCALC_DATA_DIR=/data"
   -e "NSCALC_ENABLE_HTTP3=1"
+  -e "NSCALC_USE_HTTP3_SHM_CHANNELS=1"
   -e "NSCALC_USE_SSL=1"
   -e "NSCALC_PUBLIC_KEY=$PUBLIC_KEY"
   -e "NSCALC_PRIVATE_KEY=$PRIVATE_KEY"
+  -e "NSCALC_OLLAMA_MODEL=$OLLAMA_MODEL"
+  -e "NSCALC_OLLAMA_NUM_CTX=$OLLAMA_NUM_CTX"
+  -e "NSCALC_COMPUTE_WORKER_TOKEN=$COMPUTE_WORKER_TOKEN"
 )
 
 if [ -n "$DH_PARAMS" ]; then

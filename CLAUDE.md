@@ -55,6 +55,14 @@ Production packaging/deploy (see README for full flag list):
 ./scripts/deploy.sh --ssh ... --hostname ... --cert-dir ... --dh-params ... --port 443
 ```
 
+AI assistant / RAG / compute-worker (see "AI assistant, RAG, and the
+compute-worker relay" under Architecture):
+```bash
+./scripts/build-compute-worker.sh      # build compute-worker/ inside Docker
+./scripts/run-compute-worker-test.sh   # run it against a local test server (hardcoded config — read the script)
+cd rag && .venv/bin/python serve.py    # start the RAG HTTP bridge (needs rag/docker-compose.yml's postgres up)
+```
+
 ## Architecture
 
 **IDL is the source of truth for the client/server contract.** `idl/*.npidl`
@@ -68,7 +76,9 @@ the generated types won't exist/be stale.
 
 - `idl/nscalc.npidl` — calculator/auth/chat/realtime domain (`Solution`,
   `Fertilizer`, `Calculation`, `Authorizator`, `RegisteredUser`, `Calculator`,
-  `Chat`, `Realtime`, `SiteEventService`).
+  `Chat`, `Realtime`, `SiteEventService`), plus the AI assistant/compute
+  relay (`AssistantService`, `ComputeChannel` — see the architecture section
+  below).
 - `idl/grow_journal.npidl` — grow journal domain (`JournalService`,
   `UploadService`, `StoryStreamService`, `MediaService`). Note:
   `docs/GROW_JOURNAL_DESIGN.md` is the original design doc and says this is
@@ -82,14 +92,16 @@ the generated types won't exist/be stale.
   builds the NPRPC server (`RpcBuilder`), and activates one servant per
   interface on a shared POA with fixed object IDs (0=calculator, 1=authorizator,
   4=chat, 5=realtime, 6=journal, 7=journal_uploads, 8=journal_stream,
-  9=journal_media, 10=site_events). These names are what `host.json` exposes
-  and what the client looks up by name (see `getNscalcRpc`/`getJournalRpc`
-  patterns) — if you add a new servant, activate it here and add it to
-  `host.json` via `rpc.addToHostJson`.
+  9=journal_media, 10=site_events, 11=assistant, 12=compute_channel). These
+  names are what `host.json` exposes and what the client looks up by name
+  (see `getNscalcRpc`/`getJournalRpc` patterns) — if you add a new servant,
+  activate it here and add it to `host.json` via `rpc.addToHostJson`.
 - `Database/AppDatabase.swift` — GRDB `DatabaseQueue` wrapper; all schema
   changes go through `DatabaseMigrator` migrations registered here in order
   (`v1` initial schema, `v2_fertilizer_parsed_fields`, `v3_grow_journal`,
-  `v4_grow_journal_recovery`, `v5_site_events`). Add new migrations rather
+  `v4_grow_journal_recovery`, `v5_site_events`, `v6_fertilizer_purity_fix` —
+  re-parses stored fertilizer formulas because `formula X purity Y` used to
+  be a no-op, see `FertilizerFormulaParser.swift`). Add new migrations rather
   than editing old ones; `database/create.sql` mirrors `v1` for reference
   only and is not itself executed.
   `*Record.swift` files are the GRDB row types per table; `*Service`-style
@@ -131,6 +143,52 @@ the generated types won't exist/be stale.
 - Dev server proxies `/host.json` and `/mock` to the Swift server
   (`NSCALC_SWIFT_PROXY_TARGET`, default `http://localhost:8443`), so run the
   Swift server alongside `npm run dev` for the RPC calls to resolve.
+
+**AI assistant, RAG, and the compute-worker relay** — a crop-advice assistant
+built on top of the existing NPRPC server, not (yet) covered by the README:
+- `AssistantService` (`idl/nscalc.npidl`, `server/Sources/NScalcServer/AssistantService.swift`)
+  is a `bidi_stream` interface (`AssistantAsk`/`AssistantEvent`, statuses
+  `Thinking`/`ToolCall`/`Token`/`Done`/`Error`) running a tool-calling loop
+  against Ollama's `/api/chat`, streaming tokens back live. Tools call
+  straight into existing services instead of duplicating logic:
+  `create_solution`/`update_solution`/`list_my_solutions` → `SolutionService`,
+  `create_fertilizer`/`update_fertilizer`/`list_my_fertilizers` →
+  `FertilizerService` (goes through the real `FertilizerFormulaParser`, so a
+  bad LLM-generated formula is rejected and the model retries rather than
+  corrupting data), `search_growing_guides` → the RAG bridge below. Supports
+  vision (a fertilizer-label photo → `AssistantImage` base64 → Ollama's
+  vision input).
+- `OllamaClient.swift` is hand-rolled around real Linux Foundation gaps:
+  `URLSession.bytes(for:)` and `URLProtectionSpace.serverTrust` are both
+  *unavailable* in swift-corelibs-foundation, so streaming uses a
+  `URLSessionDataDelegate` bridged to `AsyncThrowingStream` instead of the
+  modern async API. `--ollama-num-ctx` matters — Ollama's default context
+  window (~2048-4096) is much smaller than a model's architectural max and
+  silently truncates long conversations once exceeded (visible as
+  `truncated = 1` in Ollama's own logs) unless raised.
+- Poor man's RAG, running on a laptop via the compute broker (below):
+  `rag/` is a separate Python project (its own `.venv`, sibling to the Swift
+  code) — growing-guide PDFs → `docling` → chunked → embedded with
+  `Qwen/Qwen3-Embedding-0.6B` → pgvector (`rag/docker-compose.yml`'s
+  `nscalc-rag-postgres` container). `rag/serve.py` is a stdlib-only HTTP
+  bridge (`POST /search`) since Swift has no embedding-model/pgvector
+  equivalent; `RagClient.swift` calls it the same way `OllamaClient.swift`
+  calls Ollama.
+- `compute-worker/` (a separate Swift package + Dockerfile, sibling to
+  `server/`, own generated `NScalc` stubs via `gen_stubs.py`) solves running
+  Ollama/RAG on a NAT'd machine (a laptop) while `server/` runs on a public
+  VPS: the worker dials *out* to the server — the server can't dial in past
+  NAT — via a second `bidi_stream`, `ComputeChannel.Connect(worker_token)`,
+  and relays raw JSON HTTP request/response bodies both ways without
+  knowing Ollama's or the RAG bridge's schema at all (see the comment above
+  `ComputeChannel` in `idl/nscalc.npidl`). Auth is a shared-secret token
+  (`--compute-worker-token` on the server; unset means the channel refuses
+  all connections, closed by default, not an open relay). `ComputeBroker`
+  (`server/Sources/NScalcServer/ComputeBroker.swift`) is the actor
+  multiplexing in-flight jobs over the one worker connection by job id;
+  `AssistantStore` prefers a connected worker over any direct
+  `--ollama-host`/`--rag-host` when one's live, falling back to direct HTTP
+  otherwise — local dev without a worker still works unchanged.
 
 ## Data flow for a typical feature
 

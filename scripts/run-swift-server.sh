@@ -27,14 +27,6 @@ RAG_HOST_ARG="${NSCALC_RAG_HOST:-}"
 RAG_TIMEOUT_ARG="${NSCALC_RAG_TIMEOUT:-}"
 COMPUTE_WORKER_TOKEN_ARG="${NSCALC_COMPUTE_WORKER_TOKEN:-}"
 
-# HOST_JSON="$ROOT_DIR/client/dist/host.json"
-# if [ -f "$HOST_JSON" ]; then
-#     _host=$(python3 -c "import json,sys; d=json.load(open('$HOST_JSON')); print(d.get('hostname','localhost'))" 2>/dev/null || true)
-#     _port=$(python3 -c "import json,sys; d=json.load(open('$HOST_JSON')); print(d.get('port',8443))" 2>/dev/null || true)
-#     [ -n "$_host" ] && HOSTNAME_ARG=$_host
-#     [ -n "$_port" ] && PORT_ARG=$_port
-# fi
-
 while [ $# -gt 0 ]; do
     case "$1" in
         --debug|debug)

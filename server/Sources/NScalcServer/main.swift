@@ -240,6 +240,7 @@ private func parseServerConfig() throws -> ServerConfig {
         dataDir: dataDir,
         useSsl: useSsl,
         enableHttp3: enableHttp3,
+        useHttp3ShmChannels: useHttp3ShmChannels,
         publicKeyPath: publicKeyPath,
         privateKeyPath: privateKeyPath,
         dhParamsPath: dhParamsPath,
