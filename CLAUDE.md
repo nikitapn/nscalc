@@ -20,6 +20,11 @@ host.
 
 ## Commands
 
+A `justfile` wraps everything below as discoverable recipes (`just --list`;
+e.g. `just build-server`, `just run-server --ollama-model qwen3.5:latest`).
+It's a thin pass-through over these same scripts, not a replacement — the
+scripts remain the source of truth.
+
 ```bash
 ./scripts/build-dev-image.sh              # build the nscalc-builder:latest image (do this first, once)
 python3 scripts/gen_stubs.py              # regenerate NPRPC stubs (TS + Swift) from idl/*.npidl
