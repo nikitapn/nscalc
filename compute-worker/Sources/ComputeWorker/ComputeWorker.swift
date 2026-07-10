@@ -174,30 +174,14 @@ private func fetchHostJson(serverURL: URL) async throws -> HostJson {
     return try JSONDecoder().decode(HostJson.self, from: data)
 }
 
-/// Prefers a secure WebSocket endpoint over plain ws/tcp/mem — `select_endpoint()`
-/// otherwise ranks unencrypted/same-machine transports first, which is wrong
-/// once this worker is dialing a public server over the internet rather than
-/// loopback. Requires the server's --hostname to be a real, resolvable
-/// address matching its TLS certificate (see README) — host.json just
-/// echoes that hostname verbatim into these URLs.
-private func preferringWss(_ objectId: detail.ObjectId) -> detail.ObjectId {
-    var oid = objectId
-    let wssURLs = oid.urls.split(separator: ";").filter { $0.hasPrefix("wss://") }
-    if !wssURLs.isEmpty {
-        oid.urls = wssURLs.map { "\($0);" }.joined()
-    }
-    return oid
-}
-
 // MARK: - Connection loop
 
 private func connectOnce(config: WorkerConfig) async throws {
     wlog("I", "fetching host.json from \(config.serverURL.absoluteString)")
     let hostJson = try await fetchHostJson(serverURL: config.serverURL)
-    guard var computeChannelOid = hostJson.objects["compute_channel"] else {
+    guard let computeChannelOid = hostJson.objects["compute_channel"] else {
         throw WorkerConfigError.missingRequired("server host.json has no 'compute_channel' object — is the server built with ComputeChannel support and a --compute-worker-token configured?")
     }
-    computeChannelOid = preferringWss(computeChannelOid)
 
     let builder = RpcBuilder().setLogLevel(.warn)
     if let caCertPath = config.caCertPath {

@@ -7,6 +7,7 @@ docker run --rm -i --add-host=host.docker.internal:host-gateway \
   -e NSCALC_SERVER_URL=https://calculator.lan:443 \
   -e NSCALC_COMPUTE_WORKER_TOKEN=testsecret123 \
   -e NSCALC_WORKER_OLLAMA_HOST=http://host.docker.internal:11434 \
+  -e NSCALC_WORKER_RAG_HOST=http://host.docker.internal:8100 \
   -e NSCALC_WORKER_INSECURE_TLS=1 \
   --user root \
   nscalc-builder:latest \

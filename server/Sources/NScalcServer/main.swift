@@ -15,10 +15,11 @@ struct ServerConfig {
     let dataDir: String
     let useSsl: Bool
     let enableHttp3: Bool
+    let useHttp3ShmChannels: Bool
     let publicKeyPath: String?
     let privateKeyPath: String?
     let dhParamsPath: String?
-    let ollamaHost: String
+    let ollamaHost: String?
     let ollamaModel: String?
     let ollamaTimeoutSeconds: TimeInterval
     let ollamaNumCtx: Int?
@@ -129,10 +130,11 @@ private func parseServerConfig() throws -> ServerConfig {
     var dataDir = env["NSCALC_DATA_DIR"] ?? "/app/sample_data"
     var useSsl = try parseBool(env["NSCALC_USE_SSL"] ?? "1", optionName: "NSCALC_USE_SSL")
     var enableHttp3 = try parseBool(env["NSCALC_ENABLE_HTTP3"] ?? "0", optionName: "NSCALC_ENABLE_HTTP3")
+    var useHttp3ShmChannels = try parseBool(env["NSCALC_USE_HTTP3_SHM_CHANNELS"] ?? "0", optionName: "NSCALC_USE_HTTP3_SHM_CHANNELS")
     var publicKeyPath = env["NSCALC_PUBLIC_KEY"]
     var privateKeyPath = env["NSCALC_PRIVATE_KEY"]
     var dhParamsPath = env["NSCALC_DH_PARAMS"]
-    var ollamaHost = env["NSCALC_OLLAMA_HOST"] ?? "http://localhost:11434"
+    var ollamaHost = env["NSCALC_OLLAMA_HOST"]
     var ollamaModel = env["NSCALC_OLLAMA_MODEL"]
     var ollamaTimeoutSeconds = TimeInterval(env["NSCALC_OLLAMA_TIMEOUT"] ?? "120") ?? 120
     var ollamaNumCtx = env["NSCALC_OLLAMA_NUM_CTX"].flatMap { Int($0) }
@@ -178,6 +180,12 @@ private func parseServerConfig() throws -> ServerConfig {
                 enableHttp3 = try parseBool(inlineValue, optionName: option)
             } else {
                 enableHttp3 = true
+            }
+        case "--use-http3-shm-channels":
+            if let inlineValue {
+                useHttp3ShmChannels = try parseBool(inlineValue, optionName: option)
+            } else {
+                useHttp3ShmChannels = true
             }
         case "--public-key":
             publicKeyPath = try optionValue(option, inlineValue: inlineValue, index: &index, args: args)
@@ -343,7 +351,6 @@ do {
             .maxWebSocketMessageSize(6 * 1024 * 1024)
             .maxWebTransportMessageSize(6 * 1024 * 1024)
             .allowOrigins(["http://localhost:5173", "http://127.0.0.1:5173"]) // Vite dev server
-            // .http3ShmChannels(egress: "quic_edge", ingress: "nscalc_ingress")
             .http3Workers(1)
             // .watchFiles()
 
@@ -357,6 +364,9 @@ do {
     if config.enableHttp3 {
         httpBuilder.enableHttp3()
     }
+    if config.useHttp3ShmChannels {
+        httpBuilder.http3ShmChannels(egress: "quic_edge", ingress: "nscalc_ingress")
+    }
 
     let rpc = try httpBuilder
         .rootDir(config.httpDir)
@@ -366,16 +376,16 @@ do {
 
     let poa  = try rpc.createPoa(maxObjects: 13, lifetime: .Persistent, idPolicy: .userSupplied)
     let calc = CalculatorServantImpl(db: appDB)
-    let calcOid = try poa.activateObjectWithId(objectId: UInt64(0), servant: calc, flags: .allowAll)
+    let calcOid = try poa.activateObjectWithId(objectId: UInt64(0), servant: calc, flags: .networkOnly)
 
     let authorizator = try AuthorizatorImpl(rpc: rpc, db: appDB)
-    let authOid = try poa.activateObjectWithId(objectId: UInt64(1), servant: authorizator, flags: .allowAll)
+    let authOid = try poa.activateObjectWithId(objectId: UInt64(1), servant: authorizator, flags: .networkOnly)
 
     let chat = ChatServantImpl()
-    let chatOid = try poa.activateObjectWithId(objectId: UInt64(4), servant: chat, flags: .allowAll)
+    let chatOid = try poa.activateObjectWithId(objectId: UInt64(4), servant: chat, flags: .networkOnly)
 
     let realtime = RealtimeServantImpl()
-    let realtimeOid = try poa.activateObjectWithId(objectId: UInt64(5), servant: realtime, flags: .allowAll)
+    let realtimeOid = try poa.activateObjectWithId(objectId: UInt64(5), servant: realtime, flags: .networkOnly)
 
     let journalStore = GrowJournalStore(
         db: appDB,
@@ -383,19 +393,19 @@ do {
         publicRootPath: config.httpDir
     )
     let journal = JournalServiceServantImpl(store: journalStore)
-    let journalOid = try poa.activateObjectWithId(objectId: UInt64(6), servant: journal, flags: .allowAll)
+    let journalOid = try poa.activateObjectWithId(objectId: UInt64(6), servant: journal, flags: .networkOnly)
 
     let uploads = UploadServiceServantImpl(store: journalStore)
-    let uploadsOid = try poa.activateObjectWithId(objectId: UInt64(7), servant: uploads, flags: .allowAll)
+    let uploadsOid = try poa.activateObjectWithId(objectId: UInt64(7), servant: uploads, flags: .networkOnly)
 
     let storyStream = StoryStreamServiceServantImpl(store: journalStore)
-    let storyStreamOid = try poa.activateObjectWithId(objectId: UInt64(8), servant: storyStream, flags: .allowAll)
+    let storyStreamOid = try poa.activateObjectWithId(objectId: UInt64(8), servant: storyStream, flags: .networkOnly)
 
     let media = MediaServiceServantImpl(store: journalStore)
-    let mediaOid = try poa.activateObjectWithId(objectId: UInt64(9), servant: media, flags: .allowAll)
+    let mediaOid = try poa.activateObjectWithId(objectId: UInt64(9), servant: media, flags: .networkOnly)
 
     let siteEvents = SiteEventServiceServantImpl(db: appDB)
-    let siteEventsOid = try poa.activateObjectWithId(objectId: UInt64(10), servant: siteEvents, flags: .allowAll)
+    let siteEventsOid = try poa.activateObjectWithId(objectId: UInt64(10), servant: siteEvents, flags: .networkOnly)
 
     let computeBroker = ComputeBroker()
     let assistant = AssistantServiceServantImpl(
@@ -408,10 +418,10 @@ do {
         ragTimeoutSeconds: config.ragTimeoutSeconds,
         computeBroker: computeBroker
     )
-    let assistantOid = try poa.activateObjectWithId(objectId: UInt64(11), servant: assistant, flags: .allowAll)
+    let assistantOid = try poa.activateObjectWithId(objectId: UInt64(11), servant: assistant, flags: .networkOnly)
 
     let computeChannel = ComputeChannelServantImpl(broker: computeBroker, expectedToken: config.computeWorkerToken)
-    let computeChannelOid = try poa.activateObjectWithId(objectId: UInt64(12), servant: computeChannel, flags: .allowAll)
+    let computeChannelOid = try poa.activateObjectWithId(objectId: UInt64(12), servant: computeChannel, flags: .networkOnly)
 
     rpc.clearHostJson()
     try rpc.addToHostJson(name: "calculator", objectId: calcOid)
@@ -450,10 +460,6 @@ do {
     signal(SIGINT, SIG_IGN)
     signalSource.resume()
 
-    // 4 workers (was 1): AssistantService.Ask blocks its worker thread for the
-    // duration of up to several sequential Ollama HTTP round-trips, so a single
-    // worker would stall every other RPC call server-wide while an assistant
-    // request is in flight.
     try rpc.startThreadPool(4)
 
     // Block forever waiting for RPC calls
