@@ -8,7 +8,7 @@ class ChatServantImpl: ChatServant, @unchecked Sendable {
     do {
       for try await message in stream.reader {
         print("[Chat] \(session_id): \(message.str)")
-        await stream.writer.write(message)
+        try await stream.writer.write(message)
       }
     } catch {
       print("[Chat] stream failed for \(session_id): \(error)")

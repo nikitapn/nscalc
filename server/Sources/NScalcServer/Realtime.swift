@@ -5,18 +5,18 @@ class RealtimeServantImpl: RealtimeServant, @unchecked Sendable {
   override func connect(session_id: String, stream: NPRPCBidiStream<RealtimeServerEvent, RealtimeClientEvent>) async {
     print("[Realtime] stream connected: \(session_id)")
 
-    await stream.writer.write(
-      RealtimeServerEvent(
-        data_changed_idx: nil,
-        alarm: Alarm(id: 0, type: .Info, msg: "Realtime connected"),
-        footstep: nil
-      )
-    )
-
     do {
+      try await stream.writer.write(
+        RealtimeServerEvent(
+          data_changed_idx: nil,
+          alarm: Alarm(id: 0, type: .Info, msg: "Realtime connected"),
+          footstep: nil
+        )
+      )
+
       for try await event in stream.reader {
         if let footstep = event.footstep {
-          await stream.writer.write(
+          try await stream.writer.write(
             RealtimeServerEvent(
               data_changed_idx: nil,
               alarm: nil,

@@ -217,7 +217,7 @@ private func connectOnce(config: WorkerConfig) async throws {
         case .RagSearch:
             guard let ragHost = config.ragHost else {
                 wlog("W", "job \(job.job_id): RagSearch requested but no --rag-host configured")
-                await stream.writer.write(ComputeJobResult(
+                try await stream.writer.write(ComputeJobResult(
                     job_id: job.job_id,
                     status: .Error,
                     chunk_json: nil,

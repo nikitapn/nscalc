@@ -24,7 +24,9 @@ EOF
     shift
 done
 
-docker run --rm -i --add-host=host.docker.internal:host-gateway \
+docker run --rm -i \
+  --name nscalc-compute-worker \
+  --add-host=host.docker.internal:host-gateway \
   -v /home/nikita/projects/nscalc/compute-worker:/app \
   -v /home/nikita/projects/nscalc/certs/out:/app/certs \
   -w /app \

@@ -1329,7 +1329,11 @@ final class GrowJournalStore: @unchecked Sendable {
         let activeWriters = withLock { Array((watchers[storyId] ?? [:]).values) }
         for writer in activeWriters {
             Task {
-                await writer.write(event)
+                do {
+                    try await writer.write(event)
+                } catch {
+                    gjlog("W", "failed to broadcast to a story watcher: \(error)")
+                }
             }
         }
     }

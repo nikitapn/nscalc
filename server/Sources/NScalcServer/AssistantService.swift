@@ -696,7 +696,11 @@ final class AssistantServiceServantImpl: AssistantServiceServant, @unchecked Sen
         do {
             for try await ask in stream.reader {
                 await store.handle(ask: ask, sessionId: session_id) { event in
-                    await stream.writer.write(event)
+                    do {
+                        try await stream.writer.write(event)
+                    } catch {
+                        aslog("W", "failed to emit event for \(session_id): \(error)")
+                    }
                 }
             }
         } catch {

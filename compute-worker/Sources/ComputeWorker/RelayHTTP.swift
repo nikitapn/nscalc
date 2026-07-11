@@ -94,6 +94,17 @@ private func wlog(_ level: String = "I", _ message: String) {
     nplog(level, message, component: "ComputeWorker")
 }
 
+// Best-effort send back to the server: if this throws, the server-side
+// session is gone (see nprpc#4) and there's no one left to report to —
+// just log and move on rather than letting it tear down the job handler.
+private func sendResult(_ result: ComputeJobResult, via writer: NPRPCStreamWriter<ComputeJobResult>) async {
+    do {
+        try await writer.write(result)
+    } catch {
+        wlog("W", "job \(result.job_id): failed to send result back to server (connection likely dead): \(error)")
+    }
+}
+
 func handleOllamaChatStreamJob(
     _ job: ComputeJobRequest,
     ollamaBaseURL: URL,
@@ -106,13 +117,13 @@ func handleOllamaChatStreamJob(
         var lineCount = 0
         for try await line in streamLines(url: url, bodyJSON: job.request_body_json, timeoutSeconds: timeoutSeconds) {
             lineCount += 1
-            await writer.write(ComputeJobResult(job_id: job.job_id, status: .Chunk, chunk_json: line, error_message: nil))
+            await sendResult(ComputeJobResult(job_id: job.job_id, status: .Chunk, chunk_json: line, error_message: nil), via: writer)
         }
         wlog("I", "job \(job.job_id): done (\(lineCount) chunks)")
-        await writer.write(ComputeJobResult(job_id: job.job_id, status: .Done, chunk_json: nil, error_message: nil))
+        await sendResult(ComputeJobResult(job_id: job.job_id, status: .Done, chunk_json: nil, error_message: nil), via: writer)
     } catch {
         wlog("E", "job \(job.job_id): Ollama relay failed: \(error)")
-        await writer.write(ComputeJobResult(job_id: job.job_id, status: .Error, chunk_json: nil, error_message: "\(error)"))
+        await sendResult(ComputeJobResult(job_id: job.job_id, status: .Error, chunk_json: nil, error_message: "\(error)"), via: writer)
     }
 }
 
@@ -142,9 +153,9 @@ func handleRagSearchJob(
         }
         let responseJSON = String(data: data, encoding: .utf8) ?? "{}"
         wlog("I", "job \(job.job_id): done")
-        await writer.write(ComputeJobResult(job_id: job.job_id, status: .Done, chunk_json: responseJSON, error_message: nil))
+        await sendResult(ComputeJobResult(job_id: job.job_id, status: .Done, chunk_json: responseJSON, error_message: nil), via: writer)
     } catch {
         wlog("E", "job \(job.job_id): RAG relay failed: \(error)")
-        await writer.write(ComputeJobResult(job_id: job.job_id, status: .Error, chunk_json: nil, error_message: "\(error)"))
+        await sendResult(ComputeJobResult(job_id: job.job_id, status: .Error, chunk_json: nil, error_message: "\(error)"), via: writer)
     }
 }

@@ -71,7 +71,20 @@ actor ComputeBroker {
         pending[jobId] = continuation
 
         let request = ComputeJobRequest(job_id: jobId, kind: kind, request_body_json: requestBodyJSON)
-        await workerWriter.write(request)
+        do {
+            try await workerWriter.write(request)
+        } catch {
+            // The write itself just told us this writer is dead (its session
+            // died, possibly a long time ago — see nprpc#4) — don't wait for
+            // the servant's read loop to notice; clear it now so the *next*
+            // submitJob() doesn't retry the same stale writer.
+            cblog("W", "write to compute worker failed, treating it as disconnected: \(error)")
+            pending.removeValue(forKey: jobId)
+            if self.workerWriter === workerWriter {
+                self.workerWriter = nil
+            }
+            throw ComputeBrokerError.noWorkerConnected
+        }
         return stream
     }
 
