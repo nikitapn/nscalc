@@ -5,6 +5,7 @@
   import Journal from "./view/Journal.svelte";
   import Solutions from "./view/Solutions.svelte";
   import Fertilizers from "./view/Fertilizers.svelte";
+  import AssistantPanel from "./lib/AssistantPanel.svelte";
   import { localeLabels, resolveLocale, translations, type Locale } from "./lib/i18n";
   import {
     createDefaultSiteEventConfig,
@@ -16,6 +17,7 @@
   } from "./lib/adminEvents";
   import { getCookie, setCookie } from "./lib/cookies";
   import { getNscalcRpc } from "./lib/nscalcRpc";
+  import { invalidateFertilizersCatalogCache, invalidateSolutionsCatalogCache } from "./lib/catalogRpcCache";
   import { applySeasonalTheme, seasonForVariant } from "./lib/seasonalTheme";
   import * as nscalc from "@rpc/nscalc";
 
@@ -650,7 +652,7 @@
         {:else if currentView === "calculator"}
           <Calculator currentUser={authState?.registeredUser ?? null} uiText={copy.calculator} />
         {:else if currentView === "solutions"}
-          <Solutions currentUserName={authState?.name ?? null} currentUser={authState?.registeredUser ?? null} sessionId={authState?.sessionId ?? null} uiText={copy.solutions} assistantUiText={copy.assistant} />
+          <Solutions currentUserName={authState?.name ?? null} currentUser={authState?.registeredUser ?? null} sessionId={authState?.sessionId ?? null} uiText={copy.solutions} />
         {:else if currentView === "fertilizers"}
           <Fertilizers currentUserName={authState?.name ?? null} currentUser={authState?.registeredUser ?? null} uiText={copy.fertilizers} />
         {:else if currentView === "chat"}
@@ -872,4 +874,17 @@
       <p>{copy.footer.poweredBy} <span class="font-semibold text-white">NPRPC</span></p>
     </div>
   </footer>
+
+  <AssistantPanel
+    sessionId={authState?.sessionId ?? null}
+    uiText={copy.assistant}
+    onSolutionChanged={() => {
+      invalidateSolutionsCatalogCache();
+      window.dispatchEvent(new CustomEvent("nscalc:solutions-changed"));
+    }}
+    onFertilizerChanged={() => {
+      invalidateFertilizersCatalogCache();
+      window.dispatchEvent(new CustomEvent("nscalc:fertilizers-changed"));
+    }}
+  />
 </div>

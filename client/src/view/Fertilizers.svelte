@@ -45,6 +45,15 @@
     if (!initialState.ready) {
       void reloadFertilizers();
     }
+
+    const onAssistantFertilizersChanged = () => {
+      invalidateFertilizersCatalogCache();
+      void refreshVisibleFertilizers();
+    };
+    window.addEventListener("nscalc:fertilizers-changed", onAssistantFertilizersChanged);
+    return () => {
+      window.removeEventListener("nscalc:fertilizers-changed", onAssistantFertilizersChanged);
+    };
   });
 
   $effect(() => {

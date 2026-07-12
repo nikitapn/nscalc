@@ -206,6 +206,8 @@ export type AssistantCopy = {
   loginHint: string;
   ask: string;
   asking: string;
+  hide: string;
+  open: string;
   toolCallLabel: (toolName: string) => string;
   solutionUpdatedLabel: (name: string) => string;
   fertilizerUpdatedLabel: (name: string) => string;
@@ -1055,6 +1057,8 @@ export const translations: Record<Locale, TranslationSet> = {
       loginHint: "Log in to ask the assistant to create or update solutions for you.",
       ask: "Ask assistant",
       asking: "Thinking...",
+      hide: "Hide",
+      open: "Open AI assistant",
       toolCallLabel: (toolName) => `Working: ${toolName}...`,
       solutionUpdatedLabel: (name) => `Updated solution: ${name}`,
       fertilizerUpdatedLabel: (name) => `Updated fertilizer: ${name}`,
@@ -1689,6 +1693,8 @@ export const translations: Record<Locale, TranslationSet> = {
       loginHint: "Войдите, чтобы попросить ассистента создать или изменить растворы.",
       ask: "Спросить ассистента",
       asking: "Думаю...",
+      hide: "Скрыть",
+      open: "Открыть ИИ-ассистента",
       toolCallLabel: (toolName) => `Выполняю: ${toolName}...`,
       solutionUpdatedLabel: (name) => `Обновлён раствор: ${name}`,
       fertilizerUpdatedLabel: (name) => `Обновлено удобрение: ${name}`,
