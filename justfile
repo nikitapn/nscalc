@@ -56,9 +56,16 @@ run-server *args:
 run-server-debug *args:
     ./scripts/run-swift-server.sh --debug {{ args }}
 
+# Run the server in dev mode (no SSL, no HTTP/3, port 8080) for local testing under vite dev server
+run-server-dev-mode:
+    ./scripts/run-swift-server.sh --disable-ssl --disable-http3 --port 8080 \
+    --ollama-host http://host.docker.internal:11434 \
+    --ollama-model gemma4 --ollama-num-ctx 16384 --ollama-timeout 90000 \
+    --rag-host http://host.docker.internal:8100
+
 # Launch Chromium with the dev self-signed cert pre-trusted
 run-chrome:
-    ./scripts/run_chrome.sh
+    ./scripts/run-chrome.sh
 
 # Reset local SQLite dev credentials (superuser@nscalc.com/1234, guest@nscalc.com/...)
 reset-auth:
@@ -71,8 +78,8 @@ build-compute-worker:
     ./scripts/build-compute-worker.sh
 
 # Run the compute-worker test harness (see scripts/run-compute-worker-test.sh for the hardcoded server/cert config)
-run-compute-worker-test:
-    ./scripts/run-compute-worker-test.sh
+run-compute-worker *args:
+    ./scripts/run-compute-worker.sh {{ args }}
 
 # --- RAG bridge (growing-guide search — see rag/README) ------------------
 
@@ -119,6 +126,10 @@ smoke-prod:
 # Deploy to the VPS. Pass flags directly, e.g. `just deploy --ssh debian@host --hostname calc.example.com --cert-dir /etc/letsencrypt/live/calc.example.com --dh-params /certs/ssl-dhparams.pem --port 443`
 deploy *args:
     ./scripts/deploy.sh {{ args }}
+
+# Restart the existing prod container on the VPS (no rebuild). e.g. `just restart-prod --ssh debian@host`
+restart-prod *args:
+    ./scripts/restart_prod.sh {{ args }}
 
 # Gather logs/coredumps from the production server
 diagnostics *args:

@@ -355,12 +355,15 @@ do {
             .http3Workers(1)
             // .watchFiles()
 
+    var activationFlags: ObjectActivationFlags = [.ws, .http]
+
     if config.useSsl {
         httpBuilder.ssl(
             certFile: config.publicKeyPath!,
             keyFile: config.privateKeyPath!,
             dhparamsFile: config.dhParamsPath ?? ""
         )
+        activationFlags.insert([.wss, .https, .wt])
     }
     if config.enableHttp3 {
         httpBuilder.enableHttp3()
@@ -377,16 +380,16 @@ do {
 
     let poa  = try rpc.createPoa(maxObjects: 13, lifetime: .Persistent, idPolicy: .userSupplied)
     let calc = CalculatorServantImpl(db: appDB)
-    let calcOid = try poa.activateObjectWithId(objectId: UInt64(0), servant: calc, flags: .networkOnly)
+    let calcOid = try poa.activateObjectWithId(objectId: UInt64(0), servant: calc, flags: activationFlags)
 
-    let authorizator = try AuthorizatorImpl(rpc: rpc, db: appDB)
-    let authOid = try poa.activateObjectWithId(objectId: UInt64(1), servant: authorizator, flags: .networkOnly)
+    let authorizator = try AuthorizatorImpl(rpc: rpc, db: appDB, flags: activationFlags)
+    let authOid = try poa.activateObjectWithId(objectId: UInt64(1), servant: authorizator, flags: activationFlags)
 
     let chat = ChatServantImpl()
-    let chatOid = try poa.activateObjectWithId(objectId: UInt64(4), servant: chat, flags: .networkOnly)
+    let chatOid = try poa.activateObjectWithId(objectId: UInt64(4), servant: chat, flags: activationFlags)
 
     let realtime = RealtimeServantImpl()
-    let realtimeOid = try poa.activateObjectWithId(objectId: UInt64(5), servant: realtime, flags: .networkOnly)
+    let realtimeOid = try poa.activateObjectWithId(objectId: UInt64(5), servant: realtime, flags: activationFlags)
 
     let journalStore = GrowJournalStore(
         db: appDB,
@@ -394,19 +397,19 @@ do {
         publicRootPath: config.httpDir
     )
     let journal = JournalServiceServantImpl(store: journalStore)
-    let journalOid = try poa.activateObjectWithId(objectId: UInt64(6), servant: journal, flags: .networkOnly)
+    let journalOid = try poa.activateObjectWithId(objectId: UInt64(6), servant: journal, flags: activationFlags)
 
     let uploads = UploadServiceServantImpl(store: journalStore)
-    let uploadsOid = try poa.activateObjectWithId(objectId: UInt64(7), servant: uploads, flags: .networkOnly)
+    let uploadsOid = try poa.activateObjectWithId(objectId: UInt64(7), servant: uploads, flags: activationFlags)
 
     let storyStream = StoryStreamServiceServantImpl(store: journalStore)
-    let storyStreamOid = try poa.activateObjectWithId(objectId: UInt64(8), servant: storyStream, flags: .networkOnly)
+    let storyStreamOid = try poa.activateObjectWithId(objectId: UInt64(8), servant: storyStream, flags: activationFlags)
 
     let media = MediaServiceServantImpl(store: journalStore)
-    let mediaOid = try poa.activateObjectWithId(objectId: UInt64(9), servant: media, flags: .networkOnly)
+    let mediaOid = try poa.activateObjectWithId(objectId: UInt64(9), servant: media, flags: activationFlags)
 
     let siteEvents = SiteEventServiceServantImpl(db: appDB)
-    let siteEventsOid = try poa.activateObjectWithId(objectId: UInt64(10), servant: siteEvents, flags: .networkOnly)
+    let siteEventsOid = try poa.activateObjectWithId(objectId: UInt64(10), servant: siteEvents, flags: activationFlags)
 
     let computeBroker = ComputeBroker()
     let assistant = AssistantServiceServantImpl(
@@ -419,10 +422,10 @@ do {
         ragTimeoutSeconds: config.ragTimeoutSeconds,
         computeBroker: computeBroker
     )
-    let assistantOid = try poa.activateObjectWithId(objectId: UInt64(11), servant: assistant, flags: .networkOnly)
+    let assistantOid = try poa.activateObjectWithId(objectId: UInt64(11), servant: assistant, flags: activationFlags)
 
     let computeChannel = ComputeChannelServantImpl(broker: computeBroker, expectedToken: config.computeWorkerToken)
-    let computeChannelOid = try poa.activateObjectWithId(objectId: UInt64(12), servant: computeChannel, flags: .networkOnly)
+    let computeChannelOid = try poa.activateObjectWithId(objectId: UInt64(12), servant: computeChannel, flags: activationFlags)
 
     rpc.clearHostJson()
     try rpc.addToHostJson(name: "calculator", objectId: calcOid)

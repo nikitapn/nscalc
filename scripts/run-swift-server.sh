@@ -13,7 +13,7 @@ ROOT_DIR=$(dirname "$SCRIPTS_DIR")
 DOCKER_IMAGE="nscalc-builder:latest"
 BUILD_CONFIG="release"
 HOSTNAME_ARG="calculator.lan"
-PORT_ARG="443"
+PORT_ARG="8443"
 ENABLE_HTTP3=1
 USE_SSL=1
 PUBLIC_KEY_ARG="/app/certs/out/localhost.crt"
@@ -154,8 +154,8 @@ DOCKER_CMD=(
     -v "$ROOT_DIR/sample_data":/app/sample_data      # rw — SQLite DB lives here
 
     # Expose the RPC/HTTP port
-    -p "${PORT_ARG}:443/tcp"
-    -p "${PORT_ARG}:443/udp"
+    -p "${PORT_ARG}:$PORT_ARG/tcp"
+    -p "${PORT_ARG}:$PORT_ARG/udp"
 
     -w /app
     "$DOCKER_IMAGE"
@@ -168,7 +168,7 @@ fi
 DOCKER_CMD+=(
     "$BINARY"
     --hostname "$HOSTNAME_ARG"
-    --port     443
+    --port     "$PORT_ARG"
     --http-dir /app/runtime/www
     --data-dir /app/sample_data
     --use-ssl  "$USE_SSL"

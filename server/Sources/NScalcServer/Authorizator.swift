@@ -2,6 +2,11 @@ import Foundation
 import NPRPC
 import NScalc
 
+@inline(__always)
+private func log(_ level: String = "I", _ message: String) {
+    nplog(level, message, component: "Authorizator")
+}
+
 final class AuthorizatorImpl: AuthorizatorServant, @unchecked Sendable {
 	private struct PendingRegistration: Sendable {
 		let username: String
@@ -10,6 +15,7 @@ final class AuthorizatorImpl: AuthorizatorServant, @unchecked Sendable {
 		let code: UInt32
 	}
 
+	private let activationFlags: ObjectActivationFlags
 	private let userPoa: Poa
 	private let userService: UserService
 	private let solutionService: SolutionService
@@ -19,7 +25,8 @@ final class AuthorizatorImpl: AuthorizatorServant, @unchecked Sendable {
 	private let pendingLock = NSLock()
 	private var pendingRegistrations: [String: PendingRegistration] = [:]
 
-	init(rpc: Rpc, db: AppDatabase) throws {
+	init(rpc: Rpc, db: AppDatabase, flags: ObjectActivationFlags) throws {
+		self.activationFlags = flags
 		self.userPoa = try rpc.createPoa(maxObjects: 1024, lifetime: .transient, idPolicy: .systemGenerated)
 		self.userService = UserService(db: db)
 		self.solutionService = SolutionService(db: db)
@@ -41,12 +48,7 @@ final class AuthorizatorImpl: AuthorizatorServant, @unchecked Sendable {
 			calculationService: calculationService
 		)
 
-		var flags: ObjectActivationFlags = .allowAll
-		if sessionContext != nil {
-			flags.insert(.privateSession)
-		}
-
-		let oid = try userPoa.activateObject(servant, flags: flags, sessionContext: sessionContext)
+		let oid = try userPoa.activateObject(servant, flags: self.activationFlags, sessionContext: sessionContext)
 		guard let userObject = NPRPCObject.fromObjectId(oid) else {
 			throw RuntimeError(message: "Failed to create RegisteredUser object")
 		}
@@ -90,7 +92,7 @@ final class AuthorizatorImpl: AuthorizatorServant, @unchecked Sendable {
 			try sessionService.deleteSession(session_id)
 			return true
 		} catch {
-			print("[Authorizator] logOut failed: \(error)")
+			log("E", "logOut failed: \(error)")
 			return false
 		}
 	}
@@ -99,7 +101,7 @@ final class AuthorizatorImpl: AuthorizatorServant, @unchecked Sendable {
 		do {
 			return try userService.isUsernameAvailable(username)
 		} catch {
-			print("[Authorizator] checkUsername failed: \(error)")
+			log("E", "checkUsername failed: \(error)")
 			return false
 		}
 	}
@@ -108,7 +110,7 @@ final class AuthorizatorImpl: AuthorizatorServant, @unchecked Sendable {
 		do {
 			return try userService.isEmailAvailable(email)
 		} catch {
-			print("[Authorizator] checkEmail failed: \(error)")
+			log("E", "checkEmail failed: \(error)")
 			return false
 		}
 	}
@@ -133,7 +135,7 @@ final class AuthorizatorImpl: AuthorizatorServant, @unchecked Sendable {
 		pendingRegistrations[username] = pending
 		pendingLock.unlock()
 
-		print("[Authorizator] registration code for \(username): \(code)")
+		log("I", "registration code for \(username): \(code)")
 	}
 
 	override func registerStepTwo(username: String, code: UInt32) throws {
