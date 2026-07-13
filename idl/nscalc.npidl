@@ -236,10 +236,25 @@ message AssistantImage {
   data: vector<u8>;
 }
 
+// Prior turns the client resends so the model can continue a multi-turn
+// conversation. The server is currently stateless across asks — the browser
+// holds history (e.g. in IndexedDB) and includes it here. Images from earlier
+// turns are intentionally omitted (text-only history).
+enum AssistantMessageRole: u8 {
+  User,
+  Assistant
+}
+
+message AssistantHistoryTurn {
+  role: AssistantMessageRole;
+  content: string;
+}
+
 message AssistantAsk {
   request_id: string;
   prompt: string;
   image?: AssistantImage;
+  history: AssistantHistoryTurn[];
 }
 
 message AssistantEvent {

@@ -348,10 +348,31 @@ private struct AssistantStore: Sendable {
         if let image = ask.image {
             userMessage.images = [Data(image.data).base64EncodedString()]
         }
+
+        // Client holds multi-turn history (e.g. IndexedDB) and resends it with
+        // each ask — the server is still stateless across requests. Cap the
+        // window so a long chat can't blow the model context.
+        let maxHistoryTurns = 40
+        let history = ask.history.count > maxHistoryTurns
+            ? Array(ask.history.suffix(maxHistoryTurns))
+            : ask.history
+
         var messages: [OllamaMessage] = [
             OllamaMessage(role: "system", content: Self.systemPrompt),
-            userMessage,
         ]
+        for turn in history {
+            let content = turn.content.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !content.isEmpty else { continue }
+            switch turn.role {
+            case .User:
+                messages.append(OllamaMessage(role: "user", content: content))
+            case .Assistant:
+                messages.append(OllamaMessage(role: "assistant", content: content))
+            }
+        }
+        messages.append(userMessage)
+        aslog("I", "ask \(ask.request_id) history_turns=\(history.count) messages=\(messages.count)")
+
         var lastTouchedSolution: SolutionRecord?
         var lastTouchedFertilizer: FertilizerRecord?
         let ragEnabled = ragClient != nil || workerAvailable

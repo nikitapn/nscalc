@@ -208,6 +208,13 @@ export type AssistantCopy = {
   asking: string;
   hide: string;
   open: string;
+  expand: string;
+  exitFullscreen: string;
+  clearChat: string;
+  emptyChat: string;
+  youLabel: string;
+  assistantLabel: string;
+  photoAttachedNote: string;
   toolCallLabel: (toolName: string) => string;
   solutionUpdatedLabel: (name: string) => string;
   fertilizerUpdatedLabel: (name: string) => string;
@@ -1059,6 +1066,13 @@ export const translations: Record<Locale, TranslationSet> = {
       asking: "Thinking...",
       hide: "Hide",
       open: "Open AI assistant",
+      expand: "Full screen",
+      exitFullscreen: "Exit full screen",
+      clearChat: "Clear chat",
+      emptyChat: "Ask anything about crops, solutions, or fertilizer labels — this chat stays in this browser.",
+      youLabel: "You",
+      assistantLabel: "Assistant",
+      photoAttachedNote: "Photo attached",
       toolCallLabel: (toolName) => `Working: ${toolName}...`,
       solutionUpdatedLabel: (name) => `Updated solution: ${name}`,
       fertilizerUpdatedLabel: (name) => `Updated fertilizer: ${name}`,
@@ -1695,6 +1709,13 @@ export const translations: Record<Locale, TranslationSet> = {
       asking: "Думаю...",
       hide: "Скрыть",
       open: "Открыть ИИ-ассистента",
+      expand: "На весь экран",
+      exitFullscreen: "Свернуть",
+      clearChat: "Очистить чат",
+      emptyChat: "Спросите о культурах, растворах или этикетках удобрений — переписка хранится в этом браузере.",
+      youLabel: "Вы",
+      assistantLabel: "Ассистент",
+      photoAttachedNote: "Фото прикреплено",
       toolCallLabel: (toolName) => `Выполняю: ${toolName}...`,
       solutionUpdatedLabel: (name) => `Обновлён раствор: ${name}`,
       fertilizerUpdatedLabel: (name) => `Обновлено удобрение: ${name}`,

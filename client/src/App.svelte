@@ -309,7 +309,7 @@
         name: userData.name,
         sessionId: userData.sessionId,
         isAdmin: userData.isAdmin,
-        registeredUser: NPRPC.narrow(userData.db, nscalc.RegisteredUser),
+        registeredUser: NPRPC.narrow(userData.db, nscalc.RegisteredUser) as nscalc.RegisteredUser,
       };
       setCookie("sid", userData.sessionId);
     } catch {
@@ -335,7 +335,7 @@
         name: userData.name,
         sessionId: userData.sessionId,
         isAdmin: userData.isAdmin,
-        registeredUser: NPRPC.narrow(userData.db, nscalc.RegisteredUser),
+        registeredUser: NPRPC.narrow(userData.db, nscalc.RegisteredUser) as nscalc.RegisteredUser,
       };
       setCookie("sid", userData.sessionId);
       password = "";
@@ -876,6 +876,7 @@
   </footer>
 
   <AssistantPanel
+    userName={authState?.name ?? null}
     sessionId={authState?.sessionId ?? null}
     uiText={copy.assistant}
     onSolutionChanged={() => {
