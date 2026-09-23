@@ -14,15 +14,12 @@ RUN mkdir -p /data && chmod 777 /data
 
 # SQLite built with SQLITE_ENABLE_SNAPSHOT (see Dockerfile.dev).
 COPY bundle/runtime-libs/system/x86_64-linux-gnu/ /usr/lib/x86_64-linux-gnu/
-COPY bundle/app/NScalcServer /app/NScalcServer
-COPY bundle/app/www /app/www
-COPY bundle/seed /app/seed
-COPY docker/entrypoint.prod.sh /usr/local/bin/nscalc-entrypoint
-
-RUN chmod +x /app/NScalcServer /usr/local/bin/nscalc-entrypoint && \
-    chmod -R a+rX /app && \
-    chmod -R a+rwX /app/www && \
-    chown -R nscalc:nscalc /app /home/nscalc
+# Owner and mode are set while copying: a later chown/chmod layer would store
+# a second copy of every file (the seed data alone is over 1 GB).
+COPY --chown=nscalc:nscalc --chmod=755 bundle/app/NScalcServer /app/NScalcServer
+COPY --chown=nscalc:nscalc bundle/app/www /app/www
+COPY --chown=nscalc:nscalc bundle/seed /app/seed
+COPY --chmod=755 docker/entrypoint.prod.sh /usr/local/bin/nscalc-entrypoint
 
 ENV NSCALC_HTTP_DIR=/app/www
 ENV NSCALC_DATA_DIR=/data

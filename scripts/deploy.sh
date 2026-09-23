@@ -239,11 +239,22 @@ mkdir -p "$REMOTE_TMP_DIR" "$APP_DIR/data" "$RELEASE_DIR"
 rm -rf "$REMOTE_TMP_DIR"/*
 tar -xzf "$REMOTE_TMP_DIR.tar.gz" -C "$REMOTE_TMP_DIR"
 
+OLD_IMAGE_ID=$(docker image inspect --format '{{.Id}}' "$IMAGE_NAME" 2>/dev/null || true)
 docker build -t "$IMAGE_NAME" \
   --build-arg NPRPC_RUNTIME_IMAGE="$RUNTIME_TAG" \
   -f "$REMOTE_TMP_DIR/docker/Dockerfile.prod" "$REMOTE_TMP_DIR"
 
 docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+
+# HTTP/3 reaches the server through shared-memory rings it shares with
+# npquicrouter. A new server re-creates them while the router stays attached to
+# the old ones, so HTTP/3 goes silent (TCP keeps working). Restart the router
+# first, then start the server. Other sites behind the router see a pause of a
+# few seconds.
+if systemctl is-active --quiet npquicrouter; then
+  sudo systemctl restart npquicrouter
+  sleep 2
+fi
 
 DOCKER_ARGS=(
   run -d
@@ -281,7 +292,15 @@ fi
 
 docker "${DOCKER_ARGS[@]}" "$IMAGE_NAME"
 
-rm -f "$REMOTE_TMP_DIR.tar.gz"
+# Drop the previous image (over 2 GB, mostly seed data); the runtime layers it
+# shared with other sites stay.
+if [ -n "$OLD_IMAGE_ID" ] && [ "$OLD_IMAGE_ID" != "$(docker image inspect --format '{{.Id}}' "$IMAGE_NAME")" ]; then
+  docker image rm "$OLD_IMAGE_ID" >/dev/null 2>&1 || true
+fi
+
+rm -rf "$REMOTE_TMP_DIR" "$REMOTE_TMP_DIR.tar.gz"
+# Each build caches its >1 GB context, which the next deploy never reuses.
+docker builder prune -f >/dev/null
 EOF
 
 echo "Deployment complete: https://$HOSTNAME:$PORT"
