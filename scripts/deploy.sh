@@ -242,6 +242,9 @@ docker build -t "$IMAGE_NAME" \
   --build-arg NPRPC_RUNTIME_IMAGE="$RUNTIME_TAG" \
   -f "$REMOTE_TMP_DIR/docker/Dockerfile.prod" "$REMOTE_TMP_DIR"
 
+# SIGTERM first, with time to finish: a process killed mid-operation can
+# strand state it shares with npquicrouter. rm -f alone is a SIGKILL.
+docker stop -t 15 "$CONTAINER_NAME" >/dev/null 2>&1 || true
 docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 
 DOCKER_ARGS=(
