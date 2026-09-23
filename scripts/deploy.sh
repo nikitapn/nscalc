@@ -12,8 +12,9 @@ PORT="8443"
 HOSTNAME=""
 SSH_TARGET=""
 CERT_DIR="/etc/letsencrypt"
-PUBLIC_KEY="/certs/live/nikitapn.com/fullchain.pem"
-PRIVATE_KEY="/certs/live/nikitapn.com/privkey.pem"
+# Default: the certbot lineage named after --hostname, under --cert-dir.
+PUBLIC_KEY=""
+PRIVATE_KEY=""
 DH_PARAMS=""
 CERT_WATCH_INTERVAL=""
 # npquicrouter's shared-memory directory (its unit bind-mounts it as its own
@@ -39,8 +40,10 @@ Usage: ./deploy.sh --ssh user@server --hostname calc.example.com --cert-dir /pat
   --image <name>              Docker image tag (default: nscalc-swift:latest)
   --container <name>          Docker container name (default: nscalc-swift)
   --port <value>              Public TCP/UDP port (default: 443)
-  --public-key <path>         Certificate path inside the container (default: /certs/fullchain.pem)
-  --private-key <path>        Private key path inside the container (default: /certs/privkey.pem)
+  --public-key <path>         Certificate path inside the container
+                              (default: /certs/live/<hostname>/fullchain.pem)
+  --private-key <path>        Private key path inside the container
+                              (default: /certs/live/<hostname>/privkey.pem)
   --dh-params <path>          DH params path inside the container
   --cert-watch-interval <secs>  Poll the mounted certificate every <secs> and reload it
                               in-process when it changes (default: unset = no polling).
@@ -158,6 +161,13 @@ if [ -z "$SSH_TARGET" ] || [ -z "$HOSTNAME" ] || [ -z "$CERT_DIR" ]; then
   usage >&2
   exit 1
 fi
+
+# A certificate of this site's own. One shared with another site on the same
+# IP makes browsers pool the two sites' HTTP/2 and HTTP/3 connections: once
+# the other site is open, requests for this one go down its connection, and
+# the router, which routes by SNI once per connection, never sees them.
+PUBLIC_KEY=${PUBLIC_KEY:-/certs/live/$HOSTNAME/fullchain.pem}
+PRIVATE_KEY=${PRIVATE_KEY:-/certs/live/$HOSTNAME/privkey.pem}
 
 cd "$ROOT_DIR"
 
