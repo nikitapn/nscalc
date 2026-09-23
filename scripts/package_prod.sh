@@ -33,19 +33,15 @@ cp -a "$ROOT_DIR/sample_data" "$BUNDLE_ROOT/bundle/seed"
 cp "$ROOT_DIR/docker/Dockerfile.prod" "$BUNDLE_ROOT/docker/Dockerfile.prod"
 cp "$ROOT_DIR/docker/entrypoint.prod.sh" "$BUNDLE_ROOT/docker/entrypoint.prod.sh"
 
+# NPRPC, Boost and the system libraries come from the nprpc-runtime base
+# image; only nscalc's own SQLite build is bundled.
 docker run --rm \
   -v "$BUNDLE_ROOT/bundle/runtime-libs:/out" \
   nscalc-builder:latest \
   sh -lc '
     set -e
-    mkdir -p /out/nprpc /out/boost /out/system/x86_64-linux-gnu
-    cp -a /opt/nprpc/lib /out/nprpc/
-    cp -a /opt/boost/lib /out/boost/
+    mkdir -p /out/system/x86_64-linux-gnu
     cp -a /usr/lib/x86_64-linux-gnu/libsqlite3.so* /out/system/x86_64-linux-gnu/
-    cp -a /lib/x86_64-linux-gnu/liburing.so.2* /out/system/x86_64-linux-gnu/
-    cp -a /lib/x86_64-linux-gnu/libstdc++.so.6* /out/system/x86_64-linux-gnu/
-    cp -a /lib/x86_64-linux-gnu/libgcc_s.so.1* /out/system/x86_64-linux-gnu/
-    cp -a /lib/x86_64-linux-gnu/libatomic.so.1* /out/system/x86_64-linux-gnu/
   '
 
 tar -C "$BUNDLE_ROOT" -czf "$ROOT_DIR/runtime/nscalc-prod-bundle.tar.gz" .

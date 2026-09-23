@@ -22,6 +22,9 @@ SHM_S2C="/dev/shm/nprpc_quic_edge_s2c"
 OLLAMA_MODEL="gemma4"
 OLLAMA_NUM_CTX="16384"
 COMPUTE_WORKER_TOKEN="testsecret123"
+# Base image with libnprpc (nprpc: `just build-runtime-image`). Resolved to
+# its versioned tag below, so the server keeps one image per NPRPC version.
+RUNTIME_IMAGE="nprpc-runtime:latest"
 
 usage() {
   cat <<'EOF'
@@ -44,6 +47,11 @@ Usage: ./deploy.sh --ssh user@server --hostname calc.example.com --cert-dir /pat
   --shm-c2s <path>            Host shared-memory file for QUIC client->server traffic
   --shm-s2c <path>            Host shared-memory file for QUIC server->client traffic
   --ollama-model <name>       Ollama model name (default: gemma4)
+  --runtime-image <name>      NPRPC runtime base image (default: nprpc-runtime:latest,
+                              resolved to its versioned tag). Build it in the nprpc
+                              repo with `just build-runtime-image`, from the same
+                              nprpc-dev image nscalc-builder is based on. It is
+                              copied to the server only if the server lacks it.
 
 The production container is started with CAP_NET_ADMIN and CAP_BPF so NPRPC can
 install the eBPF SO_REUSEPORT selector required by multi-worker HTTP/3.
@@ -128,6 +136,10 @@ while [ $# -gt 0 ]; do
       OLLAMA_NUM_CTX="$2"
       shift
       ;;
+    --runtime-image)
+      RUNTIME_IMAGE="$2"
+      shift
+      ;;
     --compute-worker-token)
       COMPUTE_WORKER_TOKEN="$2"
       shift
@@ -152,7 +164,41 @@ fi
 
 cd "$ROOT_DIR"
 
+# Pin the runtime image to its versioned tag (e.g. nprpc-runtime:1.0.0-abc),
+# so a later runtime built for another site doesn't change this one.
+RUNTIME_ID=$(docker image inspect --format '{{.Id}}' "$RUNTIME_IMAGE") || {
+  echo "Runtime image $RUNTIME_IMAGE not found; build it in nprpc with 'just build-runtime-image'" >&2
+  exit 1
+}
+RUNTIME_TAG=$(docker image inspect --format '{{join .RepoTags "\n"}}' "$RUNTIME_IMAGE" | grep -v ':latest$' | head -n1)
+RUNTIME_TAG=${RUNTIME_TAG:-$RUNTIME_IMAGE}
+
+# The server is compiled in nscalc-builder with the Swift bridge linked in,
+# so it must run against the same libnprpc. Refuse a mismatched runtime.
+RUNTIME_LIB_SHA=$(docker image inspect --format '{{index .Config.Labels "io.nprpc.libnprpc.sha256"}}' "$RUNTIME_TAG")
+BUILDER_LIB_SHA=$(docker run --rm --entrypoint sha256sum nscalc-builder:latest /opt/nprpc/lib/libnprpc.so.1.0.0 | cut -d' ' -f1)
+if [ "$RUNTIME_LIB_SHA" != "$BUILDER_LIB_SHA" ]; then
+  cat >&2 <<MSG
+$RUNTIME_TAG does not carry the libnprpc that nscalc-builder compiles against
+  runtime: ${RUNTIME_LIB_SHA:-<no label>}
+  builder: $BUILDER_LIB_SHA
+Rebuild nscalc-builder from the current nprpc-dev, or build a runtime image
+from the dev image nscalc-builder is based on (in nprpc:
+just build-runtime-image <that nprpc-dev image>).
+MSG
+  exit 1
+fi
+
 "$SCRIPTS_DIR/package_prod.sh"
+
+# Ship the runtime image unless the server already has it. docker save/load
+# keeps layer digests, so every site built FROM it shares its layers.
+if ssh "$SSH_TARGET" "docker image inspect --format '{{.Id}}' '$RUNTIME_TAG' 2>/dev/null" | grep -qx "$RUNTIME_ID"; then
+  echo "Server already has $RUNTIME_TAG"
+else
+  echo "Sending $RUNTIME_TAG to $SSH_TARGET ..."
+  docker save "$RUNTIME_TAG" | gzip | ssh "$SSH_TARGET" 'gunzip | docker load'
+fi
 
 BUNDLE_TARBALL="$ROOT_DIR/runtime/nscalc-prod-bundle.tar.gz"
 RELEASE_DIR="$APP_DIR/release"
@@ -172,6 +218,7 @@ ssh "$SSH_TARGET" \
   PRIVATE_KEY="$PRIVATE_KEY" \
   PUBLIC_KEY="$PUBLIC_KEY" \
   RELEASE_DIR="$RELEASE_DIR" \
+  RUNTIME_TAG="$RUNTIME_TAG" \
   SHM_C2S="$SHM_C2S" \
   SHM_S2C="$SHM_S2C" \
   OLLAMA_MODEL="$OLLAMA_MODEL" \
@@ -192,7 +239,9 @@ mkdir -p "$REMOTE_TMP_DIR" "$APP_DIR/data" "$RELEASE_DIR"
 rm -rf "$REMOTE_TMP_DIR"/*
 tar -xzf "$REMOTE_TMP_DIR.tar.gz" -C "$REMOTE_TMP_DIR"
 
-docker build -t "$IMAGE_NAME" -f "$REMOTE_TMP_DIR/docker/Dockerfile.prod" "$REMOTE_TMP_DIR"
+docker build -t "$IMAGE_NAME" \
+  --build-arg NPRPC_RUNTIME_IMAGE="$RUNTIME_TAG" \
+  -f "$REMOTE_TMP_DIR/docker/Dockerfile.prod" "$REMOTE_TMP_DIR"
 
 docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 

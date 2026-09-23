@@ -129,7 +129,11 @@ All dev and deployment scripts live in `scripts/`:
     --port 443
 ```
 
-The production image is based on `swift:6.3.0-slim`. State (SQLite database) is
+The production image is based on `nprpc-runtime` (NPRPC's shared runtime
+image on `swift:6.3.3-slim`; build it in the nprpc repo with
+`just build-runtime-image`). `deploy.sh` copies it to the server when missing
+and refuses to deploy if its libnprpc differs from `nscalc-builder`'s.
+State (SQLite database) is
 persisted from `/opt/nscalc/data` on the VPS; TLS certificates are mounted
 read-only from `--cert-dir` at `/certs`.
 
