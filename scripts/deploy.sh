@@ -16,8 +16,9 @@ PUBLIC_KEY="/certs/live/nikitapn.com/fullchain.pem"
 PRIVATE_KEY="/certs/live/nikitapn.com/privkey.pem"
 DH_PARAMS=""
 CERT_WATCH_INTERVAL=""
-SHM_C2S="/dev/shm/nprpc_nscalc_ingress_c2s"
-SHM_S2C="/dev/shm/nprpc_quic_edge_s2c"
+# npquicrouter's shared-memory directory (its unit bind-mounts it as its own
+# /dev/shm; see nprpc/npquicrouter/README.md). The container gets the same one.
+SHM_DIR="/dev/shm/npquicrouter"
 # RAG Model configuration
 OLLAMA_MODEL="gemma4"
 OLLAMA_NUM_CTX="16384"
@@ -44,8 +45,8 @@ Usage: ./deploy.sh --ssh user@server --hostname calc.example.com --cert-dir /pat
   --cert-watch-interval <secs>  Poll the mounted certificate every <secs> and reload it
                               in-process when it changes (default: unset = no polling).
                               Independent of the SIGHUP hook below, which always works.
-  --shm-c2s <path>            Host shared-memory file for QUIC client->server traffic
-  --shm-s2c <path>            Host shared-memory file for QUIC server->client traffic
+  --shm-dir <path>            npquicrouter's shared-memory directory on the host, mounted
+                              as the container's /dev/shm (default: /dev/shm/npquicrouter)
   --ollama-model <name>       Ollama model name (default: gemma4)
   --runtime-image <name>      NPRPC runtime base image (default: nprpc-runtime:latest,
                               resolved to its versioned tag). Build it in the nprpc
@@ -120,12 +121,8 @@ while [ $# -gt 0 ]; do
       CERT_WATCH_INTERVAL="$2"
       shift
       ;;
-    --shm-c2s)
-      SHM_C2S="$2"
-      shift
-      ;;
-    --shm-s2c)
-      SHM_S2C="$2"
+    --shm-dir)
+      SHM_DIR="$2"
       shift
       ;;
     --ollama-model)
@@ -219,8 +216,7 @@ ssh "$SSH_TARGET" \
   PUBLIC_KEY="$PUBLIC_KEY" \
   RELEASE_DIR="$RELEASE_DIR" \
   RUNTIME_TAG="$RUNTIME_TAG" \
-  SHM_C2S="$SHM_C2S" \
-  SHM_S2C="$SHM_S2C" \
+  SHM_DIR="$SHM_DIR" \
   OLLAMA_MODEL="$OLLAMA_MODEL" \
   OLLAMA_NUM_CTX="$OLLAMA_NUM_CTX" \
   COMPUTE_WORKER_TOKEN="$COMPUTE_WORKER_TOKEN" \
@@ -228,12 +224,14 @@ ssh "$SSH_TARGET" \
   'bash -se' <<'EOF'
 set -euo pipefail
 
-for shm_file in "$SHM_C2S" "$SHM_S2C"; do
-  if [ ! -e "$shm_file" ]; then
-    echo "Required shared-memory file not found: $shm_file" >&2
-    exit 1
-  fi
-done
+# The rings themselves may come and go — the server attaches whenever the
+# router creates them — but the directory is what gets mounted, and a missing
+# one means the router's unit predates it.
+if [ ! -d "$SHM_DIR" ]; then
+  echo "npquicrouter's shared-memory directory $SHM_DIR does not exist." >&2
+  echo "Its unit needs BindPaths=$SHM_DIR:/dev/shm (nprpc/npquicrouter/README.md)." >&2
+  exit 1
+fi
 
 mkdir -p "$REMOTE_TMP_DIR" "$APP_DIR/data" "$RELEASE_DIR"
 rm -rf "$REMOTE_TMP_DIR"/*
@@ -246,16 +244,6 @@ docker build -t "$IMAGE_NAME" \
 
 docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 
-# HTTP/3 reaches the server through shared-memory rings it shares with
-# npquicrouter. A new server re-creates them while the router stays attached to
-# the old ones, so HTTP/3 goes silent (TCP keeps working). Restart the router
-# first, then start the server. Other sites behind the router see a pause of a
-# few seconds.
-if systemctl is-active --quiet npquicrouter; then
-  sudo systemctl restart npquicrouter
-  sleep 2
-fi
-
 DOCKER_ARGS=(
   run -d
   --name "$CONTAINER_NAME"
@@ -267,8 +255,12 @@ DOCKER_ARGS=(
   -p "$PORT:443/udp"
   -v "$APP_DIR/data:/data"
   -v "$CERT_DIR:/certs:ro"
-  --mount "type=bind,src=$SHM_C2S,dst=/dev/shm/nprpc_nscalc_ingress_c2s"
-  --mount "type=bind,src=$SHM_S2C,dst=/dev/shm/nprpc_quic_edge_s2c"
+  # HTTP/3 goes through npquicrouter's shared-memory rings. The directory, not
+  # the ring files: a file bind mount stays on the object it saw, the router
+  # recreates its rings whenever it starts, and the server finds the new ones
+  # by name (it rechecks every second). So the router and this container can
+  # restart in either order.
+  -v "$SHM_DIR:/dev/shm"
   -e "NSCALC_HOSTNAME=$HOSTNAME"
   -e "NSCALC_PORT=443"
   -e "NSCALC_DATA_DIR=/data"
