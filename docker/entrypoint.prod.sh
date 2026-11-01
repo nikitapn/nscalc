@@ -7,6 +7,11 @@ DATA_DIR="${NSCALC_DATA_DIR:-/data}"
 mkdir -p "$DATA_DIR"
 
 if [ ! -f "$DATA_DIR/nscalc.db" ]; then
+    # Mounted by deploy.sh, which only sends it to a server with no database.
+    if [ ! -f /app/seed/nscalc.db ]; then
+        echo "No database in $DATA_DIR and no seed data mounted at /app/seed" >&2
+        exit 1
+    fi
     cp -R /app/seed/. "$DATA_DIR"/
 fi
 

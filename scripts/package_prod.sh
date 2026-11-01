@@ -29,7 +29,6 @@ docker run --rm \
 
 cp "$ROOT_DIR/server/.build/release/NScalcServer" "$BUNDLE_ROOT/bundle/app/NScalcServer"
 cp -a "$ROOT_DIR/client/dist" "$BUNDLE_ROOT/bundle/app/www"
-cp -a "$ROOT_DIR/sample_data" "$BUNDLE_ROOT/bundle/seed"
 cp "$ROOT_DIR/docker/Dockerfile.prod" "$BUNDLE_ROOT/docker/Dockerfile.prod"
 cp "$ROOT_DIR/docker/entrypoint.prod.sh" "$BUNDLE_ROOT/docker/entrypoint.prod.sh"
 

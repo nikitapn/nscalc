@@ -263,6 +263,16 @@ done
 BUNDLE_TARBALL="$ROOT_DIR/runtime/nscalc-prod-bundle.tar.gz"
 RELEASE_DIR="$APP_DIR/release"
 
+# The seed data is over 1 GB and only used to create the database, so it stays
+# out of the image and is sent only to a server without one.
+if ssh "$SSH_TARGET" "test -f '$APP_DIR/data/nscalc.db'"; then
+  echo "Server already has a database; not sending seed data"
+else
+  echo "Sending seed data to $SSH_TARGET ..."
+  tar -C "$ROOT_DIR/sample_data" -czf - . |
+    ssh "$SSH_TARGET" "rm -rf '$APP_DIR/seed' && mkdir -p '$APP_DIR/seed' && tar -xzf - -C '$APP_DIR/seed'"
+fi
+
 ssh "$SSH_TARGET" "mkdir -p '$(dirname "$REMOTE_TMP_DIR")'"
 scp "$BUNDLE_TARBALL" "$SSH_TARGET:$REMOTE_TMP_DIR.tar.gz"
 if [ -n "$TELEMETRY_CLIENTS" ]; then
@@ -303,7 +313,7 @@ if [ ! -d "$SHM_DIR" ]; then
   exit 1
 fi
 
-mkdir -p "$REMOTE_TMP_DIR" "$APP_DIR/data" "$RELEASE_DIR"
+mkdir -p "$REMOTE_TMP_DIR" "$APP_DIR/data" "$APP_DIR/seed" "$RELEASE_DIR"
 rm -rf "$REMOTE_TMP_DIR"/*
 tar -xzf "$REMOTE_TMP_DIR.tar.gz" -C "$REMOTE_TMP_DIR"
 
@@ -338,6 +348,7 @@ DOCKER_ARGS=(
   -p "$PORT:443/tcp"
   -p "$PORT:443/udp"
   -v "$APP_DIR/data:/data"
+  -v "$APP_DIR/seed:/app/seed:ro"
   -v "$CERT_DIR:/certs:ro"
   # HTTP/3 goes through npquicrouter's shared-memory rings. The directory, not
   # the ring files: a file bind mount stays on the object it saw, the router
@@ -369,15 +380,13 @@ fi
 
 docker "${DOCKER_ARGS[@]}" "$IMAGE_NAME"
 
-# Drop the previous image (over 2 GB, mostly seed data); the runtime layers it
+# Drop the previous image; the runtime layers it
 # shared with other sites stay.
 if [ -n "$OLD_IMAGE_ID" ] && [ "$OLD_IMAGE_ID" != "$(docker image inspect --format '{{.Id}}' "$IMAGE_NAME")" ]; then
   docker image rm "$OLD_IMAGE_ID" >/dev/null 2>&1 || true
 fi
 
 rm -rf "$REMOTE_TMP_DIR" "$REMOTE_TMP_DIR.tar.gz"
-# Each build caches its >1 GB context, which the next deploy never reuses.
-docker builder prune -f >/dev/null
 EOF
 
 echo "Deployment complete: https://$HOSTNAME:$PORT"

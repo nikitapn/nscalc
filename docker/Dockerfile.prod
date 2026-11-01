@@ -5,18 +5,29 @@ ARG NPRPC_RUNTIME_IMAGE=nprpc-runtime:latest
 ARG GPAC_IMAGE=nprpc-gpac:26.07.0
 FROM ${GPAC_IMAGE} AS gpac
 
+# ffmpeg, in a stage that doesn't depend on the runtime image. The runtime's tag
+# changes with every nprpc commit, which would repeat this download if it were
+# installed on top of it. Base this on the same Ubuntu release as the runtime.
+# The wrappers keep its 200 MB of libraries away from the server's own.
+FROM swift:6.4.1-slim AS ffmpeg
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
+    && mkdir -p /opt/ffmpeg/bin /opt/ffmpeg/lib \
+    && for tool in ffmpeg ffprobe; do \
+         cp /usr/bin/$tool /opt/ffmpeg/lib/$tool.bin; \
+         printf '#!/bin/sh\nLD_LIBRARY_PATH=/opt/ffmpeg/lib exec /opt/ffmpeg/lib/%s.bin "$@"\n' $tool > /opt/ffmpeg/bin/$tool; \
+         chmod 755 /opt/ffmpeg/bin/$tool; \
+         ldd /usr/bin/$tool | awk '/=> \//{print $3}' \
+           | grep -vE '/(libc|libm|libdl|librt|libpthread)\.so' \
+           | xargs -I{} cp -Ln {} /opt/ffmpeg/lib/; \
+       done
+
 FROM ${NPRPC_RUNTIME_IMAGE}
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg \
-    libssl3t64 \
-    zlib1g \
-    && rm -rf /var/lib/apt/lists/*
-
+COPY --from=ffmpeg /opt/ffmpeg /opt/ffmpeg
 # Use the same prebuilt media tools as nprpc/Dockerfile.dev.
 COPY --from=gpac /opt/gpac /opt/gpac
-ENV PATH="/opt/gpac/bin:${PATH}"
-RUN MP4Box -version && gpac -h >/dev/null
+ENV PATH="/opt/ffmpeg/bin:/opt/gpac/bin:${PATH}"
+RUN MP4Box -version && gpac -h >/dev/null && ffmpeg -version >/dev/null && ffprobe -version >/dev/null
 
 RUN useradd --create-home --home-dir /home/nscalc --shell /usr/sbin/nologin nscalc
 RUN mkdir -p /data && chmod 777 /data
@@ -24,10 +35,9 @@ RUN mkdir -p /data && chmod 777 /data
 # SQLite built with SQLITE_ENABLE_SNAPSHOT (see Dockerfile.dev).
 COPY bundle/runtime-libs/system/x86_64-linux-gnu/ /usr/lib/x86_64-linux-gnu/
 # Owner and mode are set while copying: a later chown/chmod layer would store
-# a second copy of every file (the seed data alone is over 1 GB).
+# a second copy of every file. The seed data isn't here: deploy.sh mounts it.
 COPY --chown=nscalc:nscalc --chmod=755 bundle/app/NScalcServer /app/NScalcServer
 COPY --chown=nscalc:nscalc bundle/app/www /app/www
-COPY --chown=nscalc:nscalc bundle/seed /app/seed
 COPY --chmod=755 docker/entrypoint.prod.sh /usr/local/bin/nscalc-entrypoint
 
 ENV NSCALC_HTTP_DIR=/app/www
