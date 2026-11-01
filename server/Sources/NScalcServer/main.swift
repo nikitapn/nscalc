@@ -20,6 +20,8 @@ struct ServerConfig {
     let privateKeyPath: String?
     let dhParamsPath: String?
     let certWatchIntervalSeconds: UInt32
+    let telemetryPort: UInt16
+    let telemetryClientsPath: String?
     let ollamaHost: String?
     let ollamaModel: String?
     let ollamaTimeoutSeconds: TimeInterval
@@ -59,6 +61,7 @@ enum ServerConfigError: LocalizedError {
     case unknownArgument(String)
     case sslRequiresCertificatePaths
     case http3RequiresSsl
+    case telemetryRequiresSsl
 
     var errorDescription: String? {
         switch self {
@@ -72,6 +75,8 @@ enum ServerConfigError: LocalizedError {
             return "SSL requires both --public-key and --private-key"
         case .http3RequiresSsl:
             return "HTTP/3 requires SSL to be enabled"
+        case .telemetryRequiresSsl:
+            return "Telemetry requires SSL to be enabled"
         }
     }
 }
@@ -104,6 +109,9 @@ private func printUsage() {
                               in-process when they change on disk, so a certbot renewal is
                               picked up without a restart. 0 (default) disables polling;
                               SIGHUP always reloads on demand regardless of this setting.
+      --telemetry-clients <pem>  Enable NPRPC Monitor telemetry over native QUIC, admitting
+                              only client certificates trusted by this PEM file (requires SSL)
+      --telemetry-port <port> UDP port for telemetry (default: 8445)
       --ollama-host <url>     Ollama server base URL for the AI assistant (default: http://localhost:11434)
       --ollama-model <name>   Ollama model to use for the AI assistant (must support tool calling, e.g. llama3.1, qwen2.5). If unset, the assistant feature is disabled.
       --ollama-timeout <secs> Per-request timeout in seconds for Ollama calls (default: 120)
@@ -140,6 +148,8 @@ private func parseServerConfig() throws -> ServerConfig {
     var privateKeyPath = env["NSCALC_PRIVATE_KEY"]
     var dhParamsPath = env["NSCALC_DH_PARAMS"]
     var certWatchIntervalSeconds = UInt32(env["NSCALC_CERT_WATCH_INTERVAL"] ?? "0") ?? 0
+    var telemetryPortValue = env["NSCALC_TELEMETRY_PORT"] ?? "8445"
+    var telemetryClientsPath = env["NSCALC_TELEMETRY_CLIENTS"]
     var ollamaHost = env["NSCALC_OLLAMA_HOST"]
     var ollamaModel = env["NSCALC_OLLAMA_MODEL"]
     var ollamaTimeoutSeconds = TimeInterval(env["NSCALC_OLLAMA_TIMEOUT"] ?? "120") ?? 120
@@ -205,6 +215,10 @@ private func parseServerConfig() throws -> ServerConfig {
                 throw ServerConfigError.invalidValue(option, value)
             }
             certWatchIntervalSeconds = parsedInterval
+        case "--telemetry-clients":
+            telemetryClientsPath = try optionValue(option, inlineValue: inlineValue, index: &index, args: args)
+        case "--telemetry-port":
+            telemetryPortValue = try optionValue(option, inlineValue: inlineValue, index: &index, args: args)
         case "--ollama-host":
             ollamaHost = try optionValue(option, inlineValue: inlineValue, index: &index, args: args)
         case "--ollama-model":
@@ -238,6 +252,18 @@ private func parseServerConfig() throws -> ServerConfig {
         index += 1
     }
 
+    guard let telemetryPort = UInt16(telemetryPortValue), telemetryPort > 0 else {
+        throw ServerConfigError.invalidValue("--telemetry-port / NSCALC_TELEMETRY_PORT", telemetryPortValue)
+    }
+    if let clients = telemetryClientsPath {
+        guard !clients.isEmpty else {
+            throw ServerConfigError.invalidValue("--telemetry-clients / NSCALC_TELEMETRY_CLIENTS", clients)
+        }
+        guard useSsl else { throw ServerConfigError.telemetryRequiresSsl }
+        if enableHttp3 && telemetryPort == httpPort {
+            throw ServerConfigError.invalidValue("--telemetry-port (must differ from HTTP/3 port)", telemetryPortValue)
+        }
+    }
     if enableHttp3 && !useSsl {
         throw ServerConfigError.http3RequiresSsl
     }
@@ -257,6 +283,8 @@ private func parseServerConfig() throws -> ServerConfig {
         privateKeyPath: privateKeyPath,
         dhParamsPath: dhParamsPath,
         certWatchIntervalSeconds: certWatchIntervalSeconds,
+        telemetryPort: telemetryPort,
+        telemetryClientsPath: telemetryClientsPath,
         ollamaHost: ollamaHost,
         ollamaModel: ollamaModel,
         ollamaTimeoutSeconds: ollamaTimeoutSeconds,
@@ -387,12 +415,22 @@ do {
     if config.useHttp3ShmChannels {
         httpBuilder.http3ShmChannels(egress: "quic_edge", ingress: "nscalc_ingress")
     }
+    if let clients = config.telemetryClientsPath {
+        try httpBuilder.withQuic(config.telemetryPort)
+            .ssl(certFile: config.publicKeyPath!, keyFile: config.privateKeyPath!)
+            .requireClientCertificates(caFile: clients)
+            .enableTelemetry()
+    }
 
     let rpc = try httpBuilder
         .rootDir(config.httpDir)
         .build()
 
     print("NScalc Swift server listening on \(config.hostname):\(config.httpPort)")
+    if let reference = rpc.telemetryReference {
+        print("  telemetry: \(reference)")
+    }
+    fflush(nil)
 
     let poa  = try rpc.createPoa(maxObjects: 13, lifetime: .Persistent, idPolicy: .userSupplied)
     let calc = CalculatorServantImpl(db: appDB)

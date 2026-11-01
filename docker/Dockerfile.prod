@@ -2,12 +2,21 @@
 # nprpc/Dockerfile.runtime). deploy.sh passes the exact tag, matching the
 # nprpc-dev image nscalc-builder compiled the server against.
 ARG NPRPC_RUNTIME_IMAGE=nprpc-runtime:latest
+ARG GPAC_IMAGE=nprpc-gpac:26.07.0
+FROM ${GPAC_IMAGE} AS gpac
+
 FROM ${NPRPC_RUNTIME_IMAGE}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
-    gpac \
+    libssl3t64 \
+    zlib1g \
     && rm -rf /var/lib/apt/lists/*
+
+# Use the same prebuilt media tools as nprpc/Dockerfile.dev.
+COPY --from=gpac /opt/gpac /opt/gpac
+ENV PATH="/opt/gpac/bin:${PATH}"
+RUN MP4Box -version && gpac -h >/dev/null
 
 RUN useradd --create-home --home-dir /home/nscalc --shell /usr/sbin/nologin nscalc
 RUN mkdir -p /data && chmod 777 /data

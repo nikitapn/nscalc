@@ -91,7 +91,43 @@ The server accepts command-line flags (and matching `NSCALC_*` env vars):
 --public-key <path>    TLS certificate file
 --private-key <path>   TLS private key file
 --dh-params <path>     Diffie-Hellman parameters
+--telemetry-clients <pem> Enable NPRPC Monitor telemetry with trusted client certificates
+--telemetry-port <port>   Telemetry UDP port (default: 8445)
 ```
+
+## Telemetry
+
+Like `mysite`, the server can expose NPRPC Monitor telemetry over a separate
+native QUIC listener protected by client certificates. Add
+`--telemetry-clients /path/to/client.crt` to `scripts/deploy.sh` to enable it.
+The deploy installs the certificate list at `/etc/nscalc/telemetry-clients.pem`
+on the server and mounts it read-only. The monitor's private key stays on the
+machine running the monitor.
+
+Telemetry uses public UDP port **8445** by default, separate from HTTP/3 and
+`mysite`'s default 8444. Override it with `--telemetry-port <port>` and allow
+that UDP port through the host firewall. It connects directly, without
+npquicrouter. A deploy without `--telemetry-clients` disables telemetry.
+
+Generate a self-signed monitor identity:
+
+```bash
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+  -keyout client.key -out client.crt -days 1825 -subj "/CN=nprpc-monitor" \
+  -addext "basicConstraints=critical,CA:FALSE" -addext "extendedKeyUsage=clientAuth"
+```
+
+As in `mysite`, leave out `keyUsage`: the image's BoringSSL rejects a
+self-signed certificate whose `keyUsage` lacks `keyCertSign`. The PEM can
+contain multiple trusted client certificates. Only certificates belong in
+this file; the deploy rejects a PEM containing a private key.
+
+The container logs `telemetry: <object-reference>` at startup. Paste that
+reference into NPRPC Monitor and configure the monitor with `client.crt`
+and `client.key`. The listener uses the same server certificate as HTTPS.
+When running the server directly, use `--telemetry-clients` and optionally
+`--telemetry-port`, or `NSCALC_TELEMETRY_CLIENTS` and
+`NSCALC_TELEMETRY_PORT`. Telemetry requires TLS and stays off by default.
 
 ## Scripts
 

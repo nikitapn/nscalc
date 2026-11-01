@@ -20,6 +20,9 @@ CERT_WATCH_INTERVAL=""
 # npquicrouter's shared-memory directory (its unit bind-mounts it as its own
 # /dev/shm; see nprpc/npquicrouter/README.md). The container gets the same one.
 SHM_DIR="/dev/shm/npquicrouter"
+TELEMETRY_CLIENTS=""
+TELEMETRY_PORT="8445"
+REMOTE_TELEMETRY_CLIENTS="/etc/nscalc/telemetry-clients.pem"
 # RAG Model configuration
 OLLAMA_MODEL="gemma4"
 OLLAMA_NUM_CTX="16384"
@@ -27,6 +30,8 @@ COMPUTE_WORKER_TOKEN="testsecret123"
 # Base image with libnprpc (nprpc: `just build-runtime-image`). Resolved to
 # its versioned tag below, so the server keeps one image per NPRPC version.
 RUNTIME_IMAGE="nprpc-runtime:latest"
+# Shared media artifacts, built in nprpc with `just build-gpac-image`.
+GPAC_IMAGE="${GPAC_IMAGE:-nprpc-gpac:26.07.0}"
 
 usage() {
   cat <<'EOF'
@@ -50,11 +55,19 @@ Usage: ./deploy.sh --ssh user@server --hostname calc.example.com --cert-dir /pat
                               Independent of the SIGHUP hook below, which always works.
   --shm-dir <path>            npquicrouter's shared-memory directory on the host, mounted
                               as the container's /dev/shm (default: /dev/shm/npquicrouter)
+  --telemetry-clients <pem>   Local PEM of client certificates allowed to read NPRPC
+                              Monitor telemetry. Installed on the server and turns
+                              telemetry on; a later deploy without it turns it off.
+  --telemetry-port <port>     Public UDP port for telemetry, directly exposed rather
+                              than routed through npquicrouter (default: 8445)
   --ollama-model <name>       Ollama model name (default: gemma4)
   --runtime-image <name>      NPRPC runtime base image (default: nprpc-runtime:latest,
                               resolved to its versioned tag). Build it in the nprpc
                               repo with `just build-runtime-image`, from the same
                               nprpc-dev image nscalc-builder is based on. It is
+                              copied to the server only if the server lacks it.
+  --gpac-image <name>         Shared GPAC artifact image (default: nprpc-gpac:26.07.0).
+                              Build it in nprpc with `just build-gpac-image`; it is
                               copied to the server only if the server lacks it.
 
 The production container is started with CAP_NET_ADMIN and CAP_BPF so NPRPC can
@@ -132,12 +145,24 @@ while [ $# -gt 0 ]; do
       OLLAMA_MODEL="$2"
       shift
       ;;
+    --telemetry-clients)
+      TELEMETRY_CLIENTS="$2"
+      shift
+      ;;
+    --telemetry-port)
+      TELEMETRY_PORT="$2"
+      shift
+      ;;
     --ollama-num-ctx)
       OLLAMA_NUM_CTX="$2"
       shift
       ;;
     --runtime-image)
       RUNTIME_IMAGE="$2"
+      shift
+      ;;
+    --gpac-image)
+      GPAC_IMAGE="$2"
       shift
       ;;
     --compute-worker-token)
@@ -160,6 +185,26 @@ done
 if [ -z "$SSH_TARGET" ] || [ -z "$HOSTNAME" ] || [ -z "$CERT_DIR" ]; then
   usage >&2
   exit 1
+fi
+
+if [ -n "$TELEMETRY_CLIENTS" ]; then
+  if [[ ! "$TELEMETRY_PORT" =~ ^[0-9]{1,5}$ ]] || (( 10#$TELEMETRY_PORT < 1 || 10#$TELEMETRY_PORT > 65535 )); then
+    echo "Telemetry port must be between 1 and 65535" >&2
+    exit 1
+  fi
+  TELEMETRY_PORT=$((10#$TELEMETRY_PORT))
+  if [ "$TELEMETRY_PORT" = "$PORT" ] || [ "$TELEMETRY_PORT" = 443 ]; then
+    echo "Telemetry needs a UDP port separate from the HTTP/3 port" >&2
+    exit 1
+  fi
+  openssl x509 -in "$TELEMETRY_CLIENTS" -noout || {
+    echo "$TELEMETRY_CLIENTS is not a PEM certificate" >&2
+    exit 1
+  }
+  if grep -q "PRIVATE KEY" "$TELEMETRY_CLIENTS"; then
+    echo "$TELEMETRY_CLIENTS holds a private key; pass only the certificates" >&2
+    exit 1
+  fi
 fi
 
 # A certificate of this site's own. One shared with another site on the same
@@ -196,22 +241,33 @@ MSG
   exit 1
 fi
 
+docker image inspect "$GPAC_IMAGE" >/dev/null || {
+  echo "GPAC image $GPAC_IMAGE not found; build it in nprpc with 'just build-gpac-image'" >&2
+  exit 1
+}
+
 "$SCRIPTS_DIR/package_prod.sh"
 
-# Ship the runtime image unless the server already has it. docker save/load
-# keeps layer digests, so every site built FROM it shares its layers.
-if ssh "$SSH_TARGET" "docker image inspect --format '{{.Id}}' '$RUNTIME_TAG' 2>/dev/null" | grep -qx "$RUNTIME_ID"; then
-  echo "Server already has $RUNTIME_TAG"
-else
-  echo "Sending $RUNTIME_TAG to $SSH_TARGET ..."
-  docker save "$RUNTIME_TAG" | gzip | ssh "$SSH_TARGET" 'gunzip | docker load'
-fi
+# Ship the runtime and shared media artifacts only when missing on the server.
+# docker save/load preserves layer digests for reuse across application images.
+for source_image in "$RUNTIME_TAG" "$GPAC_IMAGE"; do
+  source_id=$(docker image inspect --format '{{.Id}}' "$source_image")
+  if ssh "$SSH_TARGET" "docker image inspect --format '{{.Id}}' '$source_image' 2>/dev/null" | grep -qx "$source_id"; then
+    echo "Server already has $source_image"
+  else
+    echo "Sending $source_image to $SSH_TARGET ..."
+    docker save "$source_image" | gzip | ssh "$SSH_TARGET" 'gunzip | docker load'
+  fi
+done
 
 BUNDLE_TARBALL="$ROOT_DIR/runtime/nscalc-prod-bundle.tar.gz"
 RELEASE_DIR="$APP_DIR/release"
 
 ssh "$SSH_TARGET" "mkdir -p '$(dirname "$REMOTE_TMP_DIR")'"
 scp "$BUNDLE_TARBALL" "$SSH_TARGET:$REMOTE_TMP_DIR.tar.gz"
+if [ -n "$TELEMETRY_CLIENTS" ]; then
+  scp "$TELEMETRY_CLIENTS" "$SSH_TARGET:$REMOTE_TMP_DIR-clients.pem"
+fi
 
 ssh "$SSH_TARGET" \
   APP_DIR="$APP_DIR" \
@@ -226,7 +282,11 @@ ssh "$SSH_TARGET" \
   PUBLIC_KEY="$PUBLIC_KEY" \
   RELEASE_DIR="$RELEASE_DIR" \
   RUNTIME_TAG="$RUNTIME_TAG" \
+  GPAC_IMAGE="$GPAC_IMAGE" \
   SHM_DIR="$SHM_DIR" \
+  TELEMETRY_ENABLED="${TELEMETRY_CLIENTS:+1}" \
+  TELEMETRY_PORT="$TELEMETRY_PORT" \
+  REMOTE_TELEMETRY_CLIENTS="$REMOTE_TELEMETRY_CLIENTS" \
   OLLAMA_MODEL="$OLLAMA_MODEL" \
   OLLAMA_NUM_CTX="$OLLAMA_NUM_CTX" \
   COMPUTE_WORKER_TOKEN="$COMPUTE_WORKER_TOKEN" \
@@ -250,7 +310,18 @@ tar -xzf "$REMOTE_TMP_DIR.tar.gz" -C "$REMOTE_TMP_DIR"
 OLD_IMAGE_ID=$(docker image inspect --format '{{.Id}}' "$IMAGE_NAME" 2>/dev/null || true)
 docker build -t "$IMAGE_NAME" \
   --build-arg NPRPC_RUNTIME_IMAGE="$RUNTIME_TAG" \
+  --build-arg GPAC_IMAGE="$GPAC_IMAGE" \
   -f "$REMOTE_TMP_DIR/docker/Dockerfile.prod" "$REMOTE_TMP_DIR"
+
+TELEMETRY_ARGS=()
+if [ -n "$TELEMETRY_ENABLED" ]; then
+  sudo install -D -m 644 -o root -g root "$REMOTE_TMP_DIR-clients.pem" "$REMOTE_TELEMETRY_CLIENTS"
+  rm -f "$REMOTE_TMP_DIR-clients.pem"
+  TELEMETRY_ARGS=(-p "$TELEMETRY_PORT:$TELEMETRY_PORT/udp"
+                  -v "$REMOTE_TELEMETRY_CLIENTS:/telemetry-clients.pem:ro"
+                  -e "NSCALC_TELEMETRY_PORT=$TELEMETRY_PORT"
+                  -e "NSCALC_TELEMETRY_CLIENTS=/telemetry-clients.pem")
+fi
 
 # SIGTERM first, with time to finish: a process killed mid-operation can
 # strand state it shares with npquicrouter. rm -f alone is a SIGKILL.
@@ -285,6 +356,7 @@ DOCKER_ARGS=(
   -e "NSCALC_OLLAMA_MODEL=$OLLAMA_MODEL"
   -e "NSCALC_OLLAMA_NUM_CTX=$OLLAMA_NUM_CTX"
   -e "NSCALC_COMPUTE_WORKER_TOKEN=$COMPUTE_WORKER_TOKEN"
+  "${TELEMETRY_ARGS[@]}"
 )
 
 if [ -n "$DH_PARAMS" ]; then
